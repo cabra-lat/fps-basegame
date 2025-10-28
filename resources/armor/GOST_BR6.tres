@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://bepsby17yire3"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_ond2x"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_b18m3"]
+
+[sub_resource type="Resource" id="Resource_ond2x"]
+script = ExtResource("1_ond2x")
+name = "Hard Armor (16602 J)"
+type = 16
+density = 7800.0
+hardness = 25.0
+toughness = 6.0
+penetration_resistance = 29884.5
+ricochet_chance_modifier = 0.6
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 1.3
+
+[resource]
+script = ExtResource("2_b18m3")
+protection_zones = 193
+type = 0
+name = "GOST BR6"
+description = "Stops 12.7mm B32 API"
+material = SubResource("Resource_ond2x")
+max_durability = 450
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.1
+move_speed_penalty = -0.15
+ricochet_chance = 0.0
+sound_reduction = -0.2
+blind_reduction = 0.0
+standard = 2
+level = 6

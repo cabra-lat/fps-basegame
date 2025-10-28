@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://ceud5x3kwoyvc"]
+
+[ext_resource type="ArrayMesh" path="res://src/weapons/mesh_shotgun.tres" id="1_lxvda"]
+
+[node name="weapon_shotgun" type="Node3D"]
+
+[node name="model" type="Node3D" parent="."]
+transform = Transform3D(-1.5299e-06, -35, -1.5299e-06, 0, -1.5299e-06, 35, -35, 1.5299e-06, 6.6874e-14, 0, 0, -1.80369)
+
+[node name="GUN" type="MeshInstance3D" parent="model"]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 0)
+mesh = ExtResource("1_lxvda")
+skeleton = NodePath("")

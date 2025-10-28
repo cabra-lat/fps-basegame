@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://cjueqhfqfm0mw"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_sftac"]
+
+[resource]
+script = ExtResource("1_sftac")
+name = "40SW_NIJ_IIA"
+caliber = ".40 S&W"
+description = ".40 S&W (NIJ IIA)"
+type = 0
+bullet_mass = 11.7
+cartridge_mass = 19.89
+muzzle_velocity = 352.0
+penetration_value = 0.724838
+ballistic_coefficient = 0.165
+bullet_length = 21.6
+bullet_diameter = 10.16
+sectional_density = 144.314
+base_damage = 50.0
+armor_modifier = 1.0
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

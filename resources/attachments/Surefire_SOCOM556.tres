@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="Attachment" load_steps=2 format=3 uid="uid://c5s1m3pa4gxig"]
+
+[ext_resource type="Script" uid="uid://chtgefjsvykha" path="res://addons/cabra.lat_shooters/src/core/attachment.gd" id="1_buwnl"]
+
+[resource]
+script = ExtResource("1_buwnl")
+name = "Surefire_SOCOM556"
+description = "This Attachment is the default one."
+type = 1
+attachment_point = 1
+mass = 0.35
+cost = 100
+accuracy_modifier = 0.95
+recoil_modifier = 0.85
+ergonomics_modifier = 1.05
+reload_speed_modifier = 1.0
+aim_down_sights_modifier = 0.95
+magnification = 1.0
+reticle_type = 0
+reticle_color = Color(1, 0, 0, 1)
+eye_relief = 3.0
+zero_distance = 100.0
+sound_suppression = 0.8
+flash_suppression = 0.9
+recoil_reduction = 0.3
+stability_bonus = 0.0
+deployable = false
+laser_active = true
+light_active = true
+laser_range = 50.0
+light_range = 100.0
+capacity_multiplier = 1.0
+compatible_weapons = Array[String]([])
+incompatible_attachments = Array[int]([])

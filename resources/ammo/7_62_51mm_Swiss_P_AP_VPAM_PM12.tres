@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://d2og130jk3p34"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_bdrdo"]
+
+[resource]
+script = ExtResource("1_bdrdo")
+name = "762x51_SWISS_P_VPAM_PM12"
+caliber = "7.62x51mm Swiss P AP"
+description = "7.62x51mm Swiss P AP (VPAM PM12)"
+type = 3
+bullet_mass = 12.7
+cartridge_mass = 21.59
+muzzle_velocity = 810.0
+penetration_value = 16.4983
+ballistic_coefficient = 0.405
+bullet_length = 51.0
+bullet_diameter = 7.62
+sectional_density = 278.486
+base_damage = 90.0
+armor_modifier = 2.2
+flesh_modifier = 0.7
+ricochet_angle = 30.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.8
+bleeding_chance = 0.0
+ricochet_chance = 0.3
+fragment_chance = 0.0
+accuracy = 0.9

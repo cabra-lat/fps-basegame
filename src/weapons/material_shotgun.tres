@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://h2jvemdix8gg"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_40vco"]
+[ext_resource type="Texture2D" uid="uid://bw1jqnxqb2qxk" path="res://addons/cabra.lat_shooters/assets/models/weapon_shotgun/Gun_woodShotgun_TXT7.png" id="2_jy5x5"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_40vco")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_jy5x5")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)

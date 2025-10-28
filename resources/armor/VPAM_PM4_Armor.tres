@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://v3uycito45he"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_afvl1"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_huakg"]
+
+[sub_resource type="Resource" id="Resource_afvl1"]
+script = ExtResource("1_afvl1")
+name = "Medium Armor (1510 J)"
+type = 15
+density = 2600.0
+hardness = 15.0
+toughness = 8.0
+penetration_resistance = 2174.52
+ricochet_chance_modifier = 0.3
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 1.1
+
+[resource]
+script = ExtResource("2_huakg")
+protection_zones = 128
+type = 0
+name = "VPAM PM4 Armor"
+description = "Stops .357 Magnum and .44 Magnum"
+material = SubResource("Resource_afvl1")
+max_durability = 180
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.02
+move_speed_penalty = -0.03
+ricochet_chance = 0.0
+sound_reduction = -0.04
+blind_reduction = 0.0
+standard = 1
+level = 4

@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://do234htl54q8"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_wikdg"]
+
+[resource]
+script = ExtResource("1_wikdg")
+name = "FSP_4gr"
+caliber = "4gr FSP"
+description = "4gr FSP (MIL FSP)"
+type = 8
+bullet_mass = 0.26
+cartridge_mass = 0.442
+muzzle_velocity = 730.0
+penetration_value = 0.0138554
+ballistic_coefficient = 0.1
+bullet_length = 0.0
+bullet_diameter = 0.0
+sectional_density = inf
+base_damage = 12.0
+armor_modifier = 0.4
+flesh_modifier = 1.2
+ricochet_angle = 15.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 1.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.1
+fragment_chance = 0.0
+accuracy = 0.7

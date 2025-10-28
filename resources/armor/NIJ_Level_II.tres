@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://dxr4rufslhc0"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_nj23f"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_acu07"]
+
+[sub_resource type="Resource" id="Resource_nj23f"]
+script = ExtResource("1_nj23f")
+name = "Soft Armor (969 J)"
+type = 14
+density = 1400.0
+hardness = 3.0
+toughness = 12.0
+penetration_resistance = 930.71
+ricochet_chance_modifier = 0.1
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 0.9
+
+[resource]
+script = ExtResource("2_acu07")
+protection_zones = 192
+type = 0
+name = "NIJ Level II"
+description = "Stops 9mm +P and .357 Magnum"
+material = SubResource("Resource_nj23f")
+max_durability = 150
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.02
+move_speed_penalty = -0.03
+ricochet_chance = 0.0
+sound_reduction = -0.04
+blind_reduction = 0.0
+standard = 0
+level = 3

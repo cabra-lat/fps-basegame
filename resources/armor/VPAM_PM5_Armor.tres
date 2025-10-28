@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://bloe6wvuk4eoj"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_80sye"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_otc44"]
+
+[sub_resource type="Resource" id="Resource_80sye"]
+script = ExtResource("1_80sye")
+name = "Medium Armor (1194 J)"
+type = 15
+density = 2600.0
+hardness = 15.0
+toughness = 8.0
+penetration_resistance = 1719.68
+ricochet_chance_modifier = 0.3
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 1.1
+
+[resource]
+script = ExtResource("2_otc44")
+protection_zones = 128
+type = 0
+name = "VPAM PM5 Armor"
+description = "Stops .357 Magnum FMJ at 580 m/s"
+material = SubResource("Resource_80sye")
+max_durability = 200
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.0233333
+move_speed_penalty = -0.035
+ricochet_chance = 0.0
+sound_reduction = -0.0466667
+blind_reduction = 0.0
+standard = 1
+level = 5

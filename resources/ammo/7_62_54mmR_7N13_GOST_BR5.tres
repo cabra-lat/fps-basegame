@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://bnhiwt17h1elo"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_emuox"]
+
+[resource]
+script = ExtResource("1_emuox")
+name = "762x54R_7N13_GOST_BR5"
+caliber = "7.62x54mmR 7N13"
+description = "7.62x54mmR 7N13 (GOST BR5)"
+type = 5
+bullet_mass = 9.4
+cartridge_mass = 15.98
+muzzle_velocity = 830.0
+penetration_value = 5.47193
+ballistic_coefficient = 0.41
+bullet_length = 54.0
+bullet_diameter = 7.62
+sectional_density = 206.124
+base_damage = 70.0
+armor_modifier = 1.3
+flesh_modifier = 1.0
+ricochet_angle = 28.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 1.0

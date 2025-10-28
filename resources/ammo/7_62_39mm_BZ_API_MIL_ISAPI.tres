@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://ckbqlrr8y5sba"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_lq5tc"]
+
+[resource]
+script = ExtResource("1_lq5tc")
+name = "762x39_BZ_API_ISAPI"
+caliber = "7.62x39mm BZ API"
+description = "7.62x39mm BZ API (MIL ISAPI)"
+type = 4
+bullet_mass = 7.4
+cartridge_mass = 12.58
+muzzle_velocity = 730.0
+penetration_value = 4.73215
+ballistic_coefficient = 0.275
+bullet_length = 39.0
+bullet_diameter = 7.62
+sectional_density = 162.268
+base_damage = 58.0
+armor_modifier = 1.5
+flesh_modifier = 0.8
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.8
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

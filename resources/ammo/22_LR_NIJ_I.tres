@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://cf4ldlyd6ndye"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_o311u"]
+
+[resource]
+script = ExtResource("1_o311u")
+name = "22_LR_NIJ_I"
+caliber = "22 LR"
+description = "22 LR (NIJ I)"
+type = 0
+bullet_mass = 2.6
+cartridge_mass = 4.68
+muzzle_velocity = 329.0
+penetration_value = 0.126642
+ballistic_coefficient = 0.125
+bullet_length = 0.0
+bullet_diameter = 0.0
+sectional_density = inf
+base_damage = 35.0
+armor_modifier = 0.9
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://ctyxlrdyoo56a"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_qh0yj"]
+
+[resource]
+script = ExtResource("1_qh0yj")
+name = "22_LR_VPAM_PM1"
+caliber = ".22 LR"
+description = ".22 LR (VPAM PM1)"
+type = 0
+bullet_mass = 2.6
+cartridge_mass = 4.42
+muzzle_velocity = 360.0
+penetration_value = 0.151632
+ballistic_coefficient = 0.125
+bullet_length = 15.6
+bullet_diameter = 5.56
+sectional_density = 107.086
+base_damage = 40.0
+armor_modifier = 0.9
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

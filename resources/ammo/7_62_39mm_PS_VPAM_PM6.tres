@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://eppikawopxqm"]
+
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_vwics"]
+
+[resource]
+script = ExtResource("1_vwics")
+caliber = "7.62x39mm PS"
+description = "7.62x39mm PS (VPAM PM6)"
+type = 5
+bullet_mass = 8.0
+cartridge_mass = 13.6
+muzzle_velocity = 720.0
+ballistic_coefficient = 0.275
+bullet_length = 39.0
+sectional_density = 175.424
+armor_modifier = 1.2
+ricochet_angle = 28.0
+name = "762x39_PS_VPAM_PM6"

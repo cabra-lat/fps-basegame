@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://yw64dlt436dg"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_tbcps"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_luvfx"]
+
+[sub_resource type="Resource" id="Resource_tbcps"]
+script = ExtResource("1_tbcps")
+name = "Soft Armor (689 J)"
+type = 14
+density = 1400.0
+hardness = 3.0
+toughness = 12.0
+penetration_resistance = 661.344
+ricochet_chance_modifier = 0.1
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 0.9
+
+[resource]
+script = ExtResource("2_luvfx")
+protection_zones = 192
+type = 0
+name = "VPAM PM3 Armor"
+description = "Stops 9mm FMJ at 415 m/s"
+material = SubResource("Resource_tbcps")
+max_durability = 150
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.0166667
+move_speed_penalty = -0.025
+ricochet_chance = 0.0
+sound_reduction = -0.0333333
+blind_reduction = 0.0
+standard = 1
+level = 3

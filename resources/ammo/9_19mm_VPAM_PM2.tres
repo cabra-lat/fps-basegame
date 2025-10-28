@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://cnmvwwvrhcdwj"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_u8p30"]
+
+[resource]
+script = ExtResource("1_u8p30")
+name = "9mm_VPAM_PM2"
+caliber = "9x19mm"
+description = "9x19mm (VPAM PM2)"
+type = 0
+bullet_mass = 8.0
+cartridge_mass = 13.6
+muzzle_velocity = 360.0
+penetration_value = 0.5184
+ballistic_coefficient = 0.145
+bullet_length = 19.0
+bullet_diameter = 9.0
+sectional_density = 125.752
+base_damage = 45.0
+armor_modifier = 1.0
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

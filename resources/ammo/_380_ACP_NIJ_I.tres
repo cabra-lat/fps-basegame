@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://b8ipi75xkflgr"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_sewel"]
+
+[resource]
+script = ExtResource("1_sewel")
+name = "380_ACP_NIJ_I"
+caliber = ".380 ACP"
+description = ".380 ACP (NIJ I)"
+type = 0
+bullet_mass = 6.2
+cartridge_mass = 10.54
+muzzle_velocity = 322.0
+penetration_value = 0.32142
+ballistic_coefficient = 0.145
+bullet_length = 17.3
+bullet_diameter = 9.65
+sectional_density = 84.771
+base_damage = 40.0
+armor_modifier = 1.0
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

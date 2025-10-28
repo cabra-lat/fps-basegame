@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://bd0pq7u5t7d6q"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_6nt0q"]
+
+[resource]
+script = ExtResource("1_6nt0q")
+name = "44Mag_VPAM_PM4"
+caliber = ".44 Magnum"
+description = ".44 Magnum (VPAM PM4)"
+type = 1
+bullet_mass = 15.6
+cartridge_mass = 26.52
+muzzle_velocity = 440.0
+penetration_value = 1.32887
+ballistic_coefficient = 0.21
+bullet_length = 32.6
+bullet_diameter = 10.9
+sectional_density = 167.179
+base_damage = 85.0
+armor_modifier = 0.8
+flesh_modifier = 1.2
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 1.0

@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dntmiutj1hvnr"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_unbwb"]
+
+[resource]
+script = ExtResource("1_unbwb")
+name = "357Mag_VPAM_PM4"
+caliber = ".357 Magnum"
+description = ".357 Magnum (VPAM PM4)"
+type = 1
+bullet_mass = 10.2
+cartridge_mass = 16.32
+muzzle_velocity = 430.0
+penetration_value = 0.829831
+ballistic_coefficient = 0.165
+bullet_length = 33.0
+bullet_diameter = 9.07
+sectional_density = 157.869
+base_damage = 65.0
+armor_modifier = 0.8
+flesh_modifier = 1.2
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 1.0

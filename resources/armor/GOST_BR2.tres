@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://dws2byic10clj"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_y6kl6"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_4uuxc"]
+
+[sub_resource type="Resource" id="Resource_y6kl6"]
+script = ExtResource("1_y6kl6")
+name = "Soft Armor (603 J)"
+type = 14
+density = 1400.0
+hardness = 3.0
+toughness = 12.0
+penetration_resistance = 578.953
+ricochet_chance_modifier = 0.1
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 0.9
+
+[resource]
+script = ExtResource("2_4uuxc")
+protection_zones = 193
+type = 0
+name = "GOST BR2"
+description = "Stops 9x21mm Gyurza"
+material = SubResource("Resource_y6kl6")
+max_durability = 150
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.02
+move_speed_penalty = -0.03
+ricochet_chance = 0.0
+sound_reduction = -0.04
+blind_reduction = 0.0
+standard = 2
+level = 2

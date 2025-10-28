@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Weapon" load_steps=4 format=3 uid="uid://dv2woy0isa6w5"]
+
+[ext_resource type="Texture2D" uid="uid://bttb2fslo1aar" path="res://assets/ui/inventory/icon_ak47.png" id="1_0qvgb"]
+[ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_3wd1v"]
+[ext_resource type="PackedScene" uid="uid://cpqqv1tvvtk7a" path="res://src/weapons/weapon_ak47.tscn" id="3_0qvgb"]
+
+[resource]
+script = ExtResource("1_3wd1v")
+attach_points = 31
+firemodes = 7
+feed_type = 1
+base_accuracy = 1.0
+name = "AK-47"
+icon = ExtResource("1_0qvgb")
+view_model = ExtResource("3_0qvgb")

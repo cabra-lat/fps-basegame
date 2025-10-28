@@ -1,0 +1,319 @@
+[gd_scene load_steps=42 format=3 uid="uid://pc011sk80jnn"]
+
+[ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
+[ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
+[ext_resource type="PackedScene" uid="uid://c12klxocgrga0" path="res://addons/cabra.lat_shooters/src/ui/inventory/main.tscn" id="3_1jipf"]
+[ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
+[ext_resource type="Texture2D" uid="uid://rwr14fl7ogi4" path="res://assets/skybox.jpg" id="3_yghno"]
+[ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
+[ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
+
+[sub_resource type="Gradient" id="Gradient_fam23"]
+interpolation_mode = 1
+offsets = PackedFloat32Array(0, 0.8, 0.9)
+colors = PackedColorArray(0.8047426, 0.80474263, 0.8047426, 1, 0.45452422, 0.45452428, 0.45452422, 1, 1, 1, 1, 1)
+metadata/_snap_enabled = true
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_1jipf"]
+gradient = SubResource("Gradient_fam23")
+fill = 2
+fill_from = Vector2(0.508547, 0.48290598)
+fill_to = Vector2(1, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vsj1y"]
+albedo_texture = SubResource("GradientTexture2D_1jipf")
+metallic = 0.14
+metallic_specular = 0.65
+roughness = 0.1
+anisotropy_enabled = true
+anisotropy = 0.7
+uv1_scale = Vector3(1.175, 1.175, 1.175)
+uv1_triplanar = true
+uv1_world_triplanar = true
+grow_amount = 10.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_lx1hn"]
+material = SubResource("StandardMaterial3D_vsj1y")
+size = Vector3(40, 1, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5uk0x"]
+size = Vector3(40, 1.0087891, 10)
+
+[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_fam23"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_1jipf"]
+frequency = 1.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_vsj1y"]
+noise = SubResource("FastNoiseLite_1jipf")
+seamless = true
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_fam23"]
+frequency = 0.1129
+domain_warp_enabled = true
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_cnysa"]
+noise = SubResource("FastNoiseLite_fam23")
+seamless = true
+as_normal_map = true
+bump_strength = 32.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cnysa"]
+albedo_texture = SubResource("NoiseTexture2D_vsj1y")
+metallic = 1.0
+roughness = 0.34
+roughness_texture_channel = 4
+normal_texture = SubResource("NoiseTexture2D_cnysa")
+uv1_scale = Vector3(400, 400, 400)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fam23"]
+material = SubResource("StandardMaterial3D_cnysa")
+size = Vector3(400, 1, 400)
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_tqsn0"]
+panorama = ExtResource("3_yghno")
+
+[sub_resource type="Sky" id="Sky_6vvmu"]
+sky_material = SubResource("PanoramaSkyMaterial_tqsn0")
+
+[sub_resource type="Environment" id="Environment_m5uds"]
+background_mode = 2
+sky = SubResource("Sky_6vvmu")
+tonemap_mode = 2
+
+[sub_resource type="AnimationNodeStateMachine" id="1"]
+
+[sub_resource type="AnimationNodeStateMachine" id="4"]
+
+[sub_resource type="AnimationNodeStateMachine" id="5"]
+
+[sub_resource type="AnimationNodeStateMachine" id="3"]
+states/End/position = Vector2(544, 100)
+graph_offset = Vector2(84, -23)
+
+[sub_resource type="AnimationNodeStateMachine" id="6"]
+states/End/position = Vector2(492, 100)
+graph_offset = Vector2(92, -61)
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="7"]
+advance_mode = 2
+advance_condition = &"+move"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="8"]
+advance_mode = 2
+advance_condition = &"+jump"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="9"]
+advance_mode = 2
+advance_condition = &"on_air"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="10"]
+advance_mode = 2
+advance_condition = &"on_ground"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="11"]
+advance_mode = 2
+advance_condition = &"+jump"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="12"]
+advance_mode = 2
+advance_condition = &"on_air"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="13"]
+advance_mode = 2
+advance_condition = &"-move"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="14"]
+advance_mode = 2
+advance_condition = &"on_air"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="15"]
+advance_mode = 2
+advance_condition = &"+sprint"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="16"]
+advance_mode = 2
+advance_condition = &"-sprint"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="17"]
+advance_mode = 2
+advance_condition = &"+jump"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="18"]
+advance_mode = 2
+advance_condition = &"on_air"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_2gstt"]
+advance_mode = 2
+advance_expression = "true"
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_4lym8"]
+resource_local_to_scene = true
+states/End/position = Vector2(671, 189)
+states/Falling/node = SubResource("1")
+states/Falling/position = Vector2(315, 189)
+states/Jumping/node = SubResource("4")
+states/Jumping/position = Vector2(542, 189)
+states/Sprinting/node = SubResource("5")
+states/Sprinting/position = Vector2(570, 71.93827)
+states/Start/position = Vector2(195.6667, 183.037)
+states/Stopped/node = SubResource("3")
+states/Stopped/position = Vector2(263.148, 71.93827)
+states/Walking/node = SubResource("6")
+states/Walking/position = Vector2(417, -21)
+transitions = ["Stopped", "Walking", SubResource("7"), "Walking", "Jumping", SubResource("8"), "Jumping", "Falling", SubResource("9"), "Falling", "Stopped", SubResource("10"), "Stopped", "Jumping", SubResource("11"), "Walking", "Falling", SubResource("12"), "Walking", "Stopped", SubResource("13"), "Stopped", "Falling", SubResource("14"), "Walking", "Sprinting", SubResource("15"), "Sprinting", "Walking", SubResource("16"), "Sprinting", "Jumping", SubResource("17"), "Sprinting", "Falling", SubResource("18"), "Start", "Stopped", SubResource("AnimationNodeStateMachineTransition_2gstt")]
+graph_offset = Vector2(95, -63.76543)
+
+[node name="Node3D" type="Node3D"]
+script = ExtResource("1_cnysa")
+
+[node name="Cursor3D" parent="." instance=ExtResource("7_tqsn0")]
+position = Vector2(474, 355)
+scale = Vector2(0.839807, 0.839807)
+animation = &"cross"
+hide_if_idle = false
+
+[node name="Interactor3D" parent="." node_paths=PackedStringArray("follow", "Cursor") instance=ExtResource("6_vsj1y")]
+transform = Transform3D(0.998363, -1.45519e-11, 4.65661e-10, -4.00178e-11, 0.998363, -2.56784e-05, -1.62981e-09, 2.56747e-05, 0.998363, 0, 1.7481184, 0)
+collision_mask = 6
+debug_shape_custom_color = Color(0, 0, 0, 0)
+follow = NodePath("../Player/Head/Camera3D")
+Cursor = NodePath("../Cursor3D")
+
+[node name="HUD" parent="." instance=ExtResource("3_aiq23")]
+
+[node name="InventoryUi" parent="." instance=ExtResource("3_1jipf")]
+unique_name_in_owner = true
+visible = false
+
+[node name="Level" type="Node3D" parent="."]
+
+[node name="Platform" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 0, 0.00437784)
+collision_layer = 7
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00212133, 0, -0.00437784)
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0043945313, 0)
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="Platform9" type="StaticBody3D" parent="Level"]
+transform = Transform3D(0.59129566, 0.80645496, 0, -0.80645496, 0.59129566, 0, 0, 0, 1, -31.345295, 16.031086, 0.00437784)
+collision_layer = 7
+collision_mask = 0
+constant_linear_velocity = Vector3(10, 10, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform9"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00212133, 0, -0.00437784)
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform9"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="Platform2" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -2.9469411, 8.511776)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform2"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform2"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform3" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -11.679918, 16.026487)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform3"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform3"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform4" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -29.594725, 29.43588)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform4"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform4"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform5" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 0.98549396, 0.1697107, 0, -0.1697107, 0.98549396, -0.00212133, -30.434336, 19.59503)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform5"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform5"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform6" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, -0.7971837, 0.6037369, 0, -0.6037369, -0.7971837, -0.00212133, -28.308765, 8.02249)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform6"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform6"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform7" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, -0.74816877, -0.66350836, 0, 0.66350836, -0.74816877, -0.00212133, -18.125801, -0.619668)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform7"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform7"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="Platform8" type="StaticBody3D" parent="Level"]
+transform = Transform3D(1, 0, 0, 0, 0.626699, -0.77926135, 0, 0.77926135, 0.626699, -0.00212133, -7.572612, -11.908952)
+collision_layer = 7
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform8"]
+shape = SubResource("BoxShape3D_5uk0x")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform8"]
+mesh = SubResource("BoxMesh_lx1hn")
+
+[node name="WorldGround" type="StaticBody3D" parent="Level"]
+collision_layer = 7
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/WorldGround"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -31.1081, 0)
+shape = SubResource("WorldBoundaryShape3D_fam23")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/WorldGround"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -31.611757, 4.0088177)
+mesh = SubResource("BoxMesh_fam23")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_m5uds")
+
+[node name="Player" parent="." node_paths=PackedStringArray("inventory_ui") instance=ExtResource("2_yghno")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+inventory_ui = NodePath("../InventoryUi")
+
+[node name="Moving" parent="Player/StateMachine" index="0"]
+tree_root = SubResource("AnimationNodeStateMachine_4lym8")
+
+[connection signal="debug" from="Player" to="." method="_on_player_debug"]
+[connection signal="landed" from="Player" to="." method="_on_player_landed"]
+
+[editable path="Player"]

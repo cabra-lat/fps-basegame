@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://bcepu2shnpeii"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_nle21"]
+
+[resource]
+script = ExtResource("1_nle21")
+name = "556_M995_ESAPI"
+caliber = "5.56x45mm M995 AP"
+description = "5.56x45mm M995 AP (MIL ESAPI Rev G)"
+type = 7
+bullet_mass = 3.6
+cartridge_mass = 6.12
+muzzle_velocity = 1020.0
+penetration_value = 8.23997
+ballistic_coefficient = 0.151
+bullet_length = 45.0
+bullet_diameter = 5.56
+sectional_density = 148.273
+base_damage = 45.0
+armor_modifier = 2.2
+flesh_modifier = 0.7
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.8
+bleeding_chance = 0.0
+ricochet_chance = 0.3
+fragment_chance = 0.0
+accuracy = 1.0

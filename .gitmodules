@@ -1,0 +1,12 @@
+[submodule "addons/cabra.lat_cursors"]
+	path = addons/cabra.lat_cursors
+	url = git@github.com:cabra-lat/cabra.lat_cursors.git
+[submodule "addons/cabra.lat_interactions"]
+	path = addons/cabra.lat_interactions
+	url = git@github.com:cabra-lat/cabra.lat_interactions.git
+[submodule "addons/cabra.lat_shooters"]
+	path = addons/cabra.lat_shooters
+	url = git@github.com:cabra-lat/cabra.lat_shooters.git
+[submodule "addons/cabra.lat_state_machines"]
+	path = addons/cabra.lat_state_machines
+	url = git@github.com:cabra-lat/cabra.lat_state_machines.git

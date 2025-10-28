@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://w05l4msgrtp2"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_0q424"]
+
+[resource]
+script = ExtResource("1_0q424")
+name = "1270x108R_B32_GOST_BR6"
+caliber = "12.7×108mm 57-BZ-542 API"
+description = "12.7×108mm 57-BZ-542 API (GOST BR6)"
+type = 4
+bullet_mass = 48.2
+cartridge_mass = 81.94
+muzzle_velocity = 830.0
+penetration_value = 42.5024
+ballistic_coefficient = 0.41
+bullet_length = 108.0
+bullet_diameter = 12.7
+sectional_density = 380.496
+base_damage = 85.0
+armor_modifier = 1.6
+flesh_modifier = 0.8
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.8
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

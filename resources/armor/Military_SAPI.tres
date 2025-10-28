@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://c4yr5kf845pe1"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_w4fe6"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_dgaon"]
+
+[sub_resource type="Resource" id="Resource_w4fe6"]
+script = ExtResource("1_w4fe6")
+name = "Medium Armor (3387 J)"
+type = 15
+density = 2600.0
+hardness = 15.0
+toughness = 8.0
+penetration_resistance = 4877.11
+ricochet_chance_modifier = 0.3
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 1.1
+
+[resource]
+script = ExtResource("2_dgaon")
+protection_zones = 192
+type = 0
+name = "Military SAPI"
+description = "Stops M855 and 7.62x51mm"
+material = SubResource("Resource_w4fe6")
+max_durability = 350
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.0533333
+move_speed_penalty = -0.08
+ricochet_chance = 0.0
+sound_reduction = -0.106667
+blind_reduction = 0.0
+standard = 4
+level = 1

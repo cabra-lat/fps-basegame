@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dv1th71l4adp5"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_jn76v"]
+
+[resource]
+script = ExtResource("1_jn76v")
+name = "357Mag_FMs_VPAM_PM5"
+caliber = ".357 Magnum FMs"
+description = ".357 Magnum FMs (VPAM PM5)"
+type = 0
+bullet_mass = 7.1
+cartridge_mass = 12.07
+muzzle_velocity = 580.0
+penetration_value = 1.19422
+ballistic_coefficient = 0.165
+bullet_length = 33.0
+bullet_diameter = 9.07
+sectional_density = 109.889
+base_damage = 70.0
+armor_modifier = 1.0
+flesh_modifier = 1.0
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.3
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

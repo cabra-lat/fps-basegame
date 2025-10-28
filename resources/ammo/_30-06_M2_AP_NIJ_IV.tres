@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dmqdbu0bsowaj"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_8gbi1"]
+
+[resource]
+script = ExtResource("1_8gbi1")
+name = "3006_M2_AP_NIJ_IV"
+caliber = ".30-06 M2 AP"
+description = ".30-06 M2 AP (NIJ IV)"
+type = 3
+bullet_mass = 10.8
+cartridge_mass = 18.36
+muzzle_velocity = 878.0
+penetration_value = 13.4874
+ballistic_coefficient = 0.409
+bullet_length = 63.0
+bullet_diameter = 7.62
+sectional_density = 236.823
+base_damage = 75.0
+armor_modifier = 1.8
+flesh_modifier = 0.8
+ricochet_angle = 30.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.8
+bleeding_chance = 0.0
+ricochet_chance = 0.3
+fragment_chance = 0.0
+accuracy = 0.9

@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Armor" load_steps=4 format=3 uid="uid://jkvsqev46l4x"]
+
+[ext_resource type="Script" uid="uid://cjl0ctgsqf328" path="res://addons/cabra.lat_shooters/src/core/ballistics/material.gd" id="1_5ykv7"]
+[ext_resource type="Script" uid="uid://dxkpo38tvql44" path="res://addons/cabra.lat_shooters/src/core/armor.gd" id="2_hvhgo"]
+
+[sub_resource type="Resource" id="Resource_5ykv7"]
+script = ExtResource("1_5ykv7")
+name = "Soft Armor (168 J)"
+type = 14
+density = 1400.0
+hardness = 3.0
+toughness = 12.0
+penetration_resistance = 161.741
+ricochet_chance_modifier = 0.1
+damage_modifier = 1.0
+sound_absorption = 0.0
+armor_thickness = 0.0
+armor_effectiveness = 0.9
+
+[resource]
+script = ExtResource("2_hvhgo")
+protection_zones = 192
+type = 0
+name = "VPAM PM1 Armor"
+description = "Stops .22 LR and similar low-energy rounds"
+material = SubResource("Resource_5ykv7")
+max_durability = 80
+max_backface_deformation = 25.0
+turn_speed_penalty = -0.01
+move_speed_penalty = -0.015
+ricochet_chance = 0.0
+sound_reduction = -0.02
+blind_reduction = 0.0
+standard = 1
+level = 1

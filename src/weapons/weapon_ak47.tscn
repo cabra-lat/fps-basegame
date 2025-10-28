@@ -1,0 +1,73 @@
+[gd_scene load_steps=9 format=4 uid="uid://cpqqv1tvvtk7a"]
+
+[ext_resource type="PackedScene" uid="uid://dfttkw0dhj0mx" path="res://src/weapons/magazine_ak47.tscn" id="1_3tbhq"]
+[ext_resource type="ArrayMesh" uid="uid://c1n5e1762t2f0" path="res://src/weapons/mesh_ak47.tres" id="3_3qb1m"]
+[ext_resource type="Shader" uid="uid://cajifd811rl44" path="res://shaders/psx/psx_lit_metal.gdshader" id="3_3tbhq"]
+[ext_resource type="Texture2D" uid="uid://db2u1f85qquyu" path="res://src/weapons/weapon_ak47.tres" id="3_osqyb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wnvlt"]
+resource_name = "Material"
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_osqyb")
+emission_enabled = true
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_vnnxd"]
+_surfaces = [{
+"aabb": AABB(-0.00230499, -0.0187516, -0.0143784, 0.00460997, 0.0311098, 0.0282176),
+"format": 34359742465,
+"index_count": 78,
+"index_data": PackedByteArray("AAAHAAgACQAIAAcABwAFAAkACAAKAAAACQAFAAIAAgAAAAoACwAIAAkACgAIAAsAAgAMAAkACgAMAAIADQAJAAwACQANAAsADgAMAAoADAAOAA0ACgAPAA4ACwAPAAoAAwAOAA8ABgALAA0ADwALAAYADwABAAMABgABAA8ADgADAAQABAANAA4ABAADAAEADQAEAAYAAQAGAAQA"),
+"lods": [0.00729221, PackedByteArray("AAABAAIAAwACAAEAAgADAAQABAADAAEABAAFAAIABgABAAAAAQAGAAQABQAEAAYAAAAHAAYABgAHAAUA")],
+"name": "Material",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray("Qw8Xu+GcmbyovWI8BirquoqCQTzhlDc8Qw8XO+GcmbyovWI8BirqOoqCQTzhlDc8BirqOjh6Sjzsfy88Qw8XO2E4lrxqk2u8Birqujh6Sjzsfy88Qw8Xu2E4lrxqk2u8BirqugA0a7tIISu7BirqOgA0a7tIISu7Birquo8egLsp3GM7Birquj1H0jtxNQg7BirqOo8egLsp3GM7BirqOj1H0jtxNQg7BirqOq6ixDvhAp87Birquq6ixDvhAp87")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_w2bv8"]
+resource_name = "Cylinder_001"
+_surfaces = [{
+"aabb": AABB(-0.00230499, -0.0187516, -0.0143784, 0.00460997, 0.0311098, 0.0282176),
+"attribute_data": PackedByteArray("7gkEPkhrKT6jIsQ9LOU/PqLz/T1MxCE+agK6PSw+OD6YA6g9+JUSPuoNdz1ApEM+o/pwPcBDRD41HB89sD78PUjX+z00SAs+oDz/PWAVDT6gPP89+E1ePiCJWD2E3V4+TnPCPdxzQD6cS2s9JNxZPiALVz0oNVI+FlO4PeDMOD4WU7g94Mw4PmoCuj0sPjg+oyLEPSzlPz5Oc8I93HNAPli7pD042EE+mK3NPXB3Qj4kte491M8xPueU5D3UKCo+f4ZDPcxhFz4Kq3U9/JwcPjsVhz0IF0k+cTWRPQi+UD6rss09zLoxPueU5D3UKCo+JLXuPdTPMT7n0tc9yGE5PhqRQj18ADA+bHVaPeTXMT5YvMI9XOIfPkhv1T0gEyE+mK3NPXB3Qj5Yu6Q9ONhBPhqRQj18ADA+f4ZDPcxhFz4Kq3U9/JwcPmx1Wj3k1zE+YnuqPbRhSD5xNZE9CL5QPjsVhz0IF0k+KFugPbS6QD5Ib9U9IBMhPli8wj1c4h8+YnuqPbRhSD4oW6A9tLpAPquyzT3MujE+59LXPchhOT4="),
+"format": 34359742487,
+"index_count": 78,
+"index_data": PackedByteArray("CgALABQAFAAVAAoAAgAAABYAFgAXAAIAGAAHAAQABAAZABgADQAOABoAGgAbAA0AHAAdAB4AHgAfABwABgAgACEAIQAFAAYAIgAjACQAJAAlACIAJgAnACgAKAApACYAKgArACwALAAtACoAEAARABIAEgATABAACAAJAC4ALgAvAAgADAAwADEAMQAPAAwAAwAyADMAMwABAAMA"),
+"lods": [0.00729221, PackedByteArray("AAABAAIAAwACAAEABAAFAAYABgAHAAQACAAJAAoACgALAAgADAANAA4ADgAPAAwAEAARABIAEgATABAA")],
+"material": SubResource("StandardMaterial3D_wnvlt"),
+"name": "Material",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 52,
+"vertex_data": PackedByteArray("Qw8Xu+GcmbyovWI8BirquoqCQTzhlDc8Qw8XO+GcmbyovWI8BirqOoqCQTzhlDc8Qw8XO+GcmbyovWI8BirqOoqCQTzhlDc8BirqOjh6Sjzsfy88Qw8XO2E4lrxqk2u8Birqujh6Sjzsfy88BirquoqCQTzhlDc8Qw8Xu+GcmbyovWI8Qw8Xu2E4lrxqk2u8Birqujh6Sjzsfy88Qw8Xu2E4lrxqk2u8Qw8XO2E4lrxqk2u8BirqOjh6Sjzsfy88BirqOjh6Sjzsfy88BirqOoqCQTzhlDc8BirquoqCQTzhlDc8Birqujh6Sjzsfy88BirqugA0a7tIISu7Birquo8egLsp3GM7Birquo8egLsp3GM7BirqOo8egLsp3GM7BirqOgA0a7tIISu7BirqOo8egLsp3GM7BirqOgA0a7tIISu7BirqugA0a7tIISu7BirqOq6ixDvhAp87BirqOo8egLsp3GM7Birquo8egLsp3GM7Birquq6ixDvhAp87BirqOj1H0jtxNQg7BirqOq6ixDvhAp87Birquj1H0jtxNQg7Birquq6ixDvhAp87Birquo8egLsp3GM7BirqugA0a7tIISu7BirqOj1H0jtxNQg7BirqOgA0a7tIISu7BirqOo8egLsp3GM7BirqOq6ixDvhAp87Birquj1H0jtxNQg7BirqugA0a7tIISu7BirqOgA0a7tIISu7BirqOj1H0jtxNQg7Birquq6ixDvhAp87Birquj1H0jtxNQg7Birquj1H0jtxNQg7BirqOj1H0jtxNQg7BirqOq6ixDvhAp87Birquq6ixDvhAp87/3+ftNBoIqH/fyU96jDMjP9/n7TGadqg/38lPeowzIyT+1KEt4Gmpv7//3//fzmr/v//f/9/OauT+1KEs4HapgAA/3//f5m+AAD/f/9/mb5rBFKEAoDQvmsEUoT7f2++LLT//xFmzdQxx///QGlE3THH//9XaATdLLT//xFmzdT/f6y8Y2YRpf9/rLxjZhGl/3+svGNmEaX/f6y8Y2YRpWsEUoQFgPW+awRShBqAHcD/f5+0e28sn/9/n7TIcMqek/tShLiBk6aT+1KEw4H5pTHH///0btreMcf//y5wMt//f2Vwl1VCj/9/ZXCXVUKP/39lcJdVQo//f2Vwl1VCj/7//3//fzmr/v//f/9/OasAAP9//3+ZvgAA/3//f5m+AAD/f/9/mb4AAP9//3+Zvv///3//fzmr////f/9/Oav///9//385q////3//fzmrJtf//yJlbeIm1///ImVt4ibX//8iZW3iJtf//yJlbeIAAP9//3+ZvgAA/3//f5m+LLT//xFmzdQstP//EWbN1P9/JT3qMMyM/38lPeowzIw=")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_vnnxd")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_3qb1m"]
+render_priority = 0
+shader = ExtResource("3_3tbhq")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+
+[node name="weapon_ak47" type="Node3D"]
+
+[node name="model" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0749081, -0.349598)
+
+[node name="GUN" type="MeshInstance3D" parent="model"]
+transform = Transform3D(1, -8.74228e-08, 8.74228e-08, -8.74228e-08, -1, 1.50996e-07, 8.74228e-08, -1.50996e-07, -1, 0, 0, 0)
+mesh = ExtResource("3_3qb1m")
+skeleton = NodePath("")
+
+[node name="TRIGGER" type="MeshInstance3D" parent="model"]
+transform = Transform3D(1, -8.74228e-08, 8.74228e-08, -8.74228e-08, -1, 1.50996e-07, 8.74228e-08, -1.50996e-07, -1, 0, -0.0662064, 0.29742512)
+mesh = SubResource("ArrayMesh_w2bv8")
+skeleton = NodePath("")
+surface_material_override/0 = SubResource("ShaderMaterial_3qb1m")
+
+[node name="MAG" parent="model" instance=ExtResource("1_3tbhq")]
+transform = Transform3D(1.325, 0, 0, 0, -1.08404e-07, 2.48, 0, -2.48, -1.08404e-07, 0, -0.033204377, 0.23124477)
+
+[node name="EjectionPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.01863861, 0.07246152, -0.14102557)

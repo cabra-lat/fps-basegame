@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dsx7kwwuq15cd"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_5hvni"]
+
+[resource]
+script = ExtResource("1_5hvni")
+name = "9x18_Makarov_GOST_BR1"
+caliber = "9x18mm Makarov"
+description = "9x18mm Makarov (GOST BR1)"
+type = 5
+bullet_mass = 5.9
+cartridge_mass = 10.03
+muzzle_velocity = 335.0
+penetration_value = 0.516459
+ballistic_coefficient = 0.13
+bullet_length = 18.0
+bullet_diameter = 9.0
+sectional_density = 92.7421
+base_damage = 45.0
+armor_modifier = 1.2
+flesh_modifier = 1.0
+ricochet_angle = 28.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 1.0

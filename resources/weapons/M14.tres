@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Weapon" load_steps=4 format=3 uid="uid://dp22t6kqappd3"]
+
+[ext_resource type="Script" uid="uid://i1a2beubqkyr" path="res://addons/cabra.lat_shooters/src/core/ammo_feed.gd" id="1_mj6j7"]
+[ext_resource type="Script" uid="uid://57chxkjo83lo" path="res://addons/cabra.lat_shooters/src/core/weapon.gd" id="1_phgqk"]
+
+[sub_resource type="Resource" id="Resource_grjrh"]
+script = ExtResource("1_mj6j7")
+name = "Generic Ammofeed"
+description = "This Ammofeed is the default one."
+type = 1
+empty_mass = 0.0
+compatible_calibers = PackedStringArray("7.62x51mm")
+bore_tolerance = 0.1
+case_tolerance = 1.0
+strict_mode = false
+max_capacity = 30
+contents = Array[Resource]([])
+
+[resource]
+script = ExtResource("1_phgqk")
+name = "M14"
+ammofeed = SubResource("Resource_grjrh")
+attach_points = 25
+firemodes = 6
+feed_type = 1
+firerate = 750.0
+burst_count = 3
+base_mass = 3.5
+base_reload_time = 3.5
+base_accuracy = 1.0
+base_recoil_vertical = 1.0
+base_recoil_horizontal = 0.5

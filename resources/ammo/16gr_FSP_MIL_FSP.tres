@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://f3o0c6saexts"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_1043c"]
+
+[resource]
+script = ExtResource("1_1043c")
+name = "FSP_16gr"
+caliber = "16gr FSP"
+description = "16gr FSP (MIL FSP)"
+type = 8
+bullet_mass = 1.0
+cartridge_mass = 1.7
+muzzle_velocity = 620.0
+penetration_value = 0.04805
+ballistic_coefficient = 0.15
+bullet_length = 0.0
+bullet_diameter = 0.0
+sectional_density = inf
+base_damage = 25.0
+armor_modifier = 0.5
+flesh_modifier = 1.2
+ricochet_angle = 15.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 1.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.1
+fragment_chance = 0.0
+accuracy = 0.7

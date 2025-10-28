@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dpse1oc4k4u5u"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_yijis"]
+
+[resource]
+script = ExtResource("1_yijis")
+name = "762x39_BZ_API_VPAM_PM8"
+caliber = "7.62x39mm BZ API"
+description = "7.62x39mm BZ API (VPAM PM8)"
+type = 4
+bullet_mass = 7.7
+cartridge_mass = 13.09
+muzzle_velocity = 740.0
+penetration_value = 5.05982
+ballistic_coefficient = 0.275
+bullet_length = 39.0
+bullet_diameter = 7.62
+sectional_density = 168.846
+base_damage = 60.0
+armor_modifier = 1.5
+flesh_modifier = 0.8
+ricochet_angle = 25.0
+tracer_duration = 0.0
+incendiary_chance = 0.8
+fragmentation_chance = 0.0
+armor_damage = 0.0
+bleeding_chance = 0.0
+ricochet_chance = 0.2
+fragment_chance = 0.0
+accuracy = 1.0

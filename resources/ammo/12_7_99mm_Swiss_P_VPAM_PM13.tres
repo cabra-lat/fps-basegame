@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://c7odqbpewhefn"]
+
+[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_f5ha1"]
+
+[resource]
+script = ExtResource("1_f5ha1")
+name = "127x99_SWISS_P_VPAM_PM13"
+caliber = "12.7x99mm Swiss P"
+description = "12.7x99mm Swiss P (VPAM PM13)"
+type = 3
+bullet_mass = 43.5
+cartridge_mass = 73.95
+muzzle_velocity = 930.0
+penetration_value = 84.6521
+ballistic_coefficient = 0.67
+bullet_length = 99.0
+bullet_diameter = 12.7
+sectional_density = 343.393
+base_damage = 150.0
+armor_modifier = 2.5
+flesh_modifier = 0.6
+ricochet_angle = 30.0
+tracer_duration = 0.0
+incendiary_chance = 0.0
+fragmentation_chance = 0.0
+armor_damage = 0.8
+bleeding_chance = 0.0
+ricochet_chance = 0.3
+fragment_chance = 0.0
+accuracy = 0.9

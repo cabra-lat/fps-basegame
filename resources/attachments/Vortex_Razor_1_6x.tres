@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="Attachment" load_steps=2 format=3 uid="uid://diay704cpbcdb"]
+
+[ext_resource type="Script" uid="uid://chtgefjsvykha" path="res://addons/cabra.lat_shooters/src/core/attachment.gd" id="1_mj1g1"]
+
+[resource]
+script = ExtResource("1_mj1g1")
+name = "Vortex_Razor_1-6x"
+description = "This Attachment is the default one."
+type = 0
+attachment_point = 8
+mass = 0.65
+cost = 100
+accuracy_modifier = 0.65
+recoil_modifier = 0.75
+ergonomics_modifier = 1.3
+reload_speed_modifier = 0.75
+aim_down_sights_modifier = 0.85
+magnification = 6.0
+reticle_type = 5
+reticle_color = Color(1, 0, 0, 1)
+eye_relief = 3.0
+zero_distance = 100.0
+sound_suppression = 0.0
+flash_suppression = 0.0
+recoil_reduction = 0.0
+stability_bonus = 0.0
+deployable = false
+laser_active = true
+light_active = true
+laser_range = 50.0
+light_range = 100.0
+capacity_multiplier = 1.0
+compatible_weapons = Array[String]([])
+incompatible_attachments = Array[int]([])
