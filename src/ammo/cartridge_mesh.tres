@@ -99,4 +99,4 @@ shader_parameter/stamp_ao_darkness = 0.651
 
 [resource]
 material = SubResource("ShaderMaterial_aeqdp")
-radial_segments = 10
+radial_segments = 8
