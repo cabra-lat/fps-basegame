@@ -19,6 +19,10 @@ run/main_scene="uid://pc011sk80jnn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+Debug="*res://addons/cabra.lat_shooters/src/player/debug.gd"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg")

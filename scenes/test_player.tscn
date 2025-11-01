@@ -97,51 +97,51 @@ graph_offset = Vector2(92, -61)
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="7"]
 advance_mode = 2
-advance_condition = &"+move"
+advance_expression = "input.motion.length_squared() > 0"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="8"]
 advance_mode = 2
-advance_condition = &"+jump"
+advance_expression = "input.jump_pressed"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="9"]
 advance_mode = 2
-advance_condition = &"on_air"
+advance_expression = "!is_on_floor()"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="10"]
 advance_mode = 2
-advance_condition = &"on_ground"
+advance_expression = "is_on_floor()"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="11"]
 advance_mode = 2
-advance_condition = &"+jump"
+advance_expression = "input.jump_pressed"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="12"]
 advance_mode = 2
-advance_condition = &"on_air"
+advance_expression = "!is_on_floor()"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="13"]
 advance_mode = 2
-advance_condition = &"-move"
+advance_expression = "input.motion.length_squared() == 0"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="14"]
 advance_mode = 2
-advance_condition = &"on_air"
+advance_expression = "!is_on_floor()"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="15"]
 advance_mode = 2
-advance_condition = &"+sprint"
+advance_expression = "input.sprint_held"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="16"]
 advance_mode = 2
-advance_condition = &"-sprint"
+advance_expression = "!input.sprint_held"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="17"]
 advance_mode = 2
-advance_condition = &"+jump"
+advance_expression = "input.jump_pressed"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="18"]
 advance_mode = 2
-advance_condition = &"on_air"
+advance_expression = "!is_on_floor()"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_2gstt"]
 advance_mode = 2
@@ -306,9 +306,11 @@ mesh = SubResource("BoxMesh_fam23")
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_m5uds")
 
-[node name="Player" parent="." node_paths=PackedStringArray("inventory_ui") instance=ExtResource("2_yghno")]
+[node name="Player" parent="." instance=ExtResource("2_yghno")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
-inventory_ui = NodePath("../InventoryUi")
+
+[node name="StateMachine" parent="Player" index="3"]
+deterministic = true
 
 [node name="Moving" parent="Player/StateMachine" index="0"]
 tree_root = SubResource("AnimationNodeStateMachine_4lym8")

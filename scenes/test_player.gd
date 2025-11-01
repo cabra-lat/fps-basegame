@@ -14,6 +14,7 @@ func _ready():
   var magazine = AmmoFeed.new()
   magazine.name = "AK-47 Magazine"
   magazine.compatible_calibers = ["7.62x39mm"]
+  magazine.icon = preload("res://assets/ui/inventory/icon_stock_mag.png")
   magazine.max_capacity = 30
   magazine.type = AmmoFeed.Type.EXTERNAL
 
@@ -54,7 +55,8 @@ func _connect_weapon_signals(weapon: Weapon):
   if weapon:
     print("DEBUG: Connecting to weapon signals: ", weapon.name)
     for sig in weapon.get_signal_list():
-      if not weapon.is_connected(sig.name,  Callable(self, "_on_%s" % sig.name)):
+      if not weapon.is_connected(sig.name,  Callable(self, "_on_%s" % sig.name)) and \
+         self.has_method("_on_%s" % sig.name):
         weapon.connect(sig.name, Callable(self, "_on_%s" % sig.name))
 
 func _on_trigger_locked(_weapon: Weapon):
