@@ -1,22 +1,28 @@
-[gd_scene load_steps=4 format=3 uid="uid://buhidaqt8us0h"]
+[gd_scene load_steps=5 format=3 uid="uid://buhidaqt8us0h"]
 
 [ext_resource type="CapsuleMesh" uid="uid://bm6fo0ehskq31" path="res://src/ammo/cartridge_mesh.tres" id="1_d3ydn"]
+[ext_resource type="Script" uid="uid://bgd7swgo3j2hc" path="res://addons/cabra.lat_shooters/src/world/cartridge_3d.gd" id="1_vdp16"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_3hsla"]
+margin = 0.0
 radius = 0.0043945313
 height = 0.034490585
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_3hsla"]
+margin = 0.0
 height = 0.040992737
 radius = 0.005859375
 
-[node name="RigidBody3D" type="RigidBody3D"]
+[node name="Cartridge3D" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh")]
 process_thread_group = 2
 process_thread_group_order = 0
 process_thread_messages = 0
-collision_layer = 8
+collision_layer = 4
 collision_mask = 4
 input_ray_pickable = false
+script = ExtResource("1_vdp16")
+auto_disable_physics = false
+grabbable_mesh = NodePath("MeshInstance3D")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
@@ -29,3 +35,5 @@ shape = SubResource("CapsuleShape3D_3hsla")
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, -0.021)
 shape = SubResource("CylinderShape3D_3hsla")
+
+[node name="PhysicsTimer" type="Timer" parent="."]

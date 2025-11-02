@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AmmoFeed" load_steps=5 format=3 uid="uid://bqemtpunsehfm"]
+
+[ext_resource type="Script" uid="uid://174ja52pe154" path="res://addons/cabra.lat_shooters/src/core/item.gd" id="1_8tqx0"]
+[ext_resource type="Texture2D" uid="uid://da5beao6fpa82" path="res://assets/ui/inventory/icon_stock_mag.png" id="2_81qqp"]
+[ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="3_mjhel"]
+[ext_resource type="PackedScene" uid="uid://dfttkw0dhj0mx" path="res://src/weapons/magazine_ak47.tscn" id="4_k3dd4"]
+
+[resource]
+script = ExtResource("3_mjhel")
+description = "Light Alloy AK-47 magazines"
+type = 1
+empty_mass = 170.0
+icon = ExtResource("2_81qqp")
+view_model = ExtResource("4_k3dd4")
+metadata/_custom_type_script = "uid://6ckswbqpufn8"

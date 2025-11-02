@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="Ammo" load_steps=4 format=3 uid="uid://hb6qrsnotiah"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_up7cb"]
-[ext_resource type="Texture2D" uid="uid://binx4ahv4oaog" path="res://addons/cabra.lat_shooters/assets/ui/inventory/icon_ammo.png" id="1_wxkd3"]
+[ext_resource type="Texture2D" uid="uid://binx4ahv4oaog" path="res://assets/ui/inventory/icon_ammo.png" id="1_wxkd3"]
 [ext_resource type="PackedScene" uid="uid://buhidaqt8us0h" path="res://src/ammo/cartridges.tscn" id="3_emy52"]
 
 [resource]

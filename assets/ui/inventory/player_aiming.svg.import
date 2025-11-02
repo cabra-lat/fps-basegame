@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bu52pdeq0jup2"
-path.s3tc="res://.godot/imported/player_body.png-edd8ce368cb5f925faf6c3ed63f4690e.s3tc.ctex"
+uid="uid://b2lv0clbc536f"
+path.s3tc="res://.godot/imported/player_aiming.svg-097211a68b99b7310f6e153a9c1f200c.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/ui/inventory/player_body.png"
-dest_files=["res://.godot/imported/player_body.png-edd8ce368cb5f925faf6c3ed63f4690e.s3tc.ctex"]
+source_file="res://assets/ui/inventory/player_aiming.svg"
+dest_files=["res://.godot/imported/player_aiming.svg-097211a68b99b7310f6e153a9c1f200c.s3tc.ctex"]
 
 [params]
 
@@ -39,3 +39,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=0
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

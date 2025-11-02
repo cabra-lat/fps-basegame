@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AmmoFeed" load_steps=5 format=3 uid="uid://si2pgg0pilt1"]
+
+[ext_resource type="Script" uid="uid://174ja52pe154" path="res://addons/cabra.lat_shooters/src/core/item.gd" id="1_bs1w3"]
+[ext_resource type="Texture2D" uid="uid://da5beao6fpa82" path="res://assets/ui/inventory/icon_stock_mag.png" id="2_m458j"]
+[ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="3_d61g4"]
+[ext_resource type="PackedScene" uid="uid://dfttkw0dhj0mx" path="res://src/weapons/magazine_ak47.tscn" id="4_hupdp"]
+
+[resource]
+script = ExtResource("3_d61g4")
+description = "Plastic ABS modern 30 round magazine"
+type = 1
+empty_mass = 250.0
+compatible_calibers = ["7.62x39mm"]
+icon = ExtResource("2_m458j")
+view_model = ExtResource("4_hupdp")
+metadata/_custom_type_script = "uid://6ckswbqpufn8"

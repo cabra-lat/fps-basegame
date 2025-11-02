@@ -7,7 +7,7 @@
 render_priority = 0
 shader = ExtResource("1_05avb")
 shader_parameter/mesh_segments_length = 64
-shader_parameter/mesh_segments_circumference = 10
+shader_parameter/mesh_segments_circumference = 64
 shader_parameter/gap_segments = 1
 shader_parameter/scale = 1.0
 shader_parameter/center_of_mass = 0.0
@@ -99,4 +99,3 @@ shader_parameter/stamp_ao_darkness = 0.651
 
 [resource]
 material = SubResource("ShaderMaterial_aeqdp")
-radial_segments = 8

@@ -11,16 +11,11 @@ var can_connect_signals: bool = false
 
 func _ready():
   # Create and load a magazine
-  var magazine = AmmoFeed.new()
-  magazine.name = "AK-47 Magazine"
-  magazine.compatible_calibers = ["7.62x39mm"]
-  magazine.icon = preload("res://assets/ui/inventory/icon_stock_mag.png")
-  magazine.max_capacity = 30
-  magazine.type = AmmoFeed.Type.EXTERNAL
+  var magazine = weapon.ammo_feed.duplicate(true)
 
     # Fill with ammunition
   for i in range(30):  # Load 10 rounds for testing
-    var cartridge = ammo.duplicate()
+    var cartridge = ammo.duplicate(true)
     cartridge.name = "7.62x39mm Round " + str(i)
     magazine.insert(cartridge)
 
@@ -51,7 +46,7 @@ func _on_player_equipped(item: Item, _slot_name: String):
   if item is Weapon:
     _connect_weapon_signals(item as Weapon)
 
-func _connect_weapon_signals(weapon: Weapon):
+func _connect_weapon_signals(_weapon: Weapon):
   if weapon:
     print("DEBUG: Connecting to weapon signals: ", weapon.name)
     for sig in weapon.get_signal_list():
@@ -116,7 +111,7 @@ func _on_cartridge_ejected(_weapon: Weapon, _cartridge: Ammo):
 func _on_cartridge_inserted(_weapon: Weapon, _cartridge: Ammo):
   $HUD.show_popup("[ Cartridge insertion sound ]")
 
-func _on_player_landed(player: PlayerController, max_velocity: float, delta: float) -> void:
+func _on_player_landed(_player: PlayerController, max_velocity: float, delta: float) -> void:
   var letal_g = player.config.letal_acceleration
   var a = abs(max_velocity - player.velocity.length()) / (2.0 * delta)
   var g = a / player.config.gravity

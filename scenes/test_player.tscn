@@ -168,13 +168,17 @@ graph_offset = Vector2(95, -63.76543)
 script = ExtResource("1_cnysa")
 
 [node name="Cursor3D" parent="." instance=ExtResource("7_tqsn0")]
+process_mode = 4
+visible = false
 position = Vector2(474, 355)
 scale = Vector2(0.839807, 0.839807)
 animation = &"cross"
 hide_if_idle = false
 
 [node name="Interactor3D" parent="." node_paths=PackedStringArray("follow", "Cursor") instance=ExtResource("6_vsj1y")]
+process_mode = 4
 transform = Transform3D(0.998363, -1.45519e-11, 4.65661e-10, -4.00178e-11, 0.998363, -2.56784e-05, -1.62981e-09, 2.56747e-05, 0.998363, 0, 1.7481184, 0)
+visible = false
 collision_mask = 6
 debug_shape_custom_color = Color(0, 0, 0, 0)
 follow = NodePath("../Player/Head/Camera3D")
@@ -190,7 +194,7 @@ visible = false
 
 [node name="Platform" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 0, 0.00437784)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform"]
@@ -203,7 +207,7 @@ shape = SubResource("BoxShape3D_5uk0x")
 
 [node name="Platform9" type="StaticBody3D" parent="Level"]
 transform = Transform3D(0.59129566, 0.80645496, 0, -0.80645496, 0.59129566, 0, 0, 0, 1, -31.345295, 16.031086, 0.00437784)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 constant_linear_velocity = Vector3(10, 10, 0)
 
@@ -216,7 +220,7 @@ shape = SubResource("BoxShape3D_5uk0x")
 
 [node name="Platform2" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -2.9469411, 8.511776)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform2"]
@@ -227,7 +231,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform3" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -11.679918, 16.026487)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform3"]
@@ -238,7 +242,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform4" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, -29.594725, 29.43588)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform4"]
@@ -249,7 +253,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform5" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 0.98549396, 0.1697107, 0, -0.1697107, 0.98549396, -0.00212133, -30.434336, 19.59503)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform5"]
@@ -260,7 +264,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform6" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, -0.7971837, 0.6037369, 0, -0.6037369, -0.7971837, -0.00212133, -28.308765, 8.02249)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform6"]
@@ -271,7 +275,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform7" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, -0.74816877, -0.66350836, 0, 0.66350836, -0.74816877, -0.00212133, -18.125801, -0.619668)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform7"]
@@ -282,7 +286,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="Platform8" type="StaticBody3D" parent="Level"]
 transform = Transform3D(1, 0, 0, 0, 0.626699, -0.77926135, 0, 0.77926135, 0.626699, -0.00212133, -7.572612, -11.908952)
-collision_layer = 7
+collision_layer = 15
 collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform8"]
@@ -292,8 +296,8 @@ shape = SubResource("BoxShape3D_5uk0x")
 mesh = SubResource("BoxMesh_lx1hn")
 
 [node name="WorldGround" type="StaticBody3D" parent="Level"]
-collision_layer = 7
-collision_mask = 7
+collision_layer = 15
+collision_mask = 15
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Level/WorldGround"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -31.1081, 0)
