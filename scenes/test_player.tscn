@@ -168,17 +168,13 @@ graph_offset = Vector2(95, -63.76543)
 script = ExtResource("1_cnysa")
 
 [node name="Cursor3D" parent="." instance=ExtResource("7_tqsn0")]
-process_mode = 4
-visible = false
 position = Vector2(474, 355)
-scale = Vector2(0.839807, 0.839807)
+scale = Vector2(0.22370496, 0.22370496)
 animation = &"cross"
 hide_if_idle = false
 
 [node name="Interactor3D" parent="." node_paths=PackedStringArray("follow", "Cursor") instance=ExtResource("6_vsj1y")]
-process_mode = 4
 transform = Transform3D(0.998363, -1.45519e-11, 4.65661e-10, -4.00178e-11, 0.998363, -2.56784e-05, -1.62981e-09, 2.56747e-05, 0.998363, 0, 1.7481184, 0)
-visible = false
 collision_mask = 6
 debug_shape_custom_color = Color(0, 0, 0, 0)
 follow = NodePath("../Player/Head/Camera3D")

@@ -12,6 +12,7 @@ type = 5
 bullet_mass = 7.9
 cartridge_mass = 13.43
 muzzle_velocity = 720.0
+recoil_impulse = 2000.0
 ballistic_coefficient = 0.275
 bullet_length = 39.0
 sectional_density = 173.232
