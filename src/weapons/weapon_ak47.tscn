@@ -1,9 +1,7 @@
-[gd_scene load_steps=9 format=4 uid="uid://cpqqv1tvvtk7a"]
+[gd_scene load_steps=6 format=4 uid="uid://cpqqv1tvvtk7a"]
 
 [ext_resource type="Script" uid="uid://cl1v3jhv7weaq" path="res://addons/cabra.lat_shooters/src/world/weapon_3d.gd" id="1_ttqpt"]
 [ext_resource type="Material" uid="uid://bv20ahhlxbd3o" path="res://src/weapons/material_ak47.tres" id="2_ttqpt"]
-[ext_resource type="Shader" uid="uid://cajifd811rl44" path="res://shaders/psx/psx_lit_metal.gdshader" id="3_3tbhq"]
-[ext_resource type="Material" uid="uid://bnthfpa4xsdt4" path="res://src/weapons/material_ak47_tactical.tres" id="3_ff17o"]
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_ff17o"]
 _surfaces = [{
@@ -30,7 +28,7 @@ _surfaces = [{
 "format": 34359742487,
 "index_count": 78,
 "index_data": PackedByteArray("CgALABQAFAAVAAoAAgAAABYAFgAXAAIAGAAHAAQABAAZABgADQAOABoAGgAbAA0AHAAdAB4AHgAfABwABgAgACEAIQAFAAYAIgAjACQAJAAlACIAJgAnACgAKAApACYAKgArACwALAAtACoAEAARABIAEgATABAACAAJAC4ALgAvAAgADAAwADEAMQAPAAwAAwAyADMAMwABAAMA"),
-"material": ExtResource("3_ff17o"),
+"material": ExtResource("2_ttqpt"),
 "name": "Material",
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
@@ -38,37 +36,25 @@ _surfaces = [{
 "vertex_data": PackedByteArray("Nw8Xu0QVOjwLZLm9Byrquj3j8rxhG6+9Tw8XO0QVOjwLZLm9BSrqOj3j8rxhG6+9Tw8XO0QVOjwLZLm9BSrqOj3j8rxhG6+9BSrqOiq6+Lxzsa29RQ8XOxxHRzwaJFe9Byrquiq6+Lxzsa29Byrquj3j8rxhG6+9Nw8Xu0QVOjwLZLm9QQ8XuxxHRzwaJFe9Byrquiq6+Lxzsa29QQ8XuxxHRzwaJFe9RQ8XOxxHRzwaJFe9BSrqOiq6+Lxzsa29BSrqOiq6+Lxzsa29BSrqOj3j8rxhG6+9Byrquj3j8rxhG6+9Byrquiq6+Lxzsa29BSrqus5BB7wJjIq9ACrqugj/BLwvXJu9ACrqugj/BLwvXJu9DCrqOgj/BLwvXJu9ByrqOs5BB7wJjIq9DCrqOgj/BLwvXJu9ByrqOs5BB7wJjIq9BSrqus5BB7wJjIq9BSrqOpJQsLwMLJ69DCrqOgj/BLwvXJu9ACrqugj/BLwvXJu9ByrqupJQsLwMLJ69AyrqOsLOs7zhe5a9BSrqOpJQsLwMLJ69CSrqusLOs7zhe5a9ByrqupJQsLwMLJ69ACrqugj/BLwvXJu9BSrqus5BB7wJjIq9AyrqOsLOs7zhe5a9ByrqOs5BB7wJjIq9DCrqOgj/BLwvXJu9BSrqOpJQsLwMLJ69CSrqusLOs7zhe5a9BSrqus5BB7wJjIq9ByrqOs5BB7wJjIq9AyrqOsLOs7zhe5a9ByrqupJQsLwMLJ69CSrqusLOs7zhe5a9CSrqusLOs7zhe5a9AyrqOsLOs7zhe5a9BSrqOpJQsLwMLJ69ByrqupJQsLwMLJ69BckAAMY+AveMQP3/+WvA2gXJAAA3P2X3jED9//lrwNq1/MF8f89Z//7//3/vJv3//v//f+8m/f+1/MF86s9a/wAA/n+1AQCAAAD+f7UBAIBFA8N83P0BgEUDw3xfAQKA/n+HNuwtGYr9f4ZJTz/hiP1/hknjPkCJ/n+HNuwtGYoGwQAA2zb69QbBAADbNvr1BsEAANs2+vUGwQAA2zb69UUDw3yS/QKARQPDfFf7B4AFyQAA0UGu+QXJAABnQjH6tfzBfFnPWP+1/MF8Hs5U//1/hkn1QZOG/X+GSYZCFobjC/z/S2fW7uML/P9LZ9bu4wv8/0tn1u7jC/z/S2fW7v7//3/vJv3//v//f+8m/f8AAP5/tQEAgAAA/n+1AQCAAAD+f7UBAIAAAP5/tQEAgP7//3/vJv3//v//f+8m/f/+//9/7yb9//7//3/vJv3//X/HWdBKqYr9f8dZ0Eqpiv1/x1nQSqmK/X/HWdBKqYoAAP5/tQEAgAAA/n+1AQCA/n+HNuwtGYr+f4c27C0ZioxA/f/5a8DajED9//lrwNo=")
 }]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_3qb1m"]
-render_priority = 0
-shader = ExtResource("3_3tbhq")
-shader_parameter/modulate_color = Color(1, 1, 1, 1)
-
 [node name="weapon_ak47" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
 collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_ttqpt")
 auto_disable_physics = true
 grabbable_mesh = NodePath("GUN")
-grab_points = [NodePath("HandPistolGrip"), NodePath("ThumbPistolGrip"), NodePath("HandHandguard"), NodePath("ThumbHandguard")]
+grab_points = [NodePath("PistolGrip"), NodePath("Handguard")]
+grab_point_weights = Array[int]([1, 100])
 spring_constant = Vector3(3000, 3000, 3000)
 angular_spring_constant = Vector3(1000, 3000, 1000)
-linear_damping_per_axis = Vector3(40, 40, 40)
+linear_damping_per_axis = Vector3(20, 20, 20)
 angular_damping_per_axis = Vector3(20, 20, 20)
 
-[node name="HandPistolGrip" type="Marker3D" parent="."]
+[node name="PistolGrip" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.036451984, 0.014971316)
 gizmo_extents = 0.05
 
-[node name="ThumbPistolGrip" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.004792057, -0.004777409)
-gizmo_extents = 0.05
-
-[node name="HandHandguard" type="Marker3D" parent="."]
+[node name="Handguard" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.027579293, -0.41737476)
-gizmo_extents = 0.05
-
-[node name="ThumbHandguard" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.030593306, -0.32767984)
 gizmo_extents = 0.05
 
 [node name="EjectionPoint" type="Marker3D" parent="."]
@@ -90,7 +76,6 @@ shape = SubResource("ConvexPolygonShape3D_qvkg1")
 [node name="TRIGGER" type="MeshInstance3D" parent="."]
 mesh = SubResource("ArrayMesh_qvkg1")
 skeleton = NodePath("")
-surface_material_override/0 = SubResource("ShaderMaterial_3qb1m")
 
 [node name="MuzzlePoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00022821128, 0.014596257, -0.73184776)
