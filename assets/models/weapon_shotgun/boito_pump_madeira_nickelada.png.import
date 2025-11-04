@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://djhelv56vptav"
-path.s3tc="res://.godot/imported/AK-47TextureMap.png-2e1c9b02afac19206580fd0e1a73ec90.s3tc.ctex"
+uid="uid://dan24afume2h0"
+path.s3tc="res://.godot/imported/boito_pump_madeira_nickelada.png-4f1f981b15a5ba7a53947ffa57fae01c.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/models/weapon_ak47/AK-47TextureMap.png"
-dest_files=["res://.godot/imported/AK-47TextureMap.png-2e1c9b02afac19206580fd0e1a73ec90.s3tc.ctex"]
+source_file="res://assets/models/weapon_shotgun/boito_pump_madeira_nickelada.png"
+dest_files=["res://.godot/imported/boito_pump_madeira_nickelada.png-4f1f981b15a5ba7a53947ffa57fae01c.s3tc.ctex"]
 
 [params]
 

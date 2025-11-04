@@ -1,0 +1,44 @@
+[gd_scene load_steps=7 format=4 uid="uid://3dj02phgfjrq"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_77rjo"]
+[ext_resource type="Texture2D" uid="uid://pmm60gh8l8ow" path="res://assets/models/weapon_pistol/suppressor.png" id="2_6nwkw"]
+[ext_resource type="Script" uid="uid://cl1v3jhv7weaq" path="res://addons/cabra.lat_shooters/src/world/weapon_3d.gd" id="3_6nwkw"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bw1cw"]
+render_priority = 0
+shader = ExtResource("1_77rjo")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_6nwkw")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_6nwkw"]
+_surfaces = [{
+"aabb": AABB(-0.01281987, -0.010782819, -0.12003164, 0.027485248, 0.024123412, 0.11852972),
+"attribute_data": PackedByteArray("AABZPwAAXD4AAFk/AAB7PwAAgDwAAFs/AACAPAAAez8AAIA8AAAZPwAAgDwAAK4+AACAPAAAXD4AAHs/AACOPgAAez8AAHA/AABaPwAAyD4AAFo/AACOPgAAWj8AABw/AABaPwAAcD8AAGM/AACgPAAAdz8AAKA8AAB3PwAAoDwAAGM/AACgPAAAZD8AAEQ+AAB2PwAARD4AAHc/AACgPAAAZD8AAEQ+AABjPwAAoDwAAHY/AABEPgAAZD8AAEQ+AABZPwAAGT8AAFk/AAA5PwAAgDwAADk/AABZPwAAWz8AAIA8AADyPgAAWT8AAPI+AABZPwAArj4AALA9AAAkPgAAJD4AABA9AACwPQAAmD0AACQ+AABQPgAAcD4AACQ+AABwPgAAmD0AAHs/AAD+PgAAez8AADg/AABjPwAAoDwAAGQ/AABEPgAAXz8AAIg9AAB9PwAAiD0AAG4/AAAsPgAAez8AAMg+AABaPwAA/j4AAHs/AAAcPwAAWj8AADg/AAB7PwAAVD8AAFo/AABUPwAAdz8AAKA8AAB2PwAARD4AAHY/AABEPgAAbj8AAAA9AABfPwAACD4AAH0/AAAIPg=="),
+"format": 34359742487,
+"index_count": 132,
+"index_data": PackedByteArray("GAAZABoAGgAZABsAGgAEABgAGwACABoAAwACABsAGwABAAMAGAAEABwAHAAdABgAHgAdABwAHAAFAB4AAAAeAAUABQAGAAAAHwAgACEAHwAiACAAIgAjACAAIwAkACAABwAsAAkACQAKAAcALQAJACwALAAlAC0ACwAtACUAJQAuAAsACwAuACYAJgAvAAsALwAmADAAMAAxAC8AMQAwAAgACAAMADEAJwARABIAEgAyACcAJwAyADMAMwAUACcAFAAzABMAEwAVABQAFQATABYAFgAXABUAKAANAA4ADgA0ACgAKAA0AA8ADwAQACgANQA2ACkANQAqADYAKgA3ADYANwArADYA"),
+"material": SubResource("ShaderMaterial_bw1cw"),
+"name": "Suppressor",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 56,
+"vertex_data": PackedByteArray("csZRvGARnTqyyfW9csZRvGARnTqyyfW9z12+u2yqMLxQ13u8bwpSvGDfhjrAi3u8EANwPEAvsjqgd3u8eL7Hu0AXVTwQNnu8bwpSvGDfhjrAi3u8h+oxvMAIhzoAbMe6h+oxvMAIhzoAbMe6euCeuwifFLwQy3u8j+ExvKD3iTpQinu8LdpPPAAXrzoQeXu8j+ExvKD3iTpQinu8z12+u2yqMLxQ13u8euCeuwifFLwQy3u8LdpPPAAXrzoQeXu8EANwPEAvsjqgd3u8EANwPEAvsjqgd3u8LdpPPAAXrzoQeXu8j+ExvKD3iTpQinu8eL7Hu0AXVTwQNnu8bwpSvGDfhjrAi3u8euCeuwifFLwQy3u8z12+u2yqMLxQ13u8DEdwPGBhyDoux/W92BsCPCwvK7zm0fW91tcBPGz1LbxQzXu8ztW9uyzkLbwm0/W9Bk/6O0DMVzwALHu8B9f6O4CSWjy+vfW9dDbHu4jdVzz+vvW9dDbHu4jdVzz+vvW9DEdwPGBhyDoux/W9B9f6O4CSWjy+vfW9csZRvGARnTqyyfW9ztW9uyzkLbwm0/W92BsCPCwvK7zm0fW9U8niO/CqEryALcm6xb/aOwBjOzwA3MS6Bk/6O0DMVzwALHu81tcBPGz1LbxQzXu8U8niO/CqEryALcm6h+oxvMAIhzoAbMe6xb/aOwBjOzwA3MS6aPKeu+T8FLyAcsm6QdviOxBNEryAwnu8NdFPPAAorDoA4sa6s9HaO+DAOzxAOHu8+fumuwgROTyAIMW6Cuqmu+huOTzgQHu8s9HaO+DAOzxAOHu8Cuqmu+huOTzgQHu8QdviOxBNEryAwnu8aPKeu+T8FLyAcsm6NdFPPAAorDoA4sa6+fumuwgROTyAIMW6hQF0fsv/+/+FAXR+y//7/+RR+C3L//v/hQF0fsv/+/9z/oSBy//7/15QP9DL//v/hQF0fsv/+/+FAXR+/H/kv4UBdH78f+S/5FH4Lfx/5L+FAXR+/H/kv3P+hIH8f+S/hQF0fvx/5L/6f8t/+a3w6Pp/y38Dquvq+n/Kf3UFRD36f8p/hAHEQPp/yn+EAcRA+n/KfzYIIET6f8p/c/7BwPp/yn98t09k+n/Kf1HxUMf6f8t/07EE5/p/y3/5rfDoc/6Egcv/+/+9r6Evy//7/72voS/L//v/5FH4Lcv/+//5reHRy//7//mt4dHL//v/XlA/0Mv/+//L//j/jITSfcv/+P+8gTx/y//4//KHHnzL//j/vIE8f8v/+P9gfkt/y//4/9J6hH29r6Ev/H/kv/mt4dH8f+S/+n/KfzxazpL6f8t/o0i8G/p/yn9fMCjY+n/Kf3stttb6f8p/Dy7/1uRR+C38f+S/va+hL/x/5L9z/oSB/H/kv/mt4dH8f+S/XlA/0Px/5L9eUD/Q/H/kv/p/yn/kUfuW+n/Kf8KvLmj6f8t/YVDfF/p/yn/HLd3W+n/Kf1suJtf6f8p/Dy7/1g==")
+}]
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_6nwkw"]
+points = PackedVector3Array(-0.013740474, -0.00045034324, -0.12094048, 0.016354762, 0.003305301, -0.013733558, 0.016354762, -0.00045034324, -0.013733558, -0.01185805, 0.003305301, -0.0005595274, 0.008828007, 0.014592856, -0.12094048, 0.008828007, -0.011740476, -0.12094048, -0.0080961455, -0.011740476, -0.013733558, -0.0080961455, 0.014592856, -0.013733558, -0.0080961455, 0.014592856, -0.12094048, 0.008828007, -0.009858787, -0.0005595274, 0.008828007, 0.012711167, -0.0005595274, 0.016354762, -0.00045034324, -0.12094048, -0.0080961455, -0.011740476, -0.12094048, -0.013740474, 0.003305301, -0.013733558, -0.013740474, -0.002332032, -0.013733558, 0.008828007, 0.014592856, -0.013733558, 0.016354762, 0.003305301, -0.12094048, -0.0062166657, -0.009858787, -0.0005595274, 0.010710431, -0.009858787, -0.013733558, -0.013740474, 0.003305301, -0.12094048, 0.014472337, -0.00045034324, -0.0005595274, -0.0062166657, 0.012711167, -0.0005595274, 0.010710431, 0.012711167, -0.013733558, 0.010710431, -0.009858787, -0.12094048, 0.010710431, 0.012711167, -0.12094048, -0.01185805, -0.002332032, -0.0005595274, 0.008036515, -0.010354823, -0.018681543, 0.014472337, 0.003305301, -0.0005595274, -0.0080961455, 0.0108294785, -0.0005595274, -0.0080961455, -0.007977098, -0.0005595274)
+
+[node name="weapon_pistol" type="RigidBody3D"]
+collision_layer = 2
+collision_mask = 2
+script = ExtResource("3_6nwkw")
+
+[node name="SILENCER" type="MeshInstance3D" parent="."]
+mesh = SubResource("ArrayMesh_6nwkw")
+skeleton = NodePath("")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("ConvexPolygonShape3D_6nwkw")

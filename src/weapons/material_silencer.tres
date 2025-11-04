@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://d2vke0rtc8q7a"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_pfyca"]
+[ext_resource type="Texture2D" uid="uid://cowuvrskce53e" path="res://assets/models/weapon_pistol/beretta_m9_wood.png" id="2_pfyca"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_pfyca")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_pfyca")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)

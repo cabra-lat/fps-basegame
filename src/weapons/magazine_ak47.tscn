@@ -21,16 +21,22 @@ _surfaces = [{
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_pka7p"]
 points = PackedVector3Array(-0.0132059, -0.121468425, -0.052917153, 0.015441271, 0.0240127, 0.02958572, -0.014812699, 0.0240127, 0.02958572, -0.011786117, -0.10907633, -0.14891268, 0.015441271, -0.16961269, -0.10652456, 0.012411728, 0.0240127, -0.049075186, 0.015441271, -0.11512238, -0.14283228, -0.014812699, 0.0240127, -0.04000699, -0.014812699, -0.16961269, -0.10652456, 0.0133, -0.059816316, -0.00383661, -0.0133, -0.05918784, -0.0011343168, 0.015441271, -0.006255485, 0.02958572, 0.012411728, -0.11210883, -0.14891268, -0.014812699, -0.11512238, -0.14283228, -0.011786117, 0.020980194, -0.05211539, 0.0133, -0.098767355, -0.03241001, 0.015441271, 0.0240127, -0.04000699, 0.015441271, -0.16961269, -0.100479096, -0.0133, -0.012909938, 0.020660797, -0.0133, -0.100024305, -0.031090809, 0.015441271, -0.124219894, -0.14283228, 0.009388108, 0.020980194, -0.05211539, 0.015441271, -0.16053413, -0.11561022, -0.0133, -0.067358546, -0.0065752347, 0.012411728, -0.11512238, -0.14891268, -0.0133, -0.037404988, 0.009747513, -0.011786117, 0.0240127, -0.049075186, -0.014812699, 0.020980194, -0.043047197, 0.0133, -0.06760978, -0.009026321)
 
-[node name="RigidBody3D" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
+[node name="MagazineAK47" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
 collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_liq57")
 grabbable_mesh = NodePath("MAG")
-grab_points = [NodePath("GrabPointA"), NodePath("GrabPointB"), NodePath("GrabPointC")]
+grab_points = [NodePath("MagazinePoint")]
 collision_layers_on_grab = 8
 collision_mask_on_grab = 8
 spring_constant = Vector3(1000, 1000, 1000)
-preserve_upright_orientation = false
+angular_spring_constant = Vector3(80, 80, 80)
+linear_damping_per_axis = Vector3(25, 25, 25)
+angular_damping_per_axis = Vector3(20, 20, 20)
+attachment_mode = 1
+enable_attachment = true
+attachment_distance_threshold = 0.01
+attachment_time_threshold = 0.01
 
 [node name="MAG" type="MeshInstance3D" parent="."]
 mesh = SubResource("ArrayMesh_liq57")
@@ -39,11 +45,6 @@ skeleton = NodePath("")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("ConvexPolygonShape3D_pka7p")
 
-[node name="GrabPointA" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.017982531, 0.024441577)
-
-[node name="GrabPointB" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01864053, -0.027376883)
-
-[node name="GrabPointC" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.14197862, -0.12662604)
+[node name="MagazinePoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.1306865e-05, 0.0036079772, -0.013219656)
+gizmo_extents = 0.05

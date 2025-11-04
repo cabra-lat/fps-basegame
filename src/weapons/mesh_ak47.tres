@@ -1,7 +1,7 @@
 [gd_resource type="ArrayMesh" load_steps=5 format=4 uid="uid://c1n5e1762t2f0"]
 
 [ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_w5qds"]
-[ext_resource type="Texture2D" uid="uid://djhelv56vptav" path="res://assets/models/weapon_ak47/AK-47TextureMap.png" id="2_7cij7"]
+[ext_resource type="Texture2D" uid="uid://djhelv56vptav" path="res://assets/models/weapon_ak47/ak47_original.png" id="2_7cij7"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_osqyb"]
 render_priority = 0

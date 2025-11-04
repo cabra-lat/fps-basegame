@@ -1,19 +1,9 @@
-[gd_scene load_steps=12 format=4 uid="uid://cpqqv1tvvtk7a"]
+[gd_scene load_steps=9 format=4 uid="uid://cpqqv1tvvtk7a"]
 
 [ext_resource type="Script" uid="uid://cl1v3jhv7weaq" path="res://addons/cabra.lat_shooters/src/world/weapon_3d.gd" id="1_ttqpt"]
-[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="2_ff17o"]
+[ext_resource type="Material" uid="uid://bv20ahhlxbd3o" path="res://src/weapons/material_ak47.tres" id="2_ttqpt"]
 [ext_resource type="Shader" uid="uid://cajifd811rl44" path="res://shaders/psx/psx_lit_metal.gdshader" id="3_3tbhq"]
-[ext_resource type="Texture2D" uid="uid://db2u1f85qquyu" path="res://src/weapons/weapon_ak47.tres" id="3_osqyb"]
-[ext_resource type="Texture2D" uid="uid://djhelv56vptav" path="res://assets/models/weapon_ak47/AK-47TextureMap.png" id="3_qvkg1"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_osqyb"]
-render_priority = 0
-shader = ExtResource("2_ff17o")
-shader_parameter/modulate_color = Color(1, 1, 1, 1)
-shader_parameter/albedoTex = ExtResource("3_qvkg1")
-shader_parameter/uv_scale = Vector2(1, 1)
-shader_parameter/uv_offset = Vector2(0, 0)
-shader_parameter/uv_pan_velocity = Vector2(0, 0)
+[ext_resource type="Material" uid="uid://bnthfpa4xsdt4" path="res://src/weapons/material_ak47_tactical.tres" id="3_ff17o"]
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_ff17o"]
 _surfaces = [{
@@ -22,7 +12,7 @@ _surfaces = [{
 "format": 34359742487,
 "index_count": 1665,
 "index_data": PackedByteArray("AAABAAIAAgADAAAABAAFAAYABgAHAAQAhgIKAAgACAAJAIYCCwAMAIcChwKIAgsADQAOAA8ADQAQAA4ADQAPAIkCDQCJAhEAEgATABQAFAAVABIAFgAXABgAGAAZABYAGgAbABwAHAAdABoAHgAfACAAIAAhAB4AIgAjACQAJAAlACIAJgCKAosCiwInACYAKAApACoAKgArACgAKwAsAC0ALQAuACsALwAuADAAMAAxAC8AMgAzACgAKACMAjIAOwA8AD0APQA+ADsAPwBAAEEAQQBCAD8AQwBEAEUARQBGAEMANgA3ADUANQA0ADYAOQA6ADgAOACNAjkAjgJJAEcAjgJIAEkAjgJKAEgASgBLAEgAjwJOAEwATABNAI8CUQBSAFMAUwBUAFEAVQBWAFcAVwBYAFUATwCQApECkQJQAE8AWQBaAFsAWwBcAFkAXQBeAF8AXwBgAF0AYQBiAGMAYwBkAGEAZQBmAGcAZwBoAGUAaQBqAGsAawBsAGkAbQBuAJICkgJwAG0AdAB1AHYAdgB3AHQAkwJ4AJQClAKVApMCfQB7AJYClgKXAn0AfACYApkCmQJ+AHwAfwCAAIEAgQCCAH8AgwCEAIUAhQCGAIMAcgCaApsCmwJzAHIAhwCIAIkAiQCKAIcAiwCMAI0AjQCOAIsAcQCcAp0CnQJvAHEAeQB6AJ4CngKfAnkAjwCQAJEAkQCSAI8AkwCUAJUAlQCWAJMAlwCYAJkAmQCaAJcAmwCcAJ0AnQCeAJsAnwCgAKEAoQCiAJ8AoAKkAKUApQChAqACogKjAqQCpAKlAqICqQCnAKYCpgKnAqkAqAKpAqsAqwCsAKgCqgKxAK8ArwCrAqoCqACsAq0CrQKqAKgArgKvArACsAKxAq4CsgKzArQCtAK1ArICtgK3ArgCuAK5ArYCswC0ALUAtQC2ALMArQCuALoCugK7Aq0AsgC8Ar0CvQKwALIApgCjAL4CvgK/AqYAwALBArkAuQC3AMACwQLAAsICwgLDAsECxALFAsYCxgLHAsQCyAK+ALsAuwDJAsgCygLBAL8AvwDLAsoCxQDGAMwCzALNAsUAvAC9AM4CzgLPArwA0ALRAtIC0gLTAtAC1ALVAtYC1gLXAtQCxwDIAMkAyQDKAMcA2ALAAMIAwgDZAtgCwwDEANoC2gLbAsMA3AK6ALgAuADdAtwCywDMAM0AzQDeAssA0ADNAMwAzADRANAA0gDTAN8C3wLVANIA0gDVANcA1wDYANIA2QDaANsA2wDcANkA3QDeAN8A3wDgAN0A7ADgAuEC4QLrAOwAzgDiAuMC4wLPAM4A1gDkAuUC5QLUANYA4QDiAOMA4wDkAOEA5QDmAOcA5wDoAOUA6QDqAOYC5gLnAukA7QDuAO8A7wDwAO0A8QDyAPMA8wD0APEA9QD2APcA9wD4APUA+QD6APsA+wD8APkA/QD+AP8A/wAAAf0A6AILAekC6QLqAugCAQHrAuwC7AIDAQEBBwEFAe0C7QIGAQcBDQHuAu8C7wLwAg0B8QLyAvMCFQEWAfQC9AL1AhUB9gL3AvgCGQEaARsBGQEcARoBHAEdARoBCAH5AvoC+gL7AggBCQH8Av0C/QL+AgkBGAH/AgADAAMXARgBAQMCAwoBDAEDAwQDBAMPAQwBBQMGAwcDBwMIAwUDHgEfASABIAEJAx4BLQEvAQoDIwEkASUBJQELAyMBKAEpASoBKgErASgBDAMNAyYBJgEnAQwDLAEOAw8DDwMuASwBIQEQAxEDEQMiASEBEAESAxMDEwMUAxABMAExATIBMgEzATABNAE1ATYBNgE3ATQBOAE5ARUDFgMXAxgDGQMaAxsDBAEcAx0DHQMCAQQBFAESAR4DHgMfAxQBIAMhAzoBOgE7ASADIgM9AT4BPgEjAyIDJAMlAz8BPwE8ASQDJgMnAygDEQEpAyoDKgMTAREBKwMsAy0DLgMOAS8DMANSATEDMgNaATMDMwM0AzIDRgE1AzYDQAFBAUIBQgFDAUABNwM4AzkDSQFKAUsBSwFMAUkBOgM7AzwDPQNVAVYBVgFUAT0DPgNOAVABUAFPAT4DRwE/A0ADQANFAUcBXAFBA0IDQgNbAVwBQwNEA1EBUQFTAUMDXQFFA0YDRgNgAV0BWAFZAUcDRwNXAVgBSANNAUkDSQNKA0gDRAFIAUsDSwNMA0QBYQFiAWMBYwFkAWEBTQNeAV8BXwFOA00DZQFmAU8DTwNQA2UBUQNrAWwBbAFSA1EDbwFwAVMDUwNUA28BVQNWA3YBdgF3AVUDVwNYA3EBcQFyAVcDcwFZA3QBdAF1AXMBWgNqAVsDWwNcA1oDXQNeA18DXwNnAV0DYANhA2IDYgNjA2ADegF7AXwBfAFkA3oBbQFlA2YDZgNuAW0BeQFnA2gDaAN4AXkBaAFpAWkDaQNqA2gBgQFrA2wDbAOAAYEBgwGEAYUBhQGGAYMBhwGIAYkBiQFtA4cBjAGNAY4BjgGPAYwBigFuA28DbwOLAYoBcANxA4IBggF/AXADkgGQAXIDcgNzA5IBfQF0A3UDdQN+AX0BdgN3A3gDeAN5A3YDlAGVAZYBlgGXAZQBegOaAZgBmAF7A3oDfAOTAZEBkQF9A3wDmQF+A38DfwOAA5kBmwGcAZ0BnQGeAZsBowGkAaUBpQGmAaMBuQG6AbsBuwG8AbkBwQHCAcMBwwHEAcEBxQGBA8YBxgHHAcUByAGCA8kByQHKAcgBpwGDA6gBqAGpAacBnwGEA4UDhQOgAZ8BvQG+AYYDhgOHA70BiAPAAb8BvwGJA4gDqgGKA6sBqwGsAaoBiwOMA40DjQOOA4sDoQGPA5ADkAOiAaEBkQOSA5MDkwOUA5EDlQOWA5cDlwOYA5UDmQOaA8wBzAGbA5kDnAOdA64BrgGeA5wDnwPNAcsBywGgA58DoQOvAa0BrQGiA6EDowOkA6UDpQOmA6MDzwHQAc4BzgGnA88B0gHTAdEB0QGoA9IBqQOwAbEBsQGyAakDtAG1AbMBswGqA7QBtgG3AasDqwO4AbYB1QHWAdQB1AGsA9UB1wHYAdkB2QHaAdcB2wHcAd0B3QHeAdsB3wHgAeEB4QHiAd8B4wHkAeUB5QHmAeMB5wHoAekB6QHqAecBrQPtAesB6wHsAa0D/wEAAq4DrgOvA/8B8wHxAbADsAPyAfMB9AGxA7ID9QH2AbIDsgOzA/UB9wH4AfkB+QH6AfcB+wH8Af0B/QH+AfsBtAO1AwECAQICArQD7wG2A7cDtwPwAe8BAwIEAgUCBQIGAgMC7gG4A7kDugMQAhECEQK7A7oDvAO9A74DvgO/A7wDwAMVAhMCEwLBA8ADwgPDAwwCDAINAsIDxAMJAgcCBwLFA8QDDwLGA8cDxwMSAg8CyAPJA8oDygPLA8gDzAPNA84DzgPPA8wD0APRA9ID0gPTA9ADFgLUA9UD1QMUAhYCCgIIAtYD1gPXAwoCCwLYA9kD2QMOAgsC2gMYAtsDKAIpAtwD3APdAygC3gMjAt8D4APeA98D3wMkAuAD4QMcAh0CHQLiA+ED4wPkAyECIQIiAuMDHwIgAuUD5QPmAx8CJwLnA+gD6AMqAicC6QPqA+sD6wMXAukDKwIsAi0CLQIuAisCGQIaAuwD7APtAxkCGwLuA+8D7wMeAhsCJgLwA/ED8QMlAiYCLwLyA/MD8wMxAi8CMwI0AjUCNQI2AjMCNwL0A/UD9QM5AjcCPQI7AvYD9gP3Az0C+AP5Az4CPgI8AvgD+gMwAjICMgL7A/oDOAI6AvwD/AP9AzgCUwL+A/8D/wNSAlMCAAT/A/4D/gMBBAAEAgQDBEACQAJBAgIEAwQCBAQEBAQFBAMEBgQHBAgECAQ/AgYECQRDAkYCRgIKBAkECwRNAk4CTgIMBAsEDQQOBA8EDwQQBA0EEQQSBBMESwJMAhQEFAQVBEsCFgRQAlECUQIXBBYEQgIYBEQCRAJFAkICSgIZBBoEGgQbBEoCHARUAh0EHQQeBBwEHwQgBCEEIQQiBB8EIwQkBCUEJQQmBCMEJwQoBCkEVwJVAioEKgRWAlcCWAJZAisEKwRaAlgCWwJcAl0CXQJeAlsCLAQtBC4ELgRHAiwELwQwBEgCSAJJAi8ETwIxBDIEMgQzBE8CNAQ1BDYENgQ3BDQEXwJgAmECYQJiAl8COAQ5BIACgAKBAjgEOgRlAmMCYwJkAjoEcAJxAnICcgI7BHACPAQ9BGcCZwJoAjwEPgQ/BEAEQARBBD4EcwJCBEMEQwR0AnMCRAR/AkUERQRGBEQEfgKDAoICggJHBH4CdQJ2AkgESAR3AnUCSQRKBEsESwRMBEkEZgJNBE4ETgRpAmYCeAJ5Ak8ETwR6AngCbQJuAmoCagJvAm0CUARRBIQChAKFAlAEUgRTBGsCawJsAlIEfAJ9AnsCewJUBHwC"),
-"material": SubResource("ShaderMaterial_osqyb"),
+"material": ExtResource("2_ttqpt"),
 "name": "Material",
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
@@ -33,12 +23,6 @@ _surfaces = [{
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_qvkg1"]
 points = PackedVector3Array(0.020034213, 0.079306334, 0.28590077, -0.019781578, -0.09588158, -0.0008150339, -0.019781578, 0.039476514, -0.27134103, 0.012064039, 0.063369885, -0.7252816, 0.020034213, -0.09588158, -0.0008150339, -0.019781578, 0.07132681, 0.33373898, -0.011815302, 0.13505, -0.70125806, 0.012064039, -0.05605176, 0.3256963, 0.020034213, 0.11115663, 0.031042278, -0.011815302, 0.047433436, -0.70125806, -0.019781578, -0.05605176, 0.31775808, 0.012064039, 0.13505, -0.70125806, -0.019781578, 0.11115663, 0.031042278, 0.020034213, 0.079306334, -0.31907478, 0.020034213, -0.04809484, 0.3256963, 0.020034213, 0.07132681, 0.33373898, -0.019781578, 0.079306334, -0.31907478, 0.0041016606, 0.047433436, -0.70125806, 0.020034213, -0.09588158, 0.039084956, -0.011815302, 0.079306334, -0.7252816, -0.019781578, -0.09588158, 0.039084956, -0.010318143, 0.11359458, -0.0038328613, -0.019781578, 0.0076714307, 0.33373898, 0.020034213, 0.039476514, -0.27134103, 0.020034213, 0.0076714307, 0.33373898, -0.019781578, 0.079306334, 0.28590077, -0.011815302, -0.05605176, 0.3256963, 0.020034213, -0.05605176, 0.31775808, 0.012064039, 0.055412963, -0.70125806, -0.011815302, 0.063369885, -0.7252816, 0.012064039, 0.079306334, -0.7252816, -0.0038529234, 0.055412963, -0.7252816)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wnvlt"]
-resource_name = "Material"
-vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("3_osqyb")
-emission_enabled = true
-
 [sub_resource type="ArrayMesh" id="ArrayMesh_qvkg1"]
 _surfaces = [{
 "aabb": AABB(-0.0023049864, -0.030362207, -0.09052285, 0.004609976, 0.042525157, 0.037998185),
@@ -46,7 +30,7 @@ _surfaces = [{
 "format": 34359742487,
 "index_count": 78,
 "index_data": PackedByteArray("CgALABQAFAAVAAoAAgAAABYAFgAXAAIAGAAHAAQABAAZABgADQAOABoAGgAbAA0AHAAdAB4AHgAfABwABgAgACEAIQAFAAYAIgAjACQAJAAlACIAJgAnACgAKAApACYAKgArACwALAAtACoAEAARABIAEgATABAACAAJAC4ALgAvAAgADAAwADEAMQAPAAwAAwAyADMAMwABAAMA"),
-"material": SubResource("StandardMaterial3D_wnvlt"),
+"material": ExtResource("3_ff17o"),
 "name": "Material",
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
@@ -63,15 +47,13 @@ shader_parameter/modulate_color = Color(1, 1, 1, 1)
 collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_ttqpt")
+auto_disable_physics = true
 grabbable_mesh = NodePath("GUN")
 grab_points = [NodePath("HandPistolGrip"), NodePath("ThumbPistolGrip"), NodePath("HandHandguard"), NodePath("ThumbHandguard")]
-collision_layers_on_grab = 2
-collision_mask_on_grab = 2
-spring_constant = Vector3(1000, 1000, 1000)
-angular_spring_constant = Vector3(80, 80, 80)
-linear_damping_per_axis = Vector3(25, 25, 25)
+spring_constant = Vector3(3000, 3000, 3000)
+angular_spring_constant = Vector3(1000, 3000, 1000)
+linear_damping_per_axis = Vector3(40, 40, 40)
 angular_damping_per_axis = Vector3(20, 20, 20)
-preserve_upright_orientation = false
 
 [node name="HandPistolGrip" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.036451984, 0.014971316)
@@ -93,16 +75,9 @@ gizmo_extents = 0.05
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.004, 0.060884938, -0.19077806)
 gizmo_extents = 0.05
 
-[node name="MagazinePointA" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.029248957, -0.15797552)
+[node name="MagazinePoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00011410564, 0.0036079772, -0.20384352)
 gizmo_extents = 0.05
-
-[node name="MagazinePointB" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.031590268, -0.22330841)
-gizmo_extents = 0.05
-
-[node name="MagazinePointC" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.11272967, -0.28460157)
 
 [node name="GUN" type="MeshInstance3D" parent="."]
 mesh = SubResource("ArrayMesh_ff17o")
@@ -116,3 +91,7 @@ shape = SubResource("ConvexPolygonShape3D_qvkg1")
 mesh = SubResource("ArrayMesh_qvkg1")
 skeleton = NodePath("")
 surface_material_override/0 = SubResource("ShaderMaterial_3qb1m")
+
+[node name="MuzzlePoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00022821128, 0.014596257, -0.73184776)
+gizmo_extents = 0.05

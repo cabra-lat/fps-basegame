@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://bnthfpa4xsdt4"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_c1qqd"]
+[ext_resource type="Texture2D" uid="uid://bwpm7wuqh2ufu" path="res://assets/models/weapon_ak47/ak47_tactical.png" id="2_hjpba"]
+
+[resource]
+resource_name = "Material"
+render_priority = 0
+shader = ExtResource("1_c1qqd")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_hjpba")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)

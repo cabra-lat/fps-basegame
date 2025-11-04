@@ -21,7 +21,7 @@ collision_layer = 4
 collision_mask = 4
 input_ray_pickable = false
 script = ExtResource("1_vdp16")
-auto_disable_physics = false
+auto_disable_physics = true
 grabbable_mesh = NodePath("MeshInstance3D")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]

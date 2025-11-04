@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
 [ext_resource type="PackedScene" uid="uid://c12klxocgrga0" path="res://addons/cabra.lat_shooters/src/ui/inventory/main.tscn" id="3_1jipf"]
 [ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
-[ext_resource type="Texture2D" uid="uid://rwr14fl7ogi4" path="res://assets/skybox.jpg" id="3_yghno"]
+[ext_resource type="Texture2D" uid="uid://d0et3dqyid8pq" path="res://assets/skybox_night.jpg" id="6_hfou0"]
 [ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
 
@@ -71,7 +71,7 @@ material = SubResource("StandardMaterial3D_cnysa")
 size = Vector3(400, 1, 400)
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_tqsn0"]
-panorama = ExtResource("3_yghno")
+panorama = ExtResource("6_hfou0")
 
 [sub_resource type="Sky" id="Sky_6vvmu"]
 sky_material = SubResource("PanoramaSkyMaterial_tqsn0")
@@ -307,7 +307,7 @@ mesh = SubResource("BoxMesh_fam23")
 environment = SubResource("Environment_m5uds")
 
 [node name="Player" parent="." instance=ExtResource("2_yghno")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0.5079155, 0)
 
 [node name="StateMachine" parent="Player" index="3"]
 deterministic = true
