@@ -1,12 +1,15 @@
-[gd_scene load_steps=42 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=45 format=3 uid="uid://pc011sk80jnn"]
 
 [ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
 [ext_resource type="PackedScene" uid="uid://c12klxocgrga0" path="res://addons/cabra.lat_shooters/src/ui/inventory/main.tscn" id="3_1jipf"]
 [ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
+[ext_resource type="Script" uid="uid://ctuq723ii3v1a" path="res://src/control.gd" id="4_oxvr6"]
+[ext_resource type="Texture2D" uid="uid://oeeg1r80cqys" path="res://assets/brazil_relief.png" id="5_10l1y"]
 [ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
-[ext_resource type="PackedScene" uid="uid://blgbqac432x5i" path="res://scenes/world_ground.tscn" id="8_oxvr6"]
+[ext_resource type="Texture2D" uid="uid://rwr14fl7ogi4" path="res://assets/skybox.jpg" id="8_qt7sb"]
+[ext_resource type="Script" uid="uid://bnvsx24aplbc0" path="res://addons/cabra.lat_terrains/chunked_terrain.gd" id="10_ca63f"]
 
 [sub_resource type="Gradient" id="Gradient_fam23"]
 interpolation_mode = 1
@@ -39,10 +42,11 @@ size = Vector3(40, 1, 10)
 [sub_resource type="BoxShape3D" id="BoxShape3D_5uk0x"]
 size = Vector3(40, 1.0087891, 10)
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_hfou0"]
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_ca63f"]
+panorama = ExtResource("8_qt7sb")
 
 [sub_resource type="Sky" id="Sky_6vvmu"]
-sky_material = SubResource("ProceduralSkyMaterial_hfou0")
+sky_material = SubResource("PanoramaSkyMaterial_ca63f")
 
 [sub_resource type="Environment" id="Environment_m5uds"]
 background_mode = 2
@@ -161,7 +165,7 @@ uv1_scale = Vector3(400, 400, 400)
 
 [sub_resource type="BoxMesh" id="BoxMesh_fam23"]
 material = SubResource("StandardMaterial3D_cnysa")
-size = Vector3(400, 1, 400)
+size = Vector3(286, 1, 286)
 
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_cnysa")
@@ -178,6 +182,19 @@ collision_mask = 6
 debug_shape_custom_color = Color(0, 0, 0, 0)
 follow = NodePath("../Player/Head/Camera3D")
 Cursor = NodePath("../Cursor3D")
+
+[node name="DEBUG" type="Control" parent="." node_paths=PackedStringArray("terrain_manager")]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -400.27002
+offset_right = -0.27001953
+offset_bottom = 400.0
+grow_horizontal = 0
+script = ExtResource("4_oxvr6")
+terrain_manager = NodePath("../ChunkedTerrain")
+background_texture = ExtResource("5_10l1y")
 
 [node name="HUD" parent="." instance=ExtResource("3_aiq23")]
 
@@ -295,7 +312,7 @@ mesh = SubResource("BoxMesh_lx1hn")
 environment = SubResource("Environment_m5uds")
 
 [node name="Player" parent="." instance=ExtResource("2_yghno")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 32.287884, 0)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -42.94358, 920.57916, 0)
 
 [node name="StateMachine" parent="Player" index="3"]
 deterministic = true
@@ -311,12 +328,20 @@ collision_mask = 15
 shape = SubResource("WorldBoundaryShape3D_fam23")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="WorldGround"]
-visible = false
 mesh = SubResource("BoxMesh_fam23")
 
-[node name="WorldGround2" parent="." instance=ExtResource("8_oxvr6")]
+[node name="ChunkedTerrain" type="Node3D" parent="."]
+script = ExtResource("10_ca63f")
+spawn_tile_index = Vector2i(0, 0)
+show_spawn_marker = false
+player_node_path = NodePath("../Player")
+camera_node_path = NodePath("../Player/Head/Camera3D")
+preview_radius_chunks = 8
+preview_show_wireframe = false
+metadata/_custom_type_script = "uid://bnvsx24aplbc0"
 
 [connection signal="debug" from="Player" to="." method="_on_player_debug"]
 [connection signal="landed" from="Player" to="." method="_on_player_landed"]
 
+[editable path="HUD"]
 [editable path="Player"]

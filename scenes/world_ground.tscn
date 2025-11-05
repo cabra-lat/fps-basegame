@@ -8,39 +8,38 @@
 render_priority = 0
 shader = ExtResource("2_rmbds")
 shader_parameter/height_texture = ExtResource("3_56rlw")
-shader_parameter/displacement_strength = 2000.0
+shader_parameter/displacement_strength = 1000.0
 shader_parameter/uv_scale = Vector2(1, 1)
 shader_parameter/uv_offset = Vector2(0, 0)
-shader_parameter/deep_water_color = Vector3(0, 0.1, 0.3)
-shader_parameter/shallow_water_color = Vector3(0, 0.3, 0.6)
-shader_parameter/sand_color = Vector3(0.76, 0.7, 0.5)
-shader_parameter/grass_low_color = Vector3(0.2, 0.5, 0.2)
-shader_parameter/grass_high_color = Vector3(0.3, 0.6, 0.3)
-shader_parameter/forest_color = Vector3(0.1, 0.4, 0.1)
-shader_parameter/rock_color = Vector3(0.5, 0.5, 0.5)
-shader_parameter/snow_color = Vector3(1, 1, 1)
-shader_parameter/water_level = 0.245
+shader_parameter/deep_water_color = Color(0, 0.1, 0.3, 1)
+shader_parameter/shallow_water_color = Color(0, 0.3, 0.6, 1)
+shader_parameter/sand_color = Color(0.76, 0.7, 0.5, 1)
+shader_parameter/grass_low_color = Color(0.2, 0.5, 0.2, 1)
+shader_parameter/grass_high_color = Color(0.3, 0.6, 0.3, 1)
+shader_parameter/forest_color = Color(0.1, 0.4, 0.1, 1)
+shader_parameter/rock_color = Color(0.5, 0.5, 0.5, 1)
+shader_parameter/snow_color = Color(1, 1, 1, 1)
+shader_parameter/water_level = 0.1
 shader_parameter/sand_level = 0.12
 shader_parameter/grass_level = 0.2
 shader_parameter/forest_level = 0.4
 shader_parameter/rock_level = 0.7
 shader_parameter/snow_level = 0.85
 shader_parameter/show_contour_lines = true
-shader_parameter/contour_spacing = 0.485
+shader_parameter/contour_spacing = 0.05
 shader_parameter/contour_color = Vector3(0, 0, 0)
-shader_parameter/contour_width = 0.002
+shader_parameter/contour_width = 0.022
 
 [sub_resource type="QuadMesh" id="QuadMesh_10l1y"]
 material = SubResource("ShaderMaterial_hfou0")
 size = Vector2(36000, 36000)
 subdivide_width = 256
 subdivide_depth = 256
-center_offset = Vector3(0, -1000, 0)
 orientation = 1
 
 [node name="WorldGround" type="Node3D"]
 script = ExtResource("1_644no")
-max_height = 2000.0
+max_height = 1000.0
 height_texture = ExtResource("3_56rlw")
 material = SubResource("ShaderMaterial_hfou0")
 

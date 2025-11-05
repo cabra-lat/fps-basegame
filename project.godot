@@ -25,7 +25,7 @@ Debug="*res://addons/cabra.lat_shooters/src/player/debug.gd"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg")
+enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg", "res://addons/cabra.lat_terrains/plugin.cfg")
 
 [input]
 
@@ -200,6 +200,7 @@ debug_clear_items={
 
 [rendering]
 
+textures/canvas_textures/default_texture_repeat=2
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 
