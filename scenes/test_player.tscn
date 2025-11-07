@@ -1,15 +1,13 @@
-[gd_scene load_steps=45 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=37 format=3 uid="uid://pc011sk80jnn"]
 
 [ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
 [ext_resource type="PackedScene" uid="uid://c12klxocgrga0" path="res://addons/cabra.lat_shooters/src/ui/inventory/main.tscn" id="3_1jipf"]
 [ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
 [ext_resource type="Script" uid="uid://ctuq723ii3v1a" path="res://src/control.gd" id="4_oxvr6"]
-[ext_resource type="Texture2D" uid="uid://oeeg1r80cqys" path="res://assets/brazil_relief.png" id="5_10l1y"]
 [ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
-[ext_resource type="Texture2D" uid="uid://rwr14fl7ogi4" path="res://assets/skybox.jpg" id="8_qt7sb"]
-[ext_resource type="Script" uid="uid://bnvsx24aplbc0" path="res://addons/cabra.lat_terrains/chunked_terrain.gd" id="10_ca63f"]
+[ext_resource type="Script" uid="uid://bnvsx24aplbc0" path="res://addons/cabra.lat_terrains/chunked_terrain.gd" id="8_10l1y"]
 
 [sub_resource type="Gradient" id="Gradient_fam23"]
 interpolation_mode = 1
@@ -42,16 +40,14 @@ size = Vector3(40, 1, 10)
 [sub_resource type="BoxShape3D" id="BoxShape3D_5uk0x"]
 size = Vector3(40, 1.0087891, 10)
 
-[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_ca63f"]
-panorama = ExtResource("8_qt7sb")
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_10l1y"]
 
-[sub_resource type="Sky" id="Sky_6vvmu"]
-sky_material = SubResource("PanoramaSkyMaterial_ca63f")
+[sub_resource type="Sky" id="Sky_lwvfx"]
+sky_material = SubResource("ProceduralSkyMaterial_10l1y")
 
 [sub_resource type="Environment" id="Environment_m5uds"]
 background_mode = 2
-sky = SubResource("Sky_6vvmu")
-tonemap_mode = 2
+sky = SubResource("Sky_lwvfx")
 
 [sub_resource type="AnimationNodeStateMachine" id="1"]
 
@@ -138,42 +134,12 @@ graph_offset = Vector2(95, -63.76543)
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_fam23"]
 
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_1jipf"]
-frequency = 1.0
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_vsj1y"]
-noise = SubResource("FastNoiseLite_1jipf")
-seamless = true
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_fam23"]
-frequency = 0.1129
-domain_warp_enabled = true
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_cnysa"]
-noise = SubResource("FastNoiseLite_fam23")
-seamless = true
-as_normal_map = true
-bump_strength = 32.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cnysa"]
-albedo_texture = SubResource("NoiseTexture2D_vsj1y")
-metallic = 1.0
-roughness = 0.34
-roughness_texture_channel = 4
-normal_texture = SubResource("NoiseTexture2D_cnysa")
-uv1_scale = Vector3(400, 400, 400)
-
-[sub_resource type="BoxMesh" id="BoxMesh_fam23"]
-material = SubResource("StandardMaterial3D_cnysa")
-size = Vector3(286, 1, 286)
-
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_cnysa")
 
 [node name="Cursor3D" parent="." instance=ExtResource("7_tqsn0")]
 position = Vector2(474, 355)
 scale = Vector2(0.22370496, 0.22370496)
-animation = &"closed_hand"
 hide_if_idle = false
 
 [node name="Interactor3D" parent="." node_paths=PackedStringArray("follow", "Cursor") instance=ExtResource("6_vsj1y")]
@@ -182,19 +148,6 @@ collision_mask = 6
 debug_shape_custom_color = Color(0, 0, 0, 0)
 follow = NodePath("../Player/Head/Camera3D")
 Cursor = NodePath("../Cursor3D")
-
-[node name="DEBUG" type="Control" parent="." node_paths=PackedStringArray("terrain_manager")]
-layout_mode = 3
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -400.27002
-offset_right = -0.27001953
-offset_bottom = 400.0
-grow_horizontal = 0
-script = ExtResource("4_oxvr6")
-terrain_manager = NodePath("../ChunkedTerrain")
-background_texture = ExtResource("5_10l1y")
 
 [node name="HUD" parent="." instance=ExtResource("3_aiq23")]
 
@@ -311,14 +264,26 @@ mesh = SubResource("BoxMesh_lx1hn")
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_m5uds")
 
-[node name="Player" parent="." instance=ExtResource("2_yghno")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -42.94358, 920.57916, 0)
+[node name="Player" parent="." groups=["player"] instance=ExtResource("2_yghno")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 1500, 0)
+
+[node name="Sprite3D" parent="Player/CollisionShape3D" index="0"]
+visible = false
+
+[node name="Sprite3D2" parent="Player/CollisionShape3D" index="1"]
+visible = false
+
+[node name="Camera3D" parent="Player/Head" index="0"]
+far = 100000.0
 
 [node name="StateMachine" parent="Player" index="3"]
 deterministic = true
 
 [node name="Moving" parent="Player/StateMachine" index="0"]
 tree_root = SubResource("AnimationNodeStateMachine_4lym8")
+
+[node name="ThirdPerson" parent="Player" index="7"]
+visible = false
 
 [node name="WorldGround" type="StaticBody3D" parent="."]
 collision_layer = 15
@@ -327,18 +292,24 @@ collision_mask = 15
 [node name="CollisionShape3D" type="CollisionShape3D" parent="WorldGround"]
 shape = SubResource("WorldBoundaryShape3D_fam23")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="WorldGround"]
-mesh = SubResource("BoxMesh_fam23")
-
-[node name="ChunkedTerrain" type="Node3D" parent="."]
-script = ExtResource("10_ca63f")
-spawn_tile_index = Vector2i(0, 0)
-show_spawn_marker = false
-player_node_path = NodePath("../Player")
-camera_node_path = NodePath("../Player/Head/Camera3D")
-preview_radius_chunks = 8
-preview_show_wireframe = false
+[node name="TerrainManager" type="Node3D" parent="." node_paths=PackedStringArray("target_node")]
+script = ExtResource("8_10l1y")
+target_node = NodePath("../Player")
+use_collision_threading = true
 metadata/_custom_type_script = "uid://bnvsx24aplbc0"
+
+[node name="DynamicTerrainMinimap" type="Control" parent="." node_paths=PackedStringArray("terrain_loader", "player_node")]
+layout_mode = 3
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -393.0
+offset_top = 4.0
+offset_right = -1.0
+offset_bottom = 376.0
+script = ExtResource("4_oxvr6")
+terrain_loader = NodePath("../TerrainManager")
+player_node = NodePath("../Player")
+metadata/_custom_type_script = "uid://ctuq723ii3v1a"
 
 [connection signal="debug" from="Player" to="." method="_on_player_debug"]
 [connection signal="landed" from="Player" to="." method="_on_player_landed"]
