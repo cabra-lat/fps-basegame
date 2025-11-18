@@ -1,49 +1,20 @@
-[gd_scene load_steps=37 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=34 format=3 uid="uid://pc011sk80jnn"]
 
 [ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
 [ext_resource type="PackedScene" uid="uid://c12klxocgrga0" path="res://addons/cabra.lat_shooters/src/ui/inventory/main.tscn" id="3_1jipf"]
 [ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
 [ext_resource type="Script" uid="uid://ctuq723ii3v1a" path="res://src/control.gd" id="4_oxvr6"]
+[ext_resource type="Texture2D" uid="uid://rwr14fl7ogi4" path="res://assets/skybox.jpg" id="6_10l1y"]
 [ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
-[ext_resource type="Script" uid="uid://bnvsx24aplbc0" path="res://addons/cabra.lat_terrains/chunked_terrain.gd" id="8_10l1y"]
+[ext_resource type="Script" uid="uid://dt0lmi3jpjtqu" path="res://addons/cabra.lat_terrains/src/dynamic_terrain_loader.gd" id="8_oxvr6"]
 
-[sub_resource type="Gradient" id="Gradient_fam23"]
-interpolation_mode = 1
-offsets = PackedFloat32Array(0, 0.8, 0.9)
-colors = PackedColorArray(0.8047426, 0.80474263, 0.8047426, 1, 0.45452422, 0.45452428, 0.45452422, 1, 1, 1, 1, 1)
-metadata/_snap_enabled = true
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_1jipf"]
-gradient = SubResource("Gradient_fam23")
-fill = 2
-fill_from = Vector2(0.508547, 0.48290598)
-fill_to = Vector2(1, 1)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vsj1y"]
-albedo_texture = SubResource("GradientTexture2D_1jipf")
-metallic = 0.14
-metallic_specular = 0.65
-roughness = 0.1
-anisotropy_enabled = true
-anisotropy = 0.7
-uv1_scale = Vector3(1.175, 1.175, 1.175)
-uv1_triplanar = true
-uv1_world_triplanar = true
-grow_amount = 10.6
-
-[sub_resource type="BoxMesh" id="BoxMesh_lx1hn"]
-material = SubResource("StandardMaterial3D_vsj1y")
-size = Vector3(40, 1, 10)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_5uk0x"]
-size = Vector3(40, 1.0087891, 10)
-
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_10l1y"]
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_lwvfx"]
+panorama = ExtResource("6_10l1y")
 
 [sub_resource type="Sky" id="Sky_lwvfx"]
-sky_material = SubResource("ProceduralSkyMaterial_10l1y")
+sky_material = SubResource("PanoramaSkyMaterial_lwvfx")
 
 [sub_resource type="Environment" id="Environment_m5uds"]
 background_mode = 2
@@ -134,6 +105,8 @@ graph_offset = Vector2(95, -63.76543)
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_fam23"]
 
+[sub_resource type="PlaneMesh" id="PlaneMesh_oxvr6"]
+
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_cnysa")
 
@@ -155,117 +128,11 @@ Cursor = NodePath("../Cursor3D")
 unique_name_in_owner = true
 visible = false
 
-[node name="Level" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -78.079956, 0)
-
-[node name="Platform" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 109.859924, 0.00437784)
-collision_layer = 15
-collision_mask = 0
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00212133, 0, -0.00437784)
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0043945313, 0)
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="Platform9" type="StaticBody3D" parent="Level"]
-transform = Transform3D(0.59129566, 0.80645496, 0, -0.80645496, 0.59129566, 0, 0, 0, 1, -31.345295, 125.89101, 0.00437784)
-collision_layer = 15
-collision_mask = 0
-constant_linear_velocity = Vector3(10, 10, 0)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform9"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00212133, 0, -0.00437784)
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform9"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="Platform2" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 106.91299, 8.511776)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform2"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform2"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform3" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 98.18001, 16.026487)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform3"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform3"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform4" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00212133, 80.2652, 29.43588)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform4"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform4"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform5" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 0.98549396, 0.1697107, 0, -0.1697107, 0.98549396, -0.00212133, 79.42559, 19.59503)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform5"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform5"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform6" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, -0.7971837, 0.6037369, 0, -0.6037369, -0.7971837, -0.00212133, 81.55116, 8.02249)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform6"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform6"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform7" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, -0.74816877, -0.66350836, 0, 0.66350836, -0.74816877, -0.00212133, 91.73412, -0.619668)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform7"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform7"]
-mesh = SubResource("BoxMesh_lx1hn")
-
-[node name="Platform8" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 0.626699, -0.77926135, 0, 0.77926135, 0.626699, -0.00212133, 102.287315, -11.908952)
-collision_layer = 15
-collision_mask = 0
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Level/Platform8"]
-shape = SubResource("BoxShape3D_5uk0x")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Level/Platform8"]
-mesh = SubResource("BoxMesh_lx1hn")
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_m5uds")
 
 [node name="Player" parent="." groups=["player"] instance=ExtResource("2_yghno")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 1500, 0)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 162.36414, 0)
 
 [node name="Sprite3D" parent="Player/CollisionShape3D" index="0"]
 visible = false
@@ -292,24 +159,29 @@ collision_mask = 15
 [node name="CollisionShape3D" type="CollisionShape3D" parent="WorldGround"]
 shape = SubResource("WorldBoundaryShape3D_fam23")
 
-[node name="TerrainManager" type="Node3D" parent="." node_paths=PackedStringArray("target_node")]
-script = ExtResource("8_10l1y")
-target_node = NodePath("../Player")
-use_collision_threading = true
-metadata/_custom_type_script = "uid://bnvsx24aplbc0"
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WorldGround"]
+mesh = SubResource("PlaneMesh_oxvr6")
 
 [node name="DynamicTerrainMinimap" type="Control" parent="." node_paths=PackedStringArray("terrain_loader", "player_node")]
 layout_mode = 3
+anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -393.0
-offset_top = 4.0
-offset_right = -1.0
-offset_bottom = 376.0
+offset_left = -305.0
+offset_top = 13.0
+offset_right = -5.0
+offset_bottom = 313.0
+grow_horizontal = 0
 script = ExtResource("4_oxvr6")
-terrain_loader = NodePath("../TerrainManager")
+terrain_loader = NodePath("../DynamicTerrainLoader")
 player_node = NodePath("../Player")
 metadata/_custom_type_script = "uid://ctuq723ii3v1a"
+
+[node name="DynamicTerrainLoader" type="Node3D" parent="." node_paths=PackedStringArray("target_node")]
+script = ExtResource("8_oxvr6")
+target_node = NodePath("../Player")
+min_zoom = 15
+metadata/_custom_type_script = "uid://dt0lmi3jpjtqu"
 
 [connection signal="debug" from="Player" to="." method="_on_player_debug"]
 [connection signal="landed" from="Player" to="." method="_on_player_landed"]

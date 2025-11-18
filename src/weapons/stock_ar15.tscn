@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=4 uid="uid://bn0qg26bwnme0"]
+
+[ext_resource type="Material" uid="uid://dmrw2ac44xeoj" path="res://src/weapons/material_ar15.tres" id="1_s7510"]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_c4anr"]
+_surfaces = [{
+"aabb": AABB(-0.04064915, -0.36830273, 0.3098558, 0.08129823, 0.35257658, 0.7530601),
+"attribute_data": PackedByteArray("MKLlPAgTcj4LkJw+CBNyPguQnD5+P4w+Z+sPPgz3jj6vj389xAqpPvKNHj08ubo+ogMwPzDTlz2iAzA/gOYMPf9Pez+A5gw9Zc9cP3hVoz1K/3E/gOUIPu5qeD9EWC4+w3LQPhpFmT4rOcE+GkWZPis5wT7Uo3U+w3LQPtSjdT4rOcE+SlaEPpP/sT4aRZk+k/+xPkpWhD5CAiU/PXcbP7TZIT8i3xg/fqGdPswSdD7EN0Y/ZgLkPsQ3Rj8q0+o+eygxP3A/Fz2Jb08/gOYMPYlvTz+QRl49ogMwP5BGXj3/T3s/kEZePYlvTz8w05c9k3RwP0wAGj4Yn3M/eFWjPe5qeD9MABo+UlZvP4DlCD6TdHA/RFguPgAAID8AAAA/AAAgPwAAQD8AAMA+AABAPwAAwD4AAAA/z8BaP0gA2z7lZ2o/RgDbPuVnaj+6/+0+Zp5tPwCA5D7PwFo/uv/tPk6KVz8AgOQ+w3LQPr5Zhj4rOcE+vlmGPis5wT4kG4Y+k/+xPiQbhj4vcEI+CBNyPi9wQj6ApII+C5CcPoCkgj4wouU8gKSCPi9wQj5+P4w+SgVnPQz3jj7yjR49QB6xPrltiz1AHrE+QuCTPcQKqT65bYs9PLm6Pl2RIj9SFRo/J6glPxhPHD+JaCI/CXIbP5U3Iz8PQhw/6zYlP2sfHT/XUyQ//uYcP1DB6T4QHTQ/VZX0PhAdND8b+CU/sS0cPxv4JT8ESx0/zyolPwRLHT9nxSY/sS0cP2fFJj8ESx0/zyolP7EtHD+EXSQ/BEsdP4RdJD+xLRw/KjnBPhpFmT4="),
+"format": 34359742487,
+"index_count": 168,
+"index_data": PackedByteArray("BwAZABoAGgAZAAgAGgAbAAcABgAbABoACAAcABoAGgAdAAYACQAaABwAHQAaAB4AHgAaAAkAHAAfAAkAHwAcACAACQAhAB4AIAAKAB8AHgAhAAoACgAgAB4AHgAiAB0AHgAgAAsACwAiAB4AIwAkACUAJQAmACMAJwAoACkAKQAoACoAKQArACcAKwAsACcADwAtAC4ALgAOAA8ALgAtAAwADAANAC4AAAAxADIAMgAxAAEAAQAzADIAMgAzAAIAMgA0AAAAAgA1ADIANAAyAAMAAwA2ADQANwA0ADYANgAEADcAAwAyADgAOAAyADUAOAA3AAQAOAA5AAMABAA5ADgABQA3ADgANQA6ADgAOAA6AAUAMAASABAAEAAvADAAEQAwAC8ALwBLABEAQwBEAEUARABDAEYARgBHAEQARQBIAEMASABFAEkASQBKAEgA"),
+"material": ExtResource("1_s7510"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 76,
+"vertex_data": PackedByteArray("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")
+}]
+
+[node name="stock_ar15" type="Node3D"]
+
+[node name="STOCK" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+mesh = SubResource("ArrayMesh_c4anr")

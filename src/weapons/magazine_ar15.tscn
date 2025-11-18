@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=4 uid="uid://cgawylhvl3e86"]
+
+[ext_resource type="Material" uid="uid://dmrw2ac44xeoj" path="res://src/weapons/material_ar15.tres" id="1_ryw86"]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_to748"]
+_surfaces = [{
+"aabb": AABB(-0.025923118, -0.48743588, -0.15490001, 0.051846124, 0.42116016, 0.1996489),
+"attribute_data": PackedByteArray("OnQGPzLfBT+L0wo/fjB5PwP1KT9Ovgg/Ht8vP/H1cD/n0Ck/FAoIP8mxCz/XV3g/QzEFP4gEBD8qwjA/EjNwP9gt4T74CQY//hv9PvgJBj/+G/0+a0d3P9gt4T5rR3c/iTsGP1iOJT/V9B0/V44lP9X0HT8bBiw/iTsGPxsGLD9c7Bw/PVotP46+BD/SRS0/PsYEP80rJD8M9Bw/OEAkP/4b/T5Js2s//hv9PiLWBT/YLeE+ItYFP9gt4T5Js2s/r47BPvwXhz4E6MU+UnGLPhxV8z4odZ89b0kFP0SejD5Sgj89RmbiPkqCPz3aqek+RYcoP5LaLz+2lgI/nuozP37aAj/5x04/U0woP7s5Sz/YLeE+aMAqP/4b/T5owCo//hv9PoJkRz/YLeE+gmRHP7zUJz+EOS8/r8QCP2QSMD/sVgQ/FvBOP8jAKT9uAkw//hv9PnBTLj/YLeE+cFMuP9gt4T5Irk0//hv9PkiuTT8="),
+"format": 34359742487,
+"index_count": 84,
+"index_data": PackedByteArray("HgACAAAAAAAfAB4AHgAfACAAIAAhAB4AIQAgAAEAAQADACEAFQAWACIAIgAjABUAJAAjACIAIgAlACQAFAAkACUAJQAXABQABgAEACYAJgAnAAYAKAAnACYAJgApACgABQAoACkAKQAHAAUACAAJACoAKgArAAgALAArACoAKgAtACwACwAsAC0ALQAKAAsADAANAA4ADgAPAAwAEAARABIAEgATABAA"),
+"material": ExtResource("1_ryw86"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 46,
+"vertex_data": PackedByteArray("uFzUvLVFib2bSjc9uFzUvDKR+b4BpYy8uFzUvJK7h73xT8y9uFzUvOSO474cnh6+fFzUPJK7h73xT8y9fFzUPDKR+b4BpYy8fFzUPLVFib2bSjc9fFzUPOSO474cnh6+uFzUvLVFib2bSjc9fFzUPLVFib2bSjc9fFzUPDKR+b4BpYy8uFzUvDKR+b4BpYy8uFzUvLVFib2bSjc9uFzUvJK7h73xT8y9fFzUPJK7h73xT8y9fFzUPLVFib2bSjc9fFzUPDKR+b4BpYy8fFzUPOSO474cnh6+uFzUvOSO474cnh6+uFzUvDKR+b4BpYy8fFzUPOSO474cnh6+fFzUPJK7h73xT8y9uFzUvJK7h73xT8y9uFzUvOSO474cnh6+krOVPEKq/72WNxq+srOVvEKq/72WNxq+srOVvEKq/72WNxq+krOVPEKq/72WNxq+krOVPEKq/72WNxq+srOVvEKq/72WNxq+uFzUvGA0UL4EJ9S9uFzUvP3KXb5cHiU9uFzUvBt/qr4srMY8uFzUvDOLnr6nne69uFzUvGA0UL4EJ9S9fFzUPGA0UL4EJ9S9fFzUPDOLnr6nne69uFzUvDOLnr6nne69fFzUPGA0UL4EJ9S9fFzUPP3KXb5cHiU9fFzUPBt/qr4srMY8fFzUPDOLnr6nne69fFzUPP3KXb5cHiU9uFzUvP3KXb5cHiU9uFzUvBt/qr4srMY8fFzUPBt/qr4srMY8bFX2qeYhfg9VVJlJcRdlc08rPNXl43JueB39K8jb/BOq1D3VpBpCkqmrmkm66LKMkqr3qbzbq/GH4v0r0SPW62xV9qkbwLHPkqr3qZ7gDqCpq5pJp9dD31VUmUl2wdSrbFX2qXcgyO9PKzzVd+DOj6rUPdWIH86Pkqr3qYbfye+pq5pJMVumxofi/SscnhyoeB39K55hQ6hVVJlJcKTQxofi/StAwf00qtQ91ei/RFBPKzzVa9/zH3gd/Sv76V9f/3//f/8//5//f/9//z//n/8/AED/f/+//78AQP7/AIAAgAAAAAD+/wCAAAAAAP7/gwQ9wT/+/WCFQ8l6DAd2YXZGJHTcBshhWguVw5f912GDBD3BVvtkHnb7PsHSvE9Co/SWwyC580VaC5XDGPSLHHb7PsFrBcHhebzKenf8VuCHuSV0f/2Jn6P0lsPEAKGeebzKevL6seCFQ8l6mr55vXZGJHT6u0a6h7kldI30AOI=")
+}]
+
+[node name="magazine_ar15" type="Node3D"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+
+[node name="MAG" type="MeshInstance3D" parent="."]
+mesh = SubResource("ArrayMesh_to748")
