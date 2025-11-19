@@ -4,8 +4,10 @@ extends Node
 var can_connect_signals: bool = false
 
 # DEV/DEBUG
-@onready var ammo: Ammo = preload("res://resources/ammo/7_62_39mm_PS_GOST_BR4.tres")
-@onready var weapon: Weapon = preload("res://resources/weapons/AK_47.tres")
+#@onready var ammo: Ammo = preload("res://resources/ammo/7_62_39mm_PS_GOST_BR4.tres")
+#@onready var weapon: Weapon = preload("res://resources/weapons/AK_47.tres")
+@onready var ammo: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
+@onready var weapon: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
 @onready var player: PlayerController = $Player
 # END DEV/DEBUG
 
@@ -16,7 +18,7 @@ func _ready():
     # Fill with ammunition
   for i in range(30):  # Load 10 rounds for testing
     var cartridge = ammo.duplicate(true)
-    cartridge.name = "7.62x39mm Round " + str(i)
+    cartridge.name = ammo.caliber + " Round " + str(i)
     magazine.insert(cartridge)
 
   weapon.ammo_feed = magazine

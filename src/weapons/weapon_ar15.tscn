@@ -1,28 +1,36 @@
-[gd_scene load_steps=7 format=3 uid="uid://r6hi7sd3qmcu"]
+[gd_scene load_steps=6 format=3 uid="uid://r6hi7sd3qmcu"]
 
 [ext_resource type="Script" uid="uid://cl1v3jhv7weaq" path="res://addons/cabra.lat_shooters/src/world/weapon_3d.gd" id="1_d5gp6"]
-[ext_resource type="PackedScene" uid="uid://cgawylhvl3e86" path="res://src/weapons/magazine_ar15.tscn" id="2_4n2tg"]
 [ext_resource type="PackedScene" uid="uid://bn0qg26bwnme0" path="res://src/weapons/stock_ar15.tscn" id="3_4n2tg"]
 [ext_resource type="PackedScene" uid="uid://clyb8jr7q2o6c" path="res://src/weapons/attachment_scope_reddot.tscn" id="3_bxb5h"]
 [ext_resource type="PackedScene" uid="uid://chsqdvio64rsw" path="res://src/weapons/receiver_ar15.tscn" id="4_klx0e"]
 [ext_resource type="PackedScene" uid="uid://bnlugar0g88vj" path="res://src/weapons/barrel_ar15.tscn" id="5_4n2tg"]
 
-[node name="weapon_ar15" type="Node3D"]
+[node name="weapon_ar15" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
+collision_layer = 2
+collision_mask = 2
 script = ExtResource("1_d5gp6")
+auto_disable_physics = true
+grabbable_mesh = NodePath("")
+grab_points = [NodePath("PistolGrip"), NodePath("Handguard")]
+grab_point_weights = Array[int]([1, 100])
+spring_constant = Vector3(3000, 3000, 3000)
+angular_spring_constant = Vector3(1000, 3000, 1000)
+linear_damping_per_axis = Vector3(20, 20, 20)
+angular_damping_per_axis = Vector3(20, 20, 20)
 
 [node name="receiver_ar15" parent="." instance=ExtResource("4_klx0e")]
 editor_description = "This is the base of the weapon."
 
 [node name="Scope" type="Marker3D" parent="."]
 
-[node name="attachment_scope_reddot" parent="Scope" instance=ExtResource("3_bxb5h")]
+[node name="attachment_scope_reddot" parent="Scope" node_paths=PackedStringArray("attractors") instance=ExtResource("3_bxb5h")]
+attractors = [NodePath("..")]
 
 [node name="MuzzlePoint" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.069823235, -1.3031168)
 
 [node name="MagazinePoint" type="Marker3D" parent="."]
-
-[node name="magazine_ar15" parent="MagazinePoint" instance=ExtResource("2_4n2tg")]
 
 [node name="Stock" type="Marker3D" parent="."]
 

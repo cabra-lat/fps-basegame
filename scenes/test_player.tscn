@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=37 format=3 uid="uid://pc011sk80jnn"]
 
 [ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://c6mfjk8v5pslc" path="res://addons/cabra.lat_interactions/interactor.tscn" id="6_vsj1y"]
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
 [ext_resource type="Script" uid="uid://dt0lmi3jpjtqu" path="res://addons/cabra.lat_terrains/src/dynamic_terrain_loader.gd" id="8_oxvr6"]
+[ext_resource type="Texture2D" uid="uid://d2du7uv0221qf" path="res://assets/dummy_target.jpg" id="10_lwvfx"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_lwvfx"]
 panorama = ExtResource("6_10l1y")
@@ -107,6 +108,14 @@ graph_offset = Vector2(95, -63.76543)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_oxvr6"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s11rc"]
+albedo_texture = ExtResource("10_lwvfx")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_qt7sb"]
+material = SubResource("StandardMaterial3D_s11rc")
+size = Vector2(1.184, 1.5)
+orientation = 2
+
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_cnysa")
 
@@ -182,6 +191,22 @@ script = ExtResource("8_oxvr6")
 target_node = NodePath("../Player")
 min_zoom = 15
 metadata/_custom_type_script = "uid://dt0lmi3jpjtqu"
+
+[node name="DummyMesh300" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 300)
+mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="DummyMesh200" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, -1, 0, 200)
+mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="DummyMesh100" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, 100)
+mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="DummyMesh600" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2, 600)
+mesh = SubResource("PlaneMesh_qt7sb")
 
 [connection signal="debug" from="Player" to="." method="_on_player_debug"]
 [connection signal="landed" from="Player" to="." method="_on_player_landed"]

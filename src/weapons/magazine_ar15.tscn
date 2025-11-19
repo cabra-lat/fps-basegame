@@ -1,5 +1,6 @@
-[gd_scene load_steps=3 format=4 uid="uid://cgawylhvl3e86"]
+[gd_scene load_steps=5 format=4 uid="uid://cgawylhvl3e86"]
 
+[ext_resource type="Script" uid="uid://d05r6wf72aah" path="res://addons/cabra.lat_shooters/src/world/magazine_3d.gd" id="1_0ikuy"]
 [ext_resource type="Material" uid="uid://dmrw2ac44xeoj" path="res://src/weapons/material_ar15.tres" id="1_ryw86"]
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_to748"]
@@ -16,8 +17,34 @@ _surfaces = [{
 "vertex_data": PackedByteArray("uFzUvLVFib2bSjc9uFzUvDKR+b4BpYy8uFzUvJK7h73xT8y9uFzUvOSO474cnh6+fFzUPJK7h73xT8y9fFzUPDKR+b4BpYy8fFzUPLVFib2bSjc9fFzUPOSO474cnh6+uFzUvLVFib2bSjc9fFzUPLVFib2bSjc9fFzUPDKR+b4BpYy8uFzUvDKR+b4BpYy8uFzUvLVFib2bSjc9uFzUvJK7h73xT8y9fFzUPJK7h73xT8y9fFzUPLVFib2bSjc9fFzUPDKR+b4BpYy8fFzUPOSO474cnh6+uFzUvOSO474cnh6+uFzUvDKR+b4BpYy8fFzUPOSO474cnh6+fFzUPJK7h73xT8y9uFzUvJK7h73xT8y9uFzUvOSO474cnh6+krOVPEKq/72WNxq+srOVvEKq/72WNxq+srOVvEKq/72WNxq+krOVPEKq/72WNxq+krOVPEKq/72WNxq+srOVvEKq/72WNxq+uFzUvGA0UL4EJ9S9uFzUvP3KXb5cHiU9uFzUvBt/qr4srMY8uFzUvDOLnr6nne69uFzUvGA0UL4EJ9S9fFzUPGA0UL4EJ9S9fFzUPDOLnr6nne69uFzUvDOLnr6nne69fFzUPGA0UL4EJ9S9fFzUPP3KXb5cHiU9fFzUPBt/qr4srMY8fFzUPDOLnr6nne69fFzUPP3KXb5cHiU9uFzUvP3KXb5cHiU9uFzUvBt/qr4srMY8fFzUPBt/qr4srMY8bFX2qeYhfg9VVJlJcRdlc08rPNXl43JueB39K8jb/BOq1D3VpBpCkqmrmkm66LKMkqr3qbzbq/GH4v0r0SPW62xV9qkbwLHPkqr3qZ7gDqCpq5pJp9dD31VUmUl2wdSrbFX2qXcgyO9PKzzVd+DOj6rUPdWIH86Pkqr3qYbfye+pq5pJMVumxofi/SscnhyoeB39K55hQ6hVVJlJcKTQxofi/StAwf00qtQ91ei/RFBPKzzVa9/zH3gd/Sv76V9f/3//f/8//5//f/9//z//n/8/AED/f/+//78AQP7/AIAAgAAAAAD+/wCAAAAAAP7/gwQ9wT/+/WCFQ8l6DAd2YXZGJHTcBshhWguVw5f912GDBD3BVvtkHnb7PsHSvE9Co/SWwyC580VaC5XDGPSLHHb7PsFrBcHhebzKenf8VuCHuSV0f/2Jn6P0lsPEAKGeebzKevL6seCFQ8l6mr55vXZGJHT6u0a6h7kldI30AOI=")
 }]
 
-[node name="magazine_ar15" type="Node3D"]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_0ikuy"]
+points = PackedVector3Array(0.03091508, -0.0629998, 0.04896587, -0.029242063, -0.0629998, 0.04896587, 0.03091508, -0.0629998, -0.104756616, 0.03091508, -0.49074203, -0.011192579, -0.025899999, -0.43128684, -0.14673051, -0.029242063, -0.0629998, -0.104756616, 0.03091508, -0.45058882, -0.15824206, -0.029242063, -0.49074203, -0.011192579, 0.03091508, -0.14992157, 0.04896587, -0.025899999, -0.30057853, 0.025555138, -0.029242063, -0.49074203, -0.031252157, 0.03091508, -0.43053317, -0.15824206, 0.03091508, -0.47064447, -0.0045195743, 0.03091508, -0.49074203, -0.031252157, -0.025899999, -0.2590809, 0.031504728, -0.025572577, -0.41178688, -0.14560273, -0.025899999, -0.33623302, 0.019623581, 0.03091508, -0.47064447, -0.098083615)
+
+[node name="magazine_ar15" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
+collision_layer = 2
+collision_mask = 2
+script = ExtResource("1_0ikuy")
+grabbable_mesh = NodePath("")
+grab_points = [NodePath("MagazinePoint")]
+collision_layers_on_grab = 8
+collision_mask_on_grab = 8
+spring_constant = Vector3(1000, 1000, 1000)
+angular_spring_constant = Vector3(80, 80, 80)
+linear_damping_per_axis = Vector3(25, 25, 25)
+angular_damping_per_axis = Vector3(20, 20, 20)
+attachment_mode = 1
+enable_attachment = true
+attachment_distance_threshold = 0.01
+attachment_time_threshold = 0.01
+
+[node name="MagazinePoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.1306865e-05, 0.0036079772, -0.013219656)
+gizmo_extents = 0.05
 
 [node name="MAG" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 mesh = SubResource("ArrayMesh_to748")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+shape = SubResource("ConvexPolygonShape3D_0ikuy")

@@ -2,122 +2,12 @@
 
 [ext_resource type="Script" uid="uid://bigw503dkolnc" path="res://addons/cabra.lat_shooters/src/world/attachment_scope_3d.gd" id="1_5rxxy"]
 [ext_resource type="Material" uid="uid://dmrw2ac44xeoj" path="res://src/weapons/material_ar15.tres" id="2_j4sc0"]
-
-[sub_resource type="Shader" id="Shader_i2wpg"]
-resource_local_to_scene = true
-code = "shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back; 
-
-// --- Texture Uniforms ---
-uniform sampler2D u_scope_texture; 
-uniform sampler2D u_reticle_texture; 
-
-// --- Color Uniforms ---
-uniform vec4 u_reticle_color : source_color = vec4(0.0, 1.0, 0.0, 1.0); 
-uniform vec4 u_bezel_color : source_color = vec4(0.0, 0.0, 0.0, 1.0); 
-uniform vec4 u_tint1_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform vec4 u_tint2_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-
-// --- UV Transform Uniforms ---
-// Controls for the FIRST scope circle
-uniform vec2 u_uv1_scale = vec2(0.5, -0.5); 
-uniform vec2 u_uv1_offset = vec2(0.25, 0.25);
-uniform float u_uv1_radius = 0.45;
-uniform float u_uv1_rotation = 0.0;
-
-// Controls for the SECOND scope circle
-uniform vec2 u_uv2_scale = vec2(0.5, 0.5); 
-uniform vec2 u_uv2_offset = vec2(-0.25, 0.25);
-uniform float u_uv2_radius = 0.45;
-uniform float u_uv2_rotation = 0.0;
-
-// Rotation function that rotates around a specific center point
-vec2 rotate_around_point(vec2 uv, vec2 center, float rotation) {
-    vec2 centered_uv = uv - center;
-    float cos_rot = cos(rotation);
-    float sin_rot = sin(rotation);
-    vec2 rotated_uv = vec2(
-        centered_uv.x * cos_rot - centered_uv.y * sin_rot,
-        centered_uv.x * sin_rot + centered_uv.y * cos_rot
-    );
-    return rotated_uv + center;
-}
-
-// Helper function to calculate color for a given UV mapping
-vec3 get_scope_color(vec2 base_uv, vec2 scale, vec2 offset, float rotation, float radius, vec4 tint_color) {
-    
-    // Calculate the center of this lens in the original UV space
-    vec2 lens_center = vec2(0.5) + offset;
-    
-    // First, apply offset to find where this lens is centered
-    vec2 offset_uv = base_uv - offset;
-    
-    // Then apply scaling relative to the lens center
-    vec2 scaled_uv = (offset_uv - vec2(0.5)) / scale + vec2(0.5);
-    
-    // Apply rotation around the lens center
-    vec2 rotated_uv = rotate_around_point(scaled_uv, vec2(0.5), rotation);
-    
-    // Calculate distance from lens center for masking
-    // We need to use the same transformed UV for distance checking as we use for sampling
-    vec2 center_uv_modified = rotated_uv - vec2(0.5);
-    float dist = length(center_uv_modified);
-
-    if (dist <= radius) {
-        // Inside the lens circle: Mix scope view and reticle
-        vec3 scope_color = texture(u_scope_texture, rotated_uv).rgb;
-        vec4 reticle_sample = texture(u_reticle_texture, rotated_uv); 
-        
-        // Apply tint to scope color
-        scope_color *= tint_color.rgb;
-        
-        // Mix scope (with tint) and reticle
-        return mix(scope_color, u_reticle_color.rgb, reticle_sample.a * u_reticle_color.a);
-
-    } else {
-        // Outside the lens circle: Bezel color (blackout)
-        return u_bezel_color.rgb;
-    }
-}
-
-void fragment() {
-    vec3 final_color = u_bezel_color.rgb;
-    
-    // For each lens, we need to check if the current UV is within its area
-    // We'll transform the UV the same way as in the helper function for consistency
-    
-    // Lens 1 check
-    vec2 offset_uv1 = UV - u_uv1_offset;
-    vec2 scaled_uv1 = (offset_uv1 - vec2(0.5)) / u_uv1_scale + vec2(0.5);
-    vec2 rotated_uv1 = rotate_around_point(scaled_uv1, vec2(0.5), u_uv1_rotation);
-    float dist1 = length(rotated_uv1 - vec2(0.5));
-    
-    // Lens 2 check
-    vec2 offset_uv2 = UV - u_uv2_offset;
-    vec2 scaled_uv2 = (offset_uv2 - vec2(0.5)) / u_uv2_scale + vec2(0.5);
-    vec2 rotated_uv2 = rotate_around_point(scaled_uv2, vec2(0.5), u_uv2_rotation);
-    float dist2 = length(rotated_uv2 - vec2(0.5));
-    
-    // Calculate both lens colors
-    vec3 color1 = get_scope_color(UV, u_uv1_scale, u_uv1_offset, u_uv1_rotation, u_uv1_radius, u_tint1_color);
-    vec3 color2 = get_scope_color(UV, u_uv2_scale, u_uv2_offset, u_uv2_rotation, u_uv2_radius, u_tint2_color);
-    
-    // Apply lens colors where appropriate
-    if (dist1 <= u_uv1_radius) {
-        final_color = color1;
-    }
-    if (dist2 <= u_uv2_radius) {
-        final_color = color2;
-    }
-    
-    ALBEDO = final_color;
-    ALPHA = 1.0; 
-}"
+[ext_resource type="Shader" uid="uid://c5onyak6rifo5" path="res://addons/cabra.lat_shooters/src/shaders/scope_lenses.gdshader" id="3_j4sc0"]
 
 [sub_resource type="Gradient" id="Gradient_i2wpg"]
-interpolation_mode = 1
-offsets = PackedFloat32Array(0, 0.032846715)
-colors = PackedColorArray(1, 0, 0, 0.89500004, 1, 1, 1, 0)
+interpolation_mode = 2
+offsets = PackedFloat32Array(-0.945, 0.014925373, 0.052238807, 0.71268654, 0.7798507)
+colors = PackedColorArray(0.9784249, 0.9963315, 0.9963315, 0.0055486374, 1, 1, 1, 1, 0.019, 0.02, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 1)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_j4sc0"]
 gradient = SubResource("Gradient_i2wpg")
@@ -125,7 +15,7 @@ width = 512
 height = 512
 fill = 1
 fill_from = Vector2(0.5, 0.5)
-fill_to = Vector2(1, 1)
+fill_to = Vector2(0.8632479, 0.8632479)
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_j4sc0"]
 viewport_path = NodePath("ScopeViewport")
@@ -133,21 +23,26 @@ viewport_path = NodePath("ScopeViewport")
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_j4sc0"]
 resource_local_to_scene = true
 render_priority = 0
-shader = SubResource("Shader_i2wpg")
+shader = ExtResource("3_j4sc0")
 shader_parameter/u_scope_texture = SubResource("ViewportTexture_j4sc0")
 shader_parameter/u_reticle_texture = SubResource("GradientTexture2D_j4sc0")
-shader_parameter/u_reticle_color = Color(1, 0, 0, 1)
+shader_parameter/u_reticle_tint = Color(0, 1, 0, 1)
 shader_parameter/u_bezel_color = Color(0, 0, 0, 1)
-shader_parameter/u_tint1_color = Color(1, 1, 1, 1)
-shader_parameter/u_tint2_color = Color(1, 1, 1, 1)
-shader_parameter/u_uv1_scale = Vector2(0.5, -0.5)
-shader_parameter/u_uv1_offset = Vector2(0.25, 0.25)
-shader_parameter/u_uv1_radius = 0.45
-shader_parameter/u_uv1_rotation = 0.0
-shader_parameter/u_uv2_scale = Vector2(0.5, 0.5)
-shader_parameter/u_uv2_offset = Vector2(-0.25, 0.25)
-shader_parameter/u_uv2_radius = 0.45
-shader_parameter/u_uv2_rotation = 0.0
+shader_parameter/u_front_tint_color = Color(1, 0.58, 0, 0.757)
+shader_parameter/u_rear_tint_color = Color(0, 0.23209421, 1, 0.102000006)
+shader_parameter/u_lens_curvature = 0.3
+shader_parameter/u_reflection_intensity = 0.4
+shader_parameter/u_chromatic_aberration = 0.005
+shader_parameter/u_vignette_strength = 0.3
+shader_parameter/u_fresnel_power = 2.0
+shader_parameter/u_front_lens_scale = Vector2(0.5, 0.5)
+shader_parameter/u_front_lens_offset = Vector2(-0.25, 0.25)
+shader_parameter/u_front_lens_radius = 0.45
+shader_parameter/u_front_lens_rotation = 0.0
+shader_parameter/u_rear_lens_scale = Vector2(0.5, -0.5)
+shader_parameter/u_rear_lens_offset = Vector2(0.25, 0.25)
+shader_parameter/u_rear_lens_radius = 0.45
+shader_parameter/u_rear_lens_rotation = 0.0
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_j4sc0"]
 resource_local_to_scene = true
@@ -211,13 +106,14 @@ shape = SubResource("ConvexPolygonShape3D_j4sc0")
 [node name="CameraPosition" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.047257386, -0.069313824)
 
-[node name="DummyMesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -600)
-mesh = SubResource("CylinderMesh_j4sc0")
-
 [node name="ScopeViewport" type="SubViewport" parent="."]
 
 [node name="Camera3D" type="Camera3D" parent="ScopeViewport"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7136335e-06, 0.04853543, -0.06971073)
 current = true
-fov = 1.0
+fov = 1.7187443
+
+[node name="DummyMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -600)
+visible = false
+mesh = SubResource("CylinderMesh_j4sc0")
