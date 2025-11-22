@@ -27,6 +27,10 @@ Debug="*res://addons/cabra.lat_shooters/src/player/debug.gd"
 
 enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg", "res://addons/cabra.lat_terrains/plugin.cfg")
 
+[filesystem]
+
+import/blender/enabled=false
+
 [input]
 
 interact={

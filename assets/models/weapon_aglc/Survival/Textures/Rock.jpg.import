@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b0smxy54v3ugi"
-path.s3tc="res://.godot/imported/R1DS3P2_Scaled_Crosshair_Pattern-780.png-c98c7f6f8b32723e10145d1267623b35.s3tc.ctex"
+uid="uid://co2nvf4t34rx"
+path.s3tc="res://.godot/imported/Rock.jpg-8a1b902fe9614b00107b2b79da8373e8.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/models/weapon_ar15/R1DS3P2_Scaled_Crosshair_Pattern-780.png"
-dest_files=["res://.godot/imported/R1DS3P2_Scaled_Crosshair_Pattern-780.png-c98c7f6f8b32723e10145d1267623b35.s3tc.ctex"]
+source_file="res://assets/models/weapon_aglc/Survival/Textures/Rock.jpg"
+dest_files=["res://.godot/imported/Rock.jpg-8a1b902fe9614b00107b2b79da8373e8.s3tc.ctex"]
 
 [params]
 

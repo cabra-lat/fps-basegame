@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Weapon" load_steps=8 format=3 uid="uid://b08t28uhoa87o"]
+
+[ext_resource type="Script" uid="uid://174ja52pe154" path="res://addons/cabra.lat_shooters/src/core/item.gd" id="1_3gpyq"]
+[ext_resource type="Texture2D" uid="uid://duglkvi55qps7" path="res://icon.svg" id="1_qk5sj"]
+[ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="2_46qal"]
+[ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="3_qki5l"]
+[ext_resource type="PackedScene" uid="uid://buhidaqt8us0h" path="res://src/ammo/cartridges.tscn" id="4_as1ph"]
+[ext_resource type="PackedScene" uid="uid://bwdft47nkirba" path="res://src/weapons/weapon_aglc.tscn" id="5_qki5l"]
+
+[sub_resource type="Resource" id="Resource_as1ph"]
+script = ExtResource("3_qki5l")
+type = 1
+compatible_calibers = ["7,62x51mm", ".308 Winchester"]
+strict_mode = true
+max_capacity = 4
+view_model = ExtResource("4_as1ph")
+metadata/_custom_type_script = "uid://6ckswbqpufn8"
+
+[resource]
+script = ExtResource("2_46qal")
+ammo_feed = SubResource("Resource_as1ph")
+attach_points = 25
+firemodes = 33
+feed_type = 1
+firerate = 40.0
+base_mass = 4.7
+base_reload_time = 6.0
+base_accuracy = 4.0
+name = "AGLC"
+view_model = ExtResource("5_qki5l")

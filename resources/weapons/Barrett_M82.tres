@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="Weapon" load_steps=4 format=3 uid="uid://dbpopw53bt3ai"]
 
-[ext_resource type="Script" uid="uid://57chxkjo83lo" path="res://addons/cabra.lat_shooters/src/core/weapon.gd" id="1_6tnoy"]
-[ext_resource type="Script" uid="uid://i1a2beubqkyr" path="res://addons/cabra.lat_shooters/src/core/ammo_feed.gd" id="1_vovva"]
+[ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_6tnoy"]
+[ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="1_vovva"]
 
 [sub_resource type="Resource" id="Resource_02u21"]
 script = ExtResource("1_vovva")

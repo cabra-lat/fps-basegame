@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=43 format=3 uid="uid://pc011sk80jnn"]
 
 [ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_cnysa"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
@@ -10,6 +10,8 @@
 [ext_resource type="PackedScene" uid="uid://8x85dbyhhwva" path="res://addons/cabra.lat_cursors/cursor_3d.tscn" id="7_tqsn0"]
 [ext_resource type="Script" uid="uid://dt0lmi3jpjtqu" path="res://addons/cabra.lat_terrains/src/dynamic_terrain_loader.gd" id="8_oxvr6"]
 [ext_resource type="Texture2D" uid="uid://d2du7uv0221qf" path="res://assets/dummy_target.jpg" id="10_lwvfx"]
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="11_qt7sb"]
+[ext_resource type="Texture2D" uid="uid://cv1q5tjiu4sc4" path="res://assets/models/weapon_aglc/Survival/Textures/Wood.jpg" id="12_ca63f"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_lwvfx"]
 panorama = ExtResource("6_10l1y")
@@ -106,7 +108,12 @@ graph_offset = Vector2(95, -63.76543)
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_fam23"]
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_b18lp"]
+
 [sub_resource type="PlaneMesh" id="PlaneMesh_oxvr6"]
+material = SubResource("ShaderMaterial_b18lp")
+size = Vector2(2, 1000)
+center_offset = Vector3(0, 0, 499)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s11rc"]
 albedo_texture = ExtResource("10_lwvfx")
@@ -114,7 +121,22 @@ albedo_texture = ExtResource("10_lwvfx")
 [sub_resource type="PlaneMesh" id="PlaneMesh_qt7sb"]
 material = SubResource("StandardMaterial3D_s11rc")
 size = Vector2(1.184, 1.5)
+center_offset = Vector3(0, 0.75, 0)
 orientation = 2
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lwvfx"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_1as6o"]
+render_priority = 0
+shader = ExtResource("11_qt7sb")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("12_ca63f")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_s11rc"]
+material = SubResource("ShaderMaterial_1as6o")
 
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_cnysa")
@@ -189,7 +211,9 @@ metadata/_custom_type_script = "uid://ctuq723ii3v1a"
 [node name="DynamicTerrainLoader" type="Node3D" parent="." node_paths=PackedStringArray("target_node")]
 script = ExtResource("8_oxvr6")
 target_node = NodePath("../Player")
-min_zoom = 15
+start_latitude = -6.077
+start_longitude = -50.124
+min_zoom = 14
 metadata/_custom_type_script = "uid://dt0lmi3jpjtqu"
 
 [node name="DummyMesh300" type="MeshInstance3D" parent="."]
@@ -207,6 +231,17 @@ mesh = SubResource("PlaneMesh_qt7sb")
 [node name="DummyMesh600" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2, 600)
 mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.58782, 0.37636304, 0)
+collision_layer = 15
+collision_mask = 15
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("BoxShape3D_lwvfx")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D"]
+mesh = SubResource("BoxMesh_s11rc")
 
 [connection signal="debug" from="Player" to="." method="_on_player_debug"]
 [connection signal="landed" from="Player" to="." method="_on_player_landed"]

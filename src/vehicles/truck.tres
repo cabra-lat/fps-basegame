@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://jtogse1vewwt"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_7fmyf"]
+[ext_resource type="Texture2D" uid="uid://h32y7c3gd1c3" path="res://assets/models/vehicle_dump_truck_cat789/truck-texture.png" id="2_qhn63"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_7fmyf")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_qhn63")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)

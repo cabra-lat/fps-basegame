@@ -8,6 +8,8 @@ var can_connect_signals: bool = false
 #@onready var weapon: Weapon = preload("res://resources/weapons/AK_47.tres")
 @onready var ammo: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
 @onready var weapon: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
+#@onready var ammo: Ammo = preload("res://resources/ammo/7_62_51mm_DM111_VPAM_PM7.tres")
+#@onready var weapon: Weapon = preload("res://resources/weapons/IMBEL_AGLC.tres")
 @onready var player: PlayerController = $Player
 # END DEV/DEBUG
 
