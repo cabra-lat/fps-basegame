@@ -15,12 +15,13 @@ collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_d5gp6")
 auto_disable_physics = true
-grab_points = [NodePath("PistolGrip"), NodePath("Handguard")]
-grab_point_weights = Array[int]([1, 100])
+grab_points = [NodePath("PistolGrip"), NodePath("Handguard"), NodePath("Stock")]
+grab_point_weights = Array[int]([1, 1, 1])
 spring_constant = Vector3(3000, 3000, 3000)
 angular_spring_constant = Vector3(1000, 3000, 1000)
 linear_damping_per_axis = Vector3(20, 20, 20)
 angular_damping_per_axis = Vector3(20, 20, 20)
+attachment_mode = 1
 
 [node name="receiver_ar15" parent="." instance=ExtResource("4_klx0e")]
 editor_description = "This is the base of the weapon."

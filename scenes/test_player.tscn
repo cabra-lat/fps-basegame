@@ -116,6 +116,8 @@ size = Vector2(2, 1000)
 center_offset = Vector3(0, 0, 499)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s11rc"]
+transparency = 1
+cull_mode = 2
 albedo_texture = ExtResource("10_lwvfx")
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_qt7sb"]
@@ -165,23 +167,14 @@ environment = SubResource("Environment_m5uds")
 [node name="Player" parent="." groups=["player"] instance=ExtResource("2_yghno")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 162.36414, 0)
 
-[node name="Sprite3D" parent="Player/CollisionShape3D" index="0"]
-visible = false
-
-[node name="Sprite3D2" parent="Player/CollisionShape3D" index="1"]
-visible = false
-
-[node name="Camera3D" parent="Player/Head" index="0"]
-far = 100000.0
-
-[node name="StateMachine" parent="Player" index="3"]
+[node name="StateMachine" parent="Player" index="2"]
 deterministic = true
 
 [node name="Moving" parent="Player/StateMachine" index="0"]
 tree_root = SubResource("AnimationNodeStateMachine_4lym8")
 
-[node name="ThirdPerson" parent="Player" index="7"]
-visible = false
+[node name="Camera3D" parent="Player/Head" index="0"]
+far = 100000.0
 
 [node name="WorldGround" type="StaticBody3D" parent="."]
 collision_layer = 15
@@ -220,17 +213,65 @@ metadata/_custom_type_script = "uid://dt0lmi3jpjtqu"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 300)
 mesh = SubResource("PlaneMesh_qt7sb")
 
+[node name="frontThirdPerson" type="Camera3D" parent="DummyMesh300"]
+transform = Transform3D(1, 0, 0, 0, 0.97820926, 0.20762146, 0, -0.20762146, 0.97820926, 0.41747546, 2.1469097, 3.913722)
+fov = 46.0
+near = 0.01
+far = 937.3
+
+[node name="FirstPerson" type="Camera3D" parent="DummyMesh300"]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 1.1672864, 0)
+fov = 46.0
+near = 0.01
+far = 937.3
+
 [node name="DummyMesh200" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, -1, 0, 200)
 mesh = SubResource("PlaneMesh_qt7sb")
 
+[node name="frontThirdPerson" type="Camera3D" parent="DummyMesh200"]
+transform = Transform3D(1, 0, 0, 0, 0.97820926, 0.20762146, 0, -0.20762146, 0.97820926, 0.41747546, 2.1469097, 3.913722)
+fov = 46.0
+near = 0.01
+far = 937.3
+
+[node name="FirstPerson" type="Camera3D" parent="DummyMesh200"]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 1.1672864, 0)
+fov = 46.0
+near = 0.01
+far = 937.3
+
 [node name="DummyMesh100" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, 100)
+transform = Transform3D(1, 8.742278e-08, 0, -8.742278e-08, 1, 0, 0, 0, -1, 1, 0, 100)
 mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="frontThirdPerson" type="Camera3D" parent="DummyMesh100"]
+transform = Transform3D(1, 0, 0, 0, 0.97820926, 0.20762146, 0, -0.20762146, 0.97820926, 0.41747546, 2.1469097, 3.913722)
+fov = 46.0
+near = 0.01
+far = 937.3
+
+[node name="FirstPerson" type="Camera3D" parent="DummyMesh100"]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 1.1672864, 0)
+fov = 46.0
+near = 0.01
+far = 937.3
 
 [node name="DummyMesh600" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 2, 600)
 mesh = SubResource("PlaneMesh_qt7sb")
+
+[node name="frontThirdPerson" type="Camera3D" parent="DummyMesh600"]
+transform = Transform3D(1, 0, 0, 0, 0.97820926, 0.20762146, 0, -0.20762146, 0.97820926, 0.41747546, 2.1469097, 3.913722)
+fov = 46.0
+near = 0.01
+far = 937.3
+
+[node name="FirstPerson" type="Camera3D" parent="DummyMesh600"]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 1.1672864, 0)
+fov = 46.0
+near = 0.01
+far = 937.3
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.58782, 0.37636304, 0)
