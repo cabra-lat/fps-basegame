@@ -4,4 +4,6 @@
 
 [node name="TileTerrainRoot" type="Node3D"]
 script = ExtResource("1_vjhlg")
+centre_latitude = -6.084
+centre_longitude = -50.177
 metadata/_custom_type_script = "uid://cbbo4l7k1k36x"
