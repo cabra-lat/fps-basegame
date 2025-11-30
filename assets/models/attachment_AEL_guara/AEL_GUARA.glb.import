@@ -37,6 +37,19 @@ import_script/path=""
 materials/extract=0
 materials/extract_format=0
 materials/extract_path=""
-_subresources={}
+_subresources={
+"materials": {
+"AEL_Guara_Profile_Material": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://src/attachments/scopes/attachment_scope_guara_material.tres",
+"use_external/path": "uid://d4g4ecpev36jg"
+},
+"LensesMaterial": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://src/attachments/scopes/attachment_scope_guara_lenses_material.tres",
+"use_external/path": "uid://cbdcekb3fe428"
+}
+}
+}
 gltf/naming_version=2
 gltf/embedded_image_handling=1

@@ -1,0 +1,41 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cbdcekb3fe428"]
+
+[ext_resource type="Shader" uid="uid://c5onyak6rifo5" path="res://addons/cabra.lat_shooters/src/shaders/scope_lenses.gdshader" id="1_kqg6d"]
+
+[sub_resource type="Gradient" id="Gradient_8tse5"]
+interpolation_mode = 1
+offsets = PackedFloat32Array(0.0037593986, 0.13533835, 0.49624062, 0.62030077)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_3wn2c"]
+gradient = SubResource("Gradient_8tse5")
+width = 512
+height = 512
+fill = 1
+fill_from = Vector2(0.4871795, 0.491453)
+fill_to = Vector2(0.5940171, 0.3846154)
+
+[resource]
+resource_local_to_scene = true
+render_priority = 0
+shader = ExtResource("1_kqg6d")
+shader_parameter/u_reticle_texture = SubResource("GradientTexture2D_3wn2c")
+shader_parameter/u_reticle_tint = Color(1, 0.12315822, 0, 0.80300003)
+shader_parameter/u_bezel_color = Color(0, 0, 0, 1)
+shader_parameter/u_front_tint_color = Color(1, 0.58, 0, 0.757)
+shader_parameter/u_rear_tint_color = Color(1, 1, 1, 0.97200006)
+shader_parameter/u_lens_curvature = 0.3
+shader_parameter/u_reflection_intensity = 0.4
+shader_parameter/u_chromatic_aberration = 0.005
+shader_parameter/u_vignette_strength = 0.3
+shader_parameter/u_fresnel_power = 2.0
+shader_parameter/u_front_lens_scale = Vector2(0.5, 0.5)
+shader_parameter/u_front_lens_offset = Vector2(0.25, 0.25)
+shader_parameter/u_front_lens_radius = 0.45
+shader_parameter/u_front_lens_rotation = 0.0
+shader_parameter/u_front_squircle_exponent = 4.0
+shader_parameter/u_rear_lens_scale = Vector2(0.5, -0.5)
+shader_parameter/u_rear_lens_offset = Vector2(-0.25, 0.25)
+shader_parameter/u_rear_lens_radius = 0.45
+shader_parameter/u_rear_lens_rotation = 0.0
+shader_parameter/u_rear_squircle_exponent = 4.0

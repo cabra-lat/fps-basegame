@@ -79,7 +79,7 @@ points = PackedVector3Array(-0.010843657, 0.009677073, -0.043472715, 0.010838071
 collision_layer = 8
 collision_mask = 8
 script = ExtResource("1_5rxxy")
-camera_position_node = NodePath("CameraPosition")
+camera_position_node = NodePath("")
 grabbable_mesh = NodePath("MESH")
 grab_points = [NodePath("Marker3D")]
 grab_point_weights = Array[int]([1])
@@ -99,12 +99,13 @@ shape = SubResource("ConvexPolygonShape3D_jwakb")
 [node name="Marker3D" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.013071783, 0)
 
-[node name="CameraPosition" type="Marker3D" parent="."]
+[node name="CameraPosition" type="RemoteTransform3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.047257386, -0.069313824)
+remote_path = NodePath("../ScopeViewport/Camera3D")
 
 [node name="ScopeViewport" type="SubViewport" parent="."]
 
 [node name="Camera3D" type="Camera3D" parent="ScopeViewport"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7136335e-06, 0.04853543, -0.06971073)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.047257386, -0.069313824)
 current = true
 fov = 1.7187443

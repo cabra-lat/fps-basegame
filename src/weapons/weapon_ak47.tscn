@@ -51,39 +51,40 @@ linear_damping_per_axis = Vector3(20, 20, 20)
 angular_damping_per_axis = Vector3(20, 20, 20)
 
 [node name="PistolGrip" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.036451984, 0.014971316)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.057274207, -0.32091066)
 gizmo_extents = 0.05
 
 [node name="Handguard" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.027579293, -0.41737476)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.023540623, -0.011746198, -0.7558656)
 gizmo_extents = 0.05
 
 [node name="EjectionPoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.004, 0.060884938, -0.19077806)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.004, 0.060884938, -0.57351005)
 gizmo_extents = 0.05
 
 [node name="MagazinePoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00011410564, 0.0036079772, -0.20384352)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00011410564, 0.0036079772, -0.5865755)
 gizmo_extents = 0.05
 
 [node name="GUN" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.38273197)
 mesh = SubResource("ArrayMesh_xpnou")
 skeleton = NodePath("")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.9993568, 0.035858825, 0, -0.035858825, 0.9993568, 0, -0.032188147, 0)
+transform = Transform3D(1, 0, 0, 0, 0.9993568, 0.035858825, 0, -0.035858825, 0.9993568, 0, -0.032188147, -0.38273197)
 shape = SubResource("ConvexPolygonShape3D_qvkg1")
 
 [node name="TRIGGER" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.38273197)
 mesh = SubResource("ArrayMesh_qvkg1")
 skeleton = NodePath("")
 
 [node name="MuzzlePoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00022821128, 0.03216092, -0.53603435)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00022821128, 0.03216092, -0.9187663)
 gizmo_extents = 0.05
 
 [node name="ScopePoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.10004892, -0.0707517)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.10004892, -0.45348367)
 
-[node name="attachment_scope_guara" parent="ScopePoint" node_paths=PackedStringArray("attractors") instance=ExtResource("3_xpnou")]
-attractors = [NodePath("..")]
+[node name="attachment_scope_guara" parent="ScopePoint" instance=ExtResource("3_xpnou")]

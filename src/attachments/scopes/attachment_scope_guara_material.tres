@@ -1,0 +1,20 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://d4g4ecpev36jg"]
+
+[ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_mil5w"]
+[ext_resource type="Texture2D" uid="uid://m7mcqknac45x" path="res://assets/models/attachment_AEL_guara/AEL_GUARA_AEL_guara.jpg" id="2_6o5ii"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_mil5w")
+shader_parameter/modulate_color = Color(1, 1, 1, 1)
+shader_parameter/albedoTex = ExtResource("2_6o5ii")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/uv_offset = Vector2(0, 0)
+shader_parameter/uv_pan_velocity = Vector2(0, 0)
+shader_parameter/use_decal = false
+shader_parameter/decal_scale = 1.0
+shader_parameter/decal_axis = 0
+shader_parameter/decal_depth_threshold = 0.05
+shader_parameter/decal_origin = Vector3(0, 0, 0)
+shader_parameter/decal_world_space = false
+shader_parameter/texture_repeat = false
