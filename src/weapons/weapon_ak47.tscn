@@ -38,6 +38,7 @@ _surfaces = [{
 }]
 
 [node name="weapon_ak47" type="RigidBody3D" node_paths=PackedStringArray("grabbable_mesh", "grab_points")]
+physics_interpolation_mode = 1
 collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_ttqpt")

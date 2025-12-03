@@ -217,6 +217,13 @@ toggle_camera_mode={
 ]
 }
 
+[layer_names]
+
+3d_physics/layer_1="player"
+3d_physics/layer_2="magazine"
+3d_physics/layer_3="weapon"
+3d_physics/layer_4="scenary"
+
 [physics]
 
 3d/run_on_separate_thread=true

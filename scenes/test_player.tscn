@@ -1,5 +1,6 @@
-[gd_scene load_steps=8 format=3 uid="uid://pc011sk80jnn"]
+[gd_scene load_steps=9 format=3 uid="uid://pc011sk80jnn"]
 
+[ext_resource type="Script" uid="uid://dn0782newa14v" path="res://scenes/test_player.gd" id="1_48w40"]
 [ext_resource type="PackedScene" uid="uid://cuqlfnss80c0b" path="res://scenes/terrain.tscn" id="2_0ax77"]
 [ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_yghno"]
 [ext_resource type="PackedScene" uid="uid://bxlbq0drdtji4" path="res://addons/cabra.lat_shooters/src/ui/hud/debug_hud.tscn" id="3_aiq23"]
@@ -16,6 +17,7 @@ background_mode = 2
 sky = SubResource("Sky_x6lmx")
 
 [node name="Node3D" type="Node3D"]
+script = ExtResource("1_48w40")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_48w40")

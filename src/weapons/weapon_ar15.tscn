@@ -11,26 +11,26 @@
 size = Vector3(0.06925964, 0.24331665, 1.184082)
 
 [node name="weapon_ar15" type="RigidBody3D" node_paths=PackedStringArray("grab_points")]
-collision_layer = 18
-collision_mask = 18
+collision_layer = 0
+collision_mask = 0
 script = ExtResource("1_d5gp6")
 grab_points = [NodePath("Stock"), NodePath("PistolGrip"), NodePath("Handguard")]
-grab_point_weights = Array[int]([1, 1, 1])
+grab_point_weights = Array[int]([2, 1, 1])
 collision_layers_on_grab = 4
-collision_mask_on_grab = 4
+collision_mask_on_grab = 15
 spring_constant = Vector3(1000, 1000, 1000)
 angular_spring_constant = Vector3(80, 80, 90)
-linear_damping_per_axis = Vector3(20, 20, 20)
-angular_damping_per_axis = Vector3(20, 20, 20)
+angular_damping_per_axis = Vector3(10, 10, 8)
 
 [node name="receiver_ar15" parent="." instance=ExtResource("4_klx0e")]
 editor_description = "This is the base of the weapon."
 
 [node name="Scope" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0020007454, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
 
 [node name="attachment_scope_reddot" parent="Scope" node_paths=PackedStringArray("attractors") instance=ExtResource("3_bxb5h")]
 visible = false
+collision_mask = 12
 attractors = [NodePath("..")]
 
 [node name="attachment_scope_guara" parent="Scope" node_paths=PackedStringArray("attractors") instance=ExtResource("4_d5gp6")]
