@@ -3,7 +3,7 @@
 # Prints QA_RESULT=RESOLVED when a level the standard does not define still
 # yields a protective material (class-RHA fallback + warning), QA_RESULT=PRESENT
 # when it yields a 0-resistance material. Run:
-#   godot --headless --path . --script res://tools/qa/probes/qa002_cert_fallback.gd
+#   tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa002_cert_fallback.gd
 extends SceneTree
 
 func _initialize() -> void:

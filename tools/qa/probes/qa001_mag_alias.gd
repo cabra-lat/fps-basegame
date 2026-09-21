@@ -2,7 +2,7 @@
 # Reproducible probe for QA-001 (magazine aliasing / source-mag drain).
 # Prints QA_RESULT=RESOLVED when ejecting from the installed feed does NOT
 # change the source magazine, QA_RESULT=PRESENT when it does. Run:
-#   godot --headless --path . --script res://tools/qa/probes/qa001_mag_alias.gd
+#   tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa001_mag_alias.gd
 extends SceneTree
 
 func _make_feed(rounds: int) -> AmmoFeed:

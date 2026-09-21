@@ -8,9 +8,9 @@
     "line": 111,
     "message": "change_magazine() aliases the new magazine with weapon.ammo_feed: Resource.duplicate() is shallow and shares the contents Array, so the next eject() drains the ORIGINAL mag (data loss).",
     "evidence": "original repro: Reservoir orig=2 dup=2 equal=true; after dup.pop orig=1 dup=1. Fix landed (_copy_feed deep-copies contents).",
-    "probe": "timeout 90 godot --headless --path . --script res://tools/qa/probes/qa001_mag_alias.gd 2>&1",
-    "status": "resolved",
-    "verified_at": "2026-09-21T16:43:46.003Z"
+    "probe": "timeout 1000 tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa001_mag_alias.gd 2>&1",
+    "status": "active",
+    "verified_at": "2026-09-21T18:16:38.997Z"
   },
   {
     "id": "QA-002",
@@ -21,9 +21,9 @@
     "line": 25,
     "message": "Silent-zero armor: levels a standard does not define (NIJ 10-14, allowed by @export_range(1,14)) produced a 0-resistance material. The Nil-return crash half was fixed (0.0, no error); class_reference_rha fallback now yields a protective material with an explicit warning.",
     "evidence": "original repro: get_certified_threats(NIJ,10)=[] -> SCRIPT ERROR 'Nil from a function whose return type is float'; MAX_ENERGY=0.0. Fix adds class-RHA fallback + push_warning.",
-    "probe": "timeout 90 godot --headless --path . --script res://tools/qa/probes/qa002_cert_fallback.gd 2>&1",
-    "status": "resolved",
-    "verified_at": "2026-09-21T16:43:54.565Z"
+    "probe": "timeout 1000 tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa002_cert_fallback.gd 2>&1",
+    "status": "active",
+    "verified_at": "2026-09-21T18:19:39.104Z"
   },
   {
     "id": "QA-003",
