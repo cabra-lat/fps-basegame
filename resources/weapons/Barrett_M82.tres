@@ -14,12 +14,11 @@ bore_tolerance = 0.1
 case_tolerance = 1.0
 strict_mode = false
 max_capacity = 30
-contents = Array[Resource]([])
 
 [resource]
 script = ExtResource("1_6tnoy")
 name = "Barrett_M82"
-ammofeed = SubResource("Resource_02u21")
+ammo_feed = SubResource("Resource_02u21")
 attach_points = 25
 firemodes = 4
 feed_type = 1
