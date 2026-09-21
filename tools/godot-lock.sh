@@ -40,7 +40,7 @@ if command -v flock >/dev/null 2>&1; then
 fi
 
 if [ "$CLEAN_TMP" -eq 1 ]; then
-  find .godot/imported -name '*.tmp' -size 0 -delete 2>/dev/null || true
+  find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
 fi
 
 exec "$GODOT_BIN" "${ARGS[@]}"

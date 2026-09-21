@@ -136,7 +136,10 @@ gate_import() {
   # forever on a locked/stale file (verifier: `reimport | pistol_9mm_albedo.png`
   # loop, exit 124, plus 34 leftover 0-byte .godot/imported/*.tmp). Drop that
   # residue and BOUND the import; a real timeout is reported, never an infinite hang.
-  find .godot/imported -name '*.tmp' -size 0 -delete 2>/dev/null || true
+  # Godot's import temp residue is named `<file>-<hash>.<fmt>.ctex-XXXXXX` (mktemp
+  # suffix), NOT `*.tmp` — so match BOTH. 0 non-zero files carry the `-XXXXXX`
+  # suffix, so this is precise (verifier, 2026-09-21).
+  find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
   while :; do
     if command -v timeout >/dev/null 2>&1; then
       timeout 300 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
@@ -151,7 +154,7 @@ gate_import() {
     fi
     echo "verify-all: import timed out (likely a concurrent 'godot --import'); waiting 15s + retry once" >&2
     sleep 15
-    find .godot/imported -name '*.tmp' -size 0 -delete 2>/dev/null || true
+    find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
     attempt=$((attempt + 1))
   done
   errs="$(grep -cE 'SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile' "$ilog")"
