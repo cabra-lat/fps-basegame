@@ -73,6 +73,23 @@ if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   exit 64
 fi
 
+# ─── PREFLIGHT: the addon harnesses live in a SEPARATE repo ──────────
+# A clean clone of THIS repo has no `addons/`: `.gitmodules` declares the
+# submodules but HEAD carries NO gitlink (mode 160000), so `git submodule update
+# --init` is a no-op. check_scripts.gd and EVERY harness live in the addon, so
+# without it the gate can only fail at gate 1 with a cryptic "Can't load script"
+# (meta, 2026-09-21). Say it plainly and stop, instead of printing per-gate
+# failures that look like code regressions.
+if [ ! -f "addons/cabra.lat_shooters/test/check_scripts.gd" ]; then
+  echo "verify-all: FATAL: addons/cabra.lat_shooters is not checked out." >&2
+  echo "  The game repo has .gitmodules but NO gitlinks in HEAD, so a fresh clone" >&2
+  echo "  has no addons/ and 'git submodule update' does nothing. The parse gate and" >&2
+  echo "  every harness live in the addon, so NOTHING can be verified here." >&2
+  echo "  Fix (infra, coordinator): commit the gitlinks, or have CI clone each addon" >&2
+  echo "  at the intended ref. Nothing below can pass until then." >&2
+  exit 1
+fi
+
 # ─── result bookkeeping ─────────────────────────────
 declare -a R_NAME R_STATUS R_DETAIL
 HARD_FAILS=0
