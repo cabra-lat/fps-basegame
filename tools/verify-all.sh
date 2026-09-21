@@ -14,16 +14,19 @@
 #   6. inventory_ux        test/validate_inventory_ux.gd        (hard)
 #   7. factions            scenes/validate_factions.gd          (hard)
 #   8. gunsmith_preview    scenes/validate_gunsmith_preview.gd   (hard)
-#   9. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
-#  10. meta_progression    src/meta/validate_meta_progression.gd (hard)
-#  11. meta_market         src/meta/validate_meta_market.gd     (hard)
-#  12. meta_flea           src/meta/validate_meta_flea.gd       (hard)
-#  13. invariants          test/validate_invariants.gd          (hard; cross-system
+#   9. arena_spawn         scenes/validate_arena_spawn.gd        (hard; regression
+#                                                                guard, not a proof
+#                                                                of the race mechanism)
+#  10. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
+#  11. meta_progression    src/meta/validate_meta_progression.gd (hard)
+#  12. meta_market         src/meta/validate_meta_market.gd     (hard)
+#  13. meta_flea           src/meta/validate_meta_flea.gd       (hard)
+#  14. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#  14. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  15. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  15. export              optional, --with-export only (SKIP if no templates)
+#  16. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -412,6 +415,7 @@ else
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
   gate_harness "factions" "res://scenes/validate_factions.gd"
   gate_harness "gunsmith_preview" "res://scenes/validate_gunsmith_preview.gd"
+  gate_harness "arena_spawn" "res://scenes/validate_arena_spawn.gd"
   if [ "$NO_QA" -eq 1 ]; then
     record "qa_audit" "SKIP" "--no-qa"
   else
