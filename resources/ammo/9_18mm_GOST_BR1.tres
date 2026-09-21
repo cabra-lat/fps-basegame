@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_5hvni")
 icon = ExtResource("icon")
-name = "9x18_Makarov_GOST_BR1"
-caliber = "9x18mm Makarov"
-description = "9x18mm Makarov (GOST BR1)"
+name = "9_18mm_GOST_BR1"
+caliber = "9x18mm"
+description = "9x18mm (GOST BR1)"
 type = 5
 bullet_mass = 5.9
 cartridge_mass = 10.03

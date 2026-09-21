@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_bdrdo")
 icon = ExtResource("icon")
-name = "762x51_SWISS_P_VPAM_PM12"
-caliber = "7.62x51mm Swiss P AP"
-description = "7.62x51mm Swiss P AP (VPAM PM12)"
+name = "7_62_51mm_AP_VPAM_PM12"
+caliber = "7.62x51mm AP"
+description = "7.62x51mm AP (VPAM PM12)"
 type = 3
 bullet_mass = 12.7
 cartridge_mass = 21.59

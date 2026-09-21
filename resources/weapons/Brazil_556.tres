@@ -10,7 +10,7 @@
 [sub_resource type="Resource" id="Resource_as1ph"]
 script = ExtResource("3_qki5l")
 type = 1
-compatible_calibers = ["7,62x51mm", ".308 Winchester"]
+compatible_calibers = ["5.56x45mm"]
 strict_mode = true
 max_capacity = 4
 view_model = ExtResource("4_as1ph")

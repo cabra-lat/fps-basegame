@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_qqg5a")
 icon = ExtResource("icon")
-name = "45ACP_NIJ_IIA"
-caliber = ".45 ACP"
-description = ".45 ACP (NIJ IIA)"
+name = "45Auto_NIJ_IIA"
+caliber = ".45 Auto"
+description = ".45 Auto (NIJ IIA)"
 type = 0
 bullet_mass = 14.9
 cartridge_mass = 22.35

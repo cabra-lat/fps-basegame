@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_sftac")
 icon = ExtResource("icon")
-name = "40SW_NIJ_IIA"
-caliber = ".40 S&W"
-description = ".40 S&W (NIJ IIA)"
+name = "40Auto_NIJ_IIA"
+caliber = ".40 Auto"
+description = ".40 Auto (NIJ IIA)"
 type = 0
 bullet_mass = 11.7
 cartridge_mass = 19.89

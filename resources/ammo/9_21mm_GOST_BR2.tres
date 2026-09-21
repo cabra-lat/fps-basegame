@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_ono1l")
 icon = ExtResource("icon")
-name = "9x21_Gyurza_GOST_BR2"
-caliber = "9x21mm Gyurza"
-description = "9x21mm Gyurza (GOST BR2)"
+name = "9_21mm_GOST_BR2"
+caliber = "9x21mm"
+description = "9x21mm (GOST BR2)"
 type = 0
 bullet_mass = 7.93
 cartridge_mass = 13.481

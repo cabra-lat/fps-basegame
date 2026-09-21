@@ -6,9 +6,9 @@
 [resource]
 script = ExtResource("1_sewel")
 icon = ExtResource("icon")
-name = "380_ACP_NIJ_I"
-caliber = ".380 ACP"
-description = ".380 ACP (NIJ I)"
+name = "380Auto_NIJ_I"
+caliber = ".380 Auto"
+description = ".380 Auto (NIJ I)"
 type = 0
 bullet_mass = 6.2
 cartridge_mass = 10.54
