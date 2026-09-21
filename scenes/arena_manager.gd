@@ -23,7 +23,11 @@ const RAID_DURATION := 2100.0 # 35 min, genre-typical long raid
 
 const SLOT_ORDER: Array[String] = ["primary", "secondary"]
 ## Spawn separation used by _free_spawn(): a candidate must clear this of every
-## point already handed out (and of live bodies) to be accepted.
+## point already handed out (and of live bodies) to be accepted. This is the
+## PHYSICAL minimum (2 x capsule radius ~ 0.7 m), i.e. "not overlapping". It is
+## deliberately NOT the same number as `NpcWaveSpawner.spawn_separation` (0.9 m),
+## which is a per-wave safety margin on top of it — two constants, two jobs: this
+## one keeps bodies from starting inside each other, that one spreads a wave out.
 const SPAWN_SEPARATION := 0.7
 ## Candidate space for the last-resort ring search: rings x angles per ring.
 const SPAWN_RINGS := 3
