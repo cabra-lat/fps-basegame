@@ -6,19 +6,20 @@
 # game code or other owners' harnesses — it just calls them.
 #
 # Gates, in order:
-#   1. import/parse        godot --headless --path . --import   (hard)
-#   2. assets              test/validate_assets.gd              (hard)
-#   3. ballistics          test/validate_tarkov_ballistics.gd   (hard)
-#   4. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
-#   5. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
-#   6. meta_progression    src/meta/validate_meta_progression.gd (hard)
-#   7. meta_market         src/meta/validate_meta_market.gd     (hard)
-#   8. invariants          test/validate_invariants.gd         (hard; cross-system
+#   1. import/parse        godot --headless --path . --import + check_scripts.gd (hard)
+#   2. uid_tracking        every tracked script has its tracked .uid   (hard)
+#   3. assets              test/validate_assets.gd              (hard)
+#   4. ballistics          test/validate_tarkov_ballistics.gd   (hard)
+#   5. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
+#   6. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
+#   7. meta_progression    src/meta/validate_meta_progression.gd (hard)
+#   8. meta_market         src/meta/validate_meta_market.gd     (hard)
+#   9. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#   9. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  10. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  10. export              optional, --with-export only (SKIP if no templates)
+#  11. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -108,6 +109,45 @@ gate_import() {
   fi
 }
 
+# ─── GATE 2: tracked-script / .uid parity ───
+# WHY (verifier finding, 2026-09-21): Godot 4.4+ references scripts by UID, but a
+# tracked .gd/.gdshader/.gdshaderinc WITHOUT a tracked .uid regenerates a
+# DIFFERENT uid on a clean clone, so every .tres/.tscn referencing it by
+# `uid://...` silently falls back to the text path (and breaks if the file moves).
+# Proven: `git archive HEAD` of the addon + `--import` regenerated weapon.gd.uid
+# with a new UID and printed "WARNING: ext_resource, invalid UID ..."; copying the
+# real .uid removed the warning. This is a GIT invariant, not runtime, so it lives
+# here (not in validate_invariants.gd). Scope: our two repos only — vendored
+# submodules are not ours to gate, and a missing git checkout (e.g. a private
+# addon the runner could not fetch) is skipped rather than faked green.
+UID_REPOS=("." "addons/cabra.lat_shooters")
+gate_uid_tracking() {
+  local repo f n total=0 details="" list="$LOG_DIR/uid_missing.log" tracked="$LOG_DIR/.uid_tracked"
+  : >"$list"
+  for repo in "${UID_REPOS[@]}"; do
+    git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || continue
+    git -C "$repo" ls-files -- '*.uid' >"$tracked"
+    n=0
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      if ! grep -qxF "$f.uid" "$tracked"; then
+        printf '%s/%s\n' "$repo" "$f" >>"$list"
+        n=$((n + 1))
+      fi
+    done < <(git -C "$repo" ls-files -- '*.gd' '*.gdshader' '*.gdshaderinc')
+    if [ "$n" -gt 0 ]; then
+      total=$((total + n))
+      details+="$repo:$n "
+    fi
+  done
+  if [ "$total" -gt 0 ]; then
+    record "uid_tracking" "FAIL" "$total tracked script(s) without a tracked .uid ($details) — list in $list"
+    HARD_FAILS=$((HARD_FAILS + 1))
+  else
+    record "uid_tracking" "PASS" "every tracked script has a tracked .uid"
+  fi
+}
+
 # ─── HARNESS GATE ───────────────────────────────────
 gate_harness() { # name script
   local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n
@@ -184,6 +224,7 @@ echo "logs: $LOG_DIR"
 echo ""
 
 gate_import
+gate_uid_tracking
 
 if [ "$QUICK" -eq 1 ]; then
   gate_harness "assets" "res://addons/cabra.lat_shooters/test/validate_assets.gd"
