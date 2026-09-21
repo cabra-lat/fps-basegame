@@ -598,15 +598,23 @@ function findDuplication(files) {
 // ───────────────────────────────────────────────── import gate ──
 
 function runImportGate() {
-  const godot = process.env.GODOT_BIN || 'godot';
   mkdirSync(SCRATCH, { recursive: true });
   const logPath = join(SCRATCH, 'qa-import.log');
+  // `.godot/` is a SHARED per-repo cache. Run Godot through tools/godot-lock.sh
+  // (the same flock verify-all uses) so a direct import can never race the gate
+  // and hang on `reimport | ...` (AGENTS: direct Godot only via the wrapper).
+  const lockScript = join(ROOT, 'tools', 'godot-lock.sh');
+  const useLock = existsSync(lockScript);
+  const cmd = useLock ? 'bash' : (process.env.GODOT_BIN || 'godot');
+  const args = useLock
+    ? [lockScript, '--headless', '--path', ROOT, '--import']
+    : ['--headless', '--path', ROOT, '--import'];
   let out = '';
   let code = 0;
   try {
-    out = execFileSync(godot, ['--headless', '--path', ROOT, '--import'], {
+    out = execFileSync(cmd, args, {
       encoding: 'utf8',
-      timeout: 600000,
+      timeout: 1200000,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (e) {
