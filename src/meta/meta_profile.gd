@@ -66,7 +66,11 @@ func to_dict() -> Dictionary:
 	sync_progress()
 	return {
 		"version": VERSION,
-		"faction": int(faction),
+		# [range 2026-09-21] faction became a String id (faction pack, "faction is
+		# content, not an enum"). VERSION stays 1 on purpose: the read path below is
+		# backwards-compatible, so bumping it here would only quarantine live saves.
+		# A hard v1->v2 boundary + ProfileStore migration is the meta lane's call.
+		"faction": faction,
 		"team": team,
 		"currency": currency,
 		"inventory": inventory,
@@ -87,7 +91,9 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> MetaProfile:
 	var p := MetaProfile.new()
-	p.faction = int(data.get("faction", p.faction))
+	# [range 2026-09-21] accepts both shapes: a String id (current) and the legacy
+	# numeric index of the old two-value enum (migrated loudly in faction_from_saved).
+	p.faction = PlayerProfile.faction_from_saved(data.get("faction", p.faction))
 	p.team = int(data.get("team", 0))
 	p.currency = int(data.get("currency", p.currency))
 	var inv = data.get("inventory", {})

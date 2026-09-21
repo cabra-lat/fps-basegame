@@ -39,8 +39,10 @@ var weapon: Weapon # active weapon (mirrors controller.current_weapon)
 var active_slot := "primary"
 var plate_mat: BallisticMaterial
 var audio: GameAudio
+var gunsmith: GunsmithUI
 var raid: Raid
 var profile: PlayerProfile
+var factions: FactionRegistry
 var meta: MetaService
 var _meta_summary := ""
 var deaths := 0 # player deaths (respawn UX); match score lives in game_mode
@@ -92,6 +94,14 @@ func _ready() -> void:
 	add_child(audio)
 	audio.start_ambient()
 	player.reloaded.connect(func(_p: PlayerController) -> void: audio.play_reload())
+	gunsmith = GunsmithUI.new()
+	gunsmith.name = "GunsmithUI"
+	add_child(gunsmith)
+	gunsmith.bind(player, audio)
+	# Primary entry (player-rig hook): inventory -> click weapon -> Modificar.
+	# Defensive: connected only once the addon exposes the signal.
+	if player.has_signal("weapon_modify_requested"):
+		player.connect("weapon_modify_requested", _on_weapon_modify_requested)
 	_apply_settings()
 	_setup_game_mode()
 	_build_hud()
@@ -100,7 +110,7 @@ func _ready() -> void:
 	_spawn_bots()
 	_spawn_medical_pickups()
 	_push_feed("%s — %d bots" % [game_mode.mode_name, BOT_COUNT])
-	_refresh_top("WASD move - 1/2 troca arma - G drop - E pega - H usa medico - R reload - Esc pausa")
+	_refresh_top("WASD - 1/2 troca arma - G drop - E pega - H medico - M mods - R reload - Esc pausa")
 	if OS.is_debug_build(): print("ARENA READY: %s + %s, mode=%s teams=%d, bots=%d, raid=%.0fs extracts=%d, ray_excludes=%d" % [_slot_weapon("primary").name if _slot_weapon("primary") else "none", _slot_weapon("secondary").name if _slot_weapon("secondary") else "none", game_mode.mode_name, game_mode.team_count, get_tree().get_nodes_in_group("bots").size(), RAID_DURATION, get_tree().get_nodes_in_group("extraction_points").size(), _shot_excludes().size()])
 
 ## Pick the mode (exported wins; else SettingsStore) and inject spawn points.
@@ -162,6 +172,10 @@ func _setup_raid() -> void:
 		meta.use_profile(MetaProfile.new())
 	profile = meta.profile
 	profile.team = _player_team
+	# Faction pack (content, not an enum). A profile id the pack does not know,
+	# or an NPC-only one, is an error in the data — report it, never mask it.
+	factions = FactionRegistry.default_registry()
+	profile.validate_faction(factions)
 	raid = Raid.new()
 	raid.name = "Raid"
 	raid.duration = RAID_DURATION
@@ -183,7 +197,7 @@ func _setup_raid() -> void:
 	for point in get_tree().get_nodes_in_group("extraction_points"):
 		if point is ExtractionPoint:
 			var ep := point as ExtractionPoint
-			ep.bind(profile, raid)
+			ep.bind(profile, raid, factions)
 			ep.player_entered.connect(_on_extract_enter)
 			ep.player_left.connect(_on_extract_leave)
 			ep.progress_changed.connect(_on_extract_progress)
@@ -269,7 +283,9 @@ func _on_extracted(point: ExtractionPoint) -> void:
 func _refresh_raid_hud() -> void:
 	if raid_label == null or raid == null:
 		return
-	raid_label.text = "RAID %s  |  %s  |  EXP %d  |  ₽ %d" % [raid.time_text(), profile.faction_name(), raid.exp, profile.currency]
+	raid_label.text = "RAID %s  |  %s  |  EXP %d  |  %d cr" % [raid.time_text(), profile.faction_name(factions), raid.exp, profile.currency]
+	# Faction colour is data too: the HUD tints the name, the pack defines the hue.
+	raid_label.add_theme_color_override("font_color", profile.faction_color(factions))
 	if extract_label:
 		extract_label.text = point_list_text()
 
@@ -283,6 +299,11 @@ func point_list_text() -> String:
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	# While the gunsmith is open the player is busy working: drop combat input
+	# (the raid keeps running — you are vulnerable), then keep the sim ticking.
+	if gunsmith != null and gunsmith.is_open():
+		_pending_shots.clear()
+		_intents.clear()
 	# Skill rule: physics queries live in _physics_process, never _process.
 	for pending in _pending_shots:
 		_resolve_shot(pending[0], pending[1])
@@ -303,6 +324,10 @@ func _physics_process(delta: float) -> void:
 		_refresh_raid_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if gunsmith != null and gunsmith.is_open():
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("mod_weapon"):
+			gunsmith.close()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if _market_open:
 			_close_market()
@@ -310,6 +335,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_pause()
 		return
 	if get_tree().paused:
+		return
+	if event.is_action_pressed("mod_weapon"):
+		gunsmith.open()
 		return
 	if event.is_action_pressed("weapon_slot1"):
 		_intents.append(["slot", "primary"])
@@ -975,7 +1003,7 @@ func _refresh_market() -> void:
 	if t == null:
 		market_title.text = "Trader desconhecido"
 		return
-	market_title.text = "%s  |  LL%d  |  REP %d  |  ₽%d" % [t.display_name(), market.loyalty_level(_market_trader), market.reputation(_market_trader), meta.profile.currency]
+	market_title.text = "%s  |  LL%d  |  REP %d  |  %d cr" % [t.display_name(), market.loyalty_level(_market_trader), market.reputation(_market_trader), meta.profile.currency]
 	for c in market_rows.get_children():
 		market_rows.remove_child(c)
 		c.queue_free()
@@ -1021,8 +1049,8 @@ func _market_buy(index: int) -> void:
 func _market_sell(index: int) -> void:
 	var r: Dictionary = meta.sell(_market_trader, index)
 	if r.get("ok", false):
-		market_msg.text = "Vendido por ₽%d" % int(r.get("price", 0))
-		_push_feed("Vendeu por ₽%d" % int(r.get("price", 0)))
+		market_msg.text = "Vendido por %d cr" % int(r.get("price", 0))
+		_push_feed("Vendeu por %d cr" % int(r.get("price", 0)))
 	else:
 		market_msg.text = "Recusado: %s" % String(r.get("reason", "?"))
 	meta.persist()
@@ -1190,6 +1218,11 @@ func _build_pause() -> void:
 	btn_cont.pressed.connect(_on_pause_continue)
 	btn_cont.pressed.connect(audio.play_ui)
 	box.add_child(btn_cont)
+	var btn_mod := Button.new()
+	btn_mod.text = "Gunsmith (M)"
+	btn_mod.pressed.connect(_on_pause_gunsmith)
+	btn_mod.pressed.connect(audio.play_ui)
+	box.add_child(btn_mod)
 	var btn_restart := Button.new()
 	btn_restart.text = "Reiniciar"
 	btn_restart.pressed.connect(_on_pause_restart)
@@ -1217,6 +1250,25 @@ func _toggle_pause() -> void:
 
 func _on_pause_continue() -> void:
 	_toggle_pause()
+
+func _on_pause_gunsmith() -> void:
+	# Leave pause, then open the (mouse-driven) gunsmith over the running raid.
+	get_tree().paused = false
+	if pause_panel != null:
+		pause_panel.visible = false
+	gunsmith.open()
+
+## Inventory "Modificar" (inventory-ux -> player-rig) -> edit that weapon.
+## Order matters: close the inventory first (it recaptures the mouse), THEN
+## open the gunsmith (which releases it last). In debug_range there is no
+## listener, so nothing closes blindly — only the opener closes.
+func _on_weapon_modify_requested(w: Weapon) -> void:
+	if gunsmith == null or w == null:
+		return
+	var inv = player.get("inventory_ui")
+	if inv != null and inv.has_method("close_inventory") and inv.visible:
+		inv.close_inventory()
+	gunsmith.open_for_weapon(w)
 
 func _on_pause_restart() -> void:
 	get_tree().paused = false

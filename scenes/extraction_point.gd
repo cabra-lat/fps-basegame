@@ -6,16 +6,18 @@ extends Area3D
 ## physics clock; leaving cancels it. All rules are checked through can_use()
 ## so the HUD and the harness see the exact same verdict.
 
-enum Faction { ALL, PMC_ONLY, SCAV_ONLY }
 enum Kind { INSTANT, PAID, FLARE, LEVER, COOP, TIMED }
 
 @export var display_name: String = "EXTRACT"
-@export var faction: Faction = Faction.ALL
+## Faction ids allowed to use this point; EMPTY = any faction. Ids come from the
+## faction pack (`FactionRegistry`), so a game with 1 or 10 factions needs no
+## code change here — the gate is a data list, not an enum of two.
+@export var allowed_factions: Array[String] = []
 @export var kind: Kind = Kind.INSTANT
 @export var extract_time: float = 0.0 ## seconds held inside (INSTANT = 0)
 @export var single_use: bool = false
 @export var required_item: String = "" ## item_id gating the point (note/key)
-@export var paid_cost: int = 0 ## V-Ex: roubles charged on completion
+@export var paid_cost: int = 0 ## paid extract: credits charged on completion
 @export var timed_open: float = 0.0 ## raid seconds when the window opens
 @export var timed_close: float = 0.0 ## raid seconds when it closes (0 = never)
 
@@ -28,6 +30,8 @@ signal state_changed(point: ExtractionPoint)
 
 var profile: PlayerProfile
 var raid: Raid
+## Faction pack used to mount the gate text. Falls back to the shared pack.
+var factions: FactionRegistry
 
 var _bodies: Array[Node] = []
 var _players_inside := 0
@@ -36,9 +40,10 @@ var _completed := false
 var _lever_pulled := false
 var _flare_active := false
 
-func bind(p_profile: PlayerProfile, p_raid: Raid) -> void:
+func bind(p_profile: PlayerProfile, p_raid: Raid, p_factions: FactionRegistry = null) -> void:
 	profile = p_profile
 	raid = p_raid
+	factions = p_factions
 
 func _ready() -> void:
 	monitoring = true
@@ -55,13 +60,8 @@ func can_use() -> Dictionary:
 		return _no("sem perfil")
 	if _completed and single_use:
 		return _no("ja usada")
-	match faction:
-		Faction.PMC_ONLY:
-			if profile.faction != PlayerProfile.Faction.PMC:
-				return _no("apenas PMC")
-		Faction.SCAV_ONLY:
-			if profile.faction != PlayerProfile.Faction.SCAV:
-				return _no("apenas SCAV")
+	if not allowed_factions.is_empty() and not allowed_factions.has(profile.faction):
+		return _no(faction_gate_text())
 	if required_item != "" and not profile.has_item(required_item):
 		return _no("precisa %s" % required_item)
 	match kind:
@@ -81,6 +81,17 @@ func can_use() -> Dictionary:
 			if not in_window():
 				return _no("fora da janela")
 	return {"ok": true, "reason": ""}
+
+## "apenas <names>" mounted from the pack; "" when the point takes anyone.
+func faction_gate_text() -> String:
+	if allowed_factions.is_empty():
+		return ""
+	var reg := factions if factions != null else FactionRegistry.default_registry()
+	var names: Array[String] = []
+	for id in allowed_factions:
+		names.append(reg.display_name(id))
+	return "apenas %s" % ", ".join(PackedStringArray(names))
+
 
 func is_open() -> bool:
 	return can_use().get("ok", false)

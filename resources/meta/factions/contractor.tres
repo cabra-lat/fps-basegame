@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="Faction" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/faction.gd" id="1_faction"]
+
+[resource]
+script = ExtResource("1_faction")
+id = "contractor"
+display_name = "Contractor"
+color = Color(0.16, 0.35, 0.9, 1)
+playable = true
