@@ -131,7 +131,17 @@ gate_uid_tracking() {
   local repo f n total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log" tracked="$LOG_DIR/.uid_tracked"
   : >"$list"
   for repo in "${UID_REPOS[@]}"; do
-    if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+    # Must be its OWN repo TOPLEVEL, not a subdirectory of a parent repo. If the
+    # addon dir exists but is not a repo (uninitialised submodule / `.git`
+    # removed), `git -C <dir> rev-parse` WALKS UP to the game repo and returns
+    # it, so the addon would count as "checked" while `ls-files` sees none of its
+    # scripts -> false PASS. Compare the repo toplevel with the dir itself.
+    # (verifier, sandbox B1.)
+    local repo_abs top
+    repo_abs="$(cd "$repo" 2>/dev/null && pwd -P)" || repo_abs=""
+    top="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" || top=""
+    top="$(cd "$top" 2>/dev/null && pwd -P)" || top=""
+    if [ -z "$repo_abs" ] || [ -z "$top" ] || [ "$top" != "$repo_abs" ]; then
       skipped+="$repo "
       continue
     fi
