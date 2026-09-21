@@ -41,7 +41,13 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 GODOT_BIN="${GODOT_BIN:-godot}"
-LOG_DIR="${VERIFY_LOG_DIR:-/tmp/shooter/verify}"
+# Per-run log dir by DEFAULT: two agents running verify-all at the same time used
+# to write the same /tmp/shooter/verify/*.log and clobber each other, which made a
+# gate read another run's half-written log and report a spurious FAIL (observed
+# 2026-09-21: assets/weapon_mechanics/meta_progression FAILed rc=0 with "RESULT:
+# PASS" actually present in the final file). VERIFY_LOG_DIR still forces an exact
+# path when a caller wants one.
+LOG_DIR="${VERIFY_LOG_DIR:-/tmp/shooter/verify.$$}"
 mkdir -p "$LOG_DIR"
 
 QUICK=0 WITH_EXPORT=0 NO_QA=0 QA_FAST=0 QA_SOFT=0
