@@ -22,6 +22,13 @@ bash tools/verify-all.sh --with-export  # + Linux/Windows export
 # nothing for a broken script (proven by sabotage). Use it to refresh the import cache,
 # never as proof of parse. The parse gate is `check_scripts.gd`, run by verify-all.
 
+# ⚠️ Run Godot DIRECTLY only through the lock wrapper. The `.godot/` cache is shared;
+# several lanes running `godot --import` at once HANG the import and block the gate for
+# everyone. `tools/godot-lock.sh` takes the SAME per-repo lock as verify-all, so a direct
+# import waits instead of racing:
+tools/godot-lock.sh --headless --path . --import            # not `godot ... --import`
+tools/godot-lock.sh --clean-tmp --headless --path . --import # also clears 0-byte leftovers
+
 # Play a scene with GPU rendering, INVISIBLE (awesomewm-safe):
 # app window lives on dummy :99, GL ships to NVIDIA via VirtualGL.
 DISPLAY=:99 nix shell nixpkgs#virtualgl -c vglrun -d :0 \
