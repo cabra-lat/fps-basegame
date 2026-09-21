@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_s4qyt")
 icon = ExtResource("icon")
-name = "Colt_M1911"
+name = "M1911"
+description = ".45 ACP single-action pistol, 7-round magazine."
 ammo_feed = SubResource("Resource_rqd3s")
 attach_points = 7
 firemodes = 4

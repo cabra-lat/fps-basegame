@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_768ti")
 icon = ExtResource("icon")
-name = "UZI"
+name = "Israel SMG-9"
+description = "9x19mm blowback submachine gun, 32-round magazine."
 ammo_feed = SubResource("Resource_27njf")
 attach_points = 31
 firemodes = 6

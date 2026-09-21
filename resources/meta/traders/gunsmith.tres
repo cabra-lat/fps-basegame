@@ -12,7 +12,7 @@ required_reputation = 0
 
 [sub_resource type="Resource" id="o_flash_hider"]
 script = ExtResource("2_o")
-item_path = "res://resources/attachments/A2_Flash_Hider.tres"
+item_path = "res://resources/attachments/USA_FH.tres"
 buy_price = 3000
 sell_price = 1200
 stock_max = 8
@@ -20,13 +20,13 @@ min_loyalty = 1
 
 [sub_resource type="Resource" id="o_barter_aimpoint"]
 script = ExtResource("2_o")
-item_path = "res://resources/attachments/Aimpoint_T1.tres"
+item_path = "res://resources/attachments/Sweden_R1.tres"
 buy_price = 5000
 sell_price = 8000
 stock_max = 4
 min_loyalty = 1
 barter_required = {
-"res://resources/attachments/A2_Flash_Hider.tres": 1
+"res://resources/attachments/USA_FH.tres": 1
 }
 
 [sub_resource type="Resource" id="o_m4"]

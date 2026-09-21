@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_1iorx")
 icon = ExtResource("icon")
-name = "Remington_700"
+name = "M24"
+description = "7.62x51mm bolt-action sniper rifle, 5-round magazine."
 ammo_feed = SubResource("Resource_46plm")
 attach_points = 25
 firemodes = 32

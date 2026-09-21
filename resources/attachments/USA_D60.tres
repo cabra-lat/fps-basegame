@@ -1,23 +1,23 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://5sl1dn1l6bou"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://mren5c6q5due"]
 
-[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_ov0oa"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_7u4p0"]
 [ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
 [ext_resource type="PackedScene" path="res://src/attachments/placeholders/attachment_placeholder_magazine.tscn" id="model"]
 
 [resource]
-script = ExtResource("1_ov0oa")
+script = ExtResource("1_7u4p0")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
-name = "Magpul_PMAG_40"
-description = "This Attachment is the default one."
+name = "USA D60"
+description = "60-round drum magazine."
 type = 5
 attachment_point = 0
-mass = 0.25
+mass = 0.85
 cost = 100
 accuracy_modifier = 1.0
 recoil_modifier = 1.0
-ergonomics_modifier = 0.95
-reload_speed_modifier = 0.9
+ergonomics_modifier = 0.85
+reload_speed_modifier = 0.8
 aim_down_sights_modifier = 1.0
 magnification = 1.0
 reticle_type = 0
@@ -33,7 +33,7 @@ laser_active = true
 light_active = true
 laser_range = 50.0
 light_range = 100.0
-capacity_multiplier = 1.33
+capacity_multiplier = 2.0
 compatible_weapons = Array[String]([])
 incompatible_attachments = Array[int]([])
 

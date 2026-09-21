@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_phnxg")
 icon = ExtResource("icon")
-name = "Saiga_12"
+name = "Russia 12"
+description = "12-gauge semi-automatic shotgun, 8-round magazine."
 ammo_feed = SubResource("Resource_ya3ax")
 attach_points = 9
 firemodes = 6

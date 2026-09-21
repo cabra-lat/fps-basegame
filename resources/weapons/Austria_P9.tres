@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_3n7f8")
 icon = ExtResource("icon")
-name = "Glock_17"
+name = "Austria P9"
+description = "Polymer-framed 9x19mm service pistol, 17-round magazine."
 ammo_feed = SubResource("Resource_4qgmr")
 attach_points = 7
 firemodes = 4

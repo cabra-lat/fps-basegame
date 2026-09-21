@@ -47,10 +47,10 @@ const GENERIC_CARTRIDGE := "res://src/ammo/cartridges.tscn"
 # the per-category placeholders below and is flagged in the manifest.
 const MODEL_ALIASES := {
 	"res://resources/weapons/AK_74.tres": "res://assets/models/weapon_ak74/PSX_AK-74.glb",
-	"res://resources/weapons/FN_FAL.tres": "res://assets/models/weapon_parafal/PSX_FN_FAL.glb",
+	"res://resources/weapons/Belgium_BR.tres": "res://assets/models/weapon_parafal/PSX_FN_FAL.glb",
 	"res://resources/weapons/PKM.tres": "res://assets/models/weapon_rpk/rpk.glb",
 	"res://resources/weapons/M249.tres": "res://assets/models/weapon_rpk/rpk.glb",
-	"res://resources/weapons/Mossberg_500.tres": "res://assets/models/weapon_shotgun_benelli/PSX_Benelli.glb",
+	"res://resources/weapons/USA_Pump.tres": "res://assets/models/weapon_shotgun_benelli/PSX_Benelli.glb",
 }
 
 # Existing project scenes used as per-category weapon placeholders. Reviewed

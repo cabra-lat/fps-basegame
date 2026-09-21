@@ -108,7 +108,7 @@ func _scenario_death_preserves_stash() -> void:
 func _scenario_weapon_state() -> void:
 	print("\n[3] weapon + magazine + attachment survive a stash save/reload")
 	var wpath := "res://resources/weapons/M4_Carbine.tres"
-	var apath := "res://resources/attachments/A2_Flash_Hider.tres"
+	var apath := "res://resources/attachments/USA_FH.tres"
 	var ammo_path := "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
 	var item := ItemCodec.item_from_path(wpath)
 	var w := item.extra as Weapon if item != null else null

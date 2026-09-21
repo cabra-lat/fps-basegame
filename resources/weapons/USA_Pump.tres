@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_efrjs")
 icon = ExtResource("icon")
-name = "Mossberg_500"
+name = "USA Pump"
+description = "12-gauge pump-action shotgun, 6-round tube."
 ammo_feed = SubResource("Resource_ddmlu")
 attach_points = 9
 firemodes = 16

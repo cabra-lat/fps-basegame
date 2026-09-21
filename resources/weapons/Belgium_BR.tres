@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_geat3")
 icon = ExtResource("icon")
-name = "FN_FAL"
+name = "Belgium BR"
+description = "7.62x51mm battle rifle, 20-round magazine."
 ammo_feed = SubResource("Resource_tr3tt")
 attach_points = 31
 firemodes = 6

@@ -1,23 +1,23 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://di4u74emh8kml"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://dqwhgieopvdvt"]
 
-[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_sglox"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_8u467"]
 [ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
-[ext_resource type="PackedScene" path="res://src/attachments/attachment_scope_reddot.tscn" id="model"]
+[ext_resource type="PackedScene" path="res://src/attachments/placeholders/attachment_placeholder_underbarrel.tscn" id="model"]
 
 [resource]
-script = ExtResource("1_sglox")
+script = ExtResource("1_8u467")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
-name = "Aimpoint_T1"
-description = "This Attachment is the default one."
-type = 0
-attachment_point = 8
+name = "USA AF"
+description = "Angled foregrip."
+type = 2
+attachment_point = 16
 mass = 0.12
 cost = 100
-accuracy_modifier = 0.9
-recoil_modifier = 0.95
+accuracy_modifier = 1.05
+recoil_modifier = 0.85
 ergonomics_modifier = 1.1
-reload_speed_modifier = 0.95
+reload_speed_modifier = 1.0
 aim_down_sights_modifier = 1.05
 magnification = 1.0
 reticle_type = 0
@@ -27,7 +27,7 @@ zero_distance = 100.0
 sound_suppression = 0.0
 flash_suppression = 0.0
 recoil_reduction = 0.0
-stability_bonus = 0.0
+stability_bonus = 0.8
 deployable = false
 laser_active = true
 light_active = true

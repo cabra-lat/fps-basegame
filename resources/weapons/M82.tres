@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_6tnoy")
 icon = ExtResource("icon")
-name = "Barrett_M82"
+name = "M82"
+description = "12.7x99mm anti-materiel rifle, 10-round magazine."
 ammo_feed = SubResource("Resource_02u21")
 attach_points = 25
 firemodes = 4

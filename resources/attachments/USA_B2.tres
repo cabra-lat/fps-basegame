@@ -1,24 +1,24 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://b35rbs8i3chmy"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://bfqikkvq5yisp"]
 
-[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_no0a4"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_2v602"]
 [ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
 [ext_resource type="PackedScene" path="res://src/attachments/placeholders/attachment_placeholder_underbarrel.tscn" id="model"]
 
 [resource]
-script = ExtResource("1_no0a4")
+script = ExtResource("1_2v602")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
-name = "BCM_Gunfighter"
-description = "This Attachment is the default one."
+name = "USA B2"
+description = "Foldable bipod."
 type = 2
 attachment_point = 16
-mass = 0.09
+mass = 0.45
 cost = 100
-accuracy_modifier = 1.03
-recoil_modifier = 0.88
-ergonomics_modifier = 1.08
+accuracy_modifier = 1.1
+recoil_modifier = 0.6
+ergonomics_modifier = 1.15
 reload_speed_modifier = 1.0
-aim_down_sights_modifier = 1.03
+aim_down_sights_modifier = 1.1
 magnification = 1.0
 reticle_type = 0
 reticle_color = Color(1, 0, 0, 1)
@@ -27,8 +27,8 @@ zero_distance = 100.0
 sound_suppression = 0.0
 flash_suppression = 0.0
 recoil_reduction = 0.0
-stability_bonus = 0.9
-deployable = false
+stability_bonus = 1.5
+deployable = true
 laser_active = true
 light_active = true
 laser_range = 50.0

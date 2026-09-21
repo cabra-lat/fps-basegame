@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_vgjfi")
 icon = ExtResource("icon")
-name = "Desert_Eagle"
+name = "USA P50"
+description = "Gas-operated .50 AE magnum pistol."
 ammo_feed = SubResource("Resource_jxgio")
 attach_points = 7
 firemodes = 4

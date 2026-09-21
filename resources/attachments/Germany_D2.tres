@@ -1,37 +1,37 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://by4xoj8r850sc"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=4 format=3 uid="uid://fmbrj8k658sk"]
 
-[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_hpb8j"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_j8js0"]
 [ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
-[ext_resource type="PackedScene" path="res://src/attachments/placeholders/attachment_placeholder_muzzle.tscn" id="model"]
+[ext_resource type="PackedScene" path="res://src/attachments/placeholders/attachment_placeholder_laser.tscn" id="model"]
 
 [resource]
-script = ExtResource("1_hpb8j")
+script = ExtResource("1_j8js0")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
-name = "A2_Flash_Hider"
-description = "This Attachment is the default one."
-type = 1
-attachment_point = 1
-mass = 0.08
+name = "Germany D2"
+description = "IR laser/illuminator box."
+type = 3
+attachment_point = 6
+mass = 0.32
 cost = 100
 accuracy_modifier = 1.0
-recoil_modifier = 0.9
+recoil_modifier = 1.0
 ergonomics_modifier = 1.0
 reload_speed_modifier = 1.0
-aim_down_sights_modifier = 1.0
+aim_down_sights_modifier = 1.05
 magnification = 1.0
 reticle_type = 0
 reticle_color = Color(1, 0, 0, 1)
 eye_relief = 3.0
 zero_distance = 100.0
 sound_suppression = 0.0
-flash_suppression = 0.6
+flash_suppression = 0.0
 recoil_reduction = 0.0
 stability_bonus = 0.0
 deployable = false
 laser_active = true
 light_active = true
-laser_range = 50.0
+laser_range = 200.0
 light_range = 100.0
 capacity_multiplier = 1.0
 compatible_weapons = Array[String]([])

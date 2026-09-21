@@ -19,7 +19,8 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_f6noh")
 icon = ExtResource("icon")
-name = "HK_MP5"
+name = "Germany SMG-5"
+description = "9x19mm roller-delayed blowback submachine gun."
 ammo_feed = SubResource("Resource_112pc")
 attach_points = 31
 firemodes = 14

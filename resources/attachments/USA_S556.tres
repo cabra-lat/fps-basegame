@@ -8,8 +8,8 @@
 script = ExtResource("1_buwnl")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
-name = "Surefire_SOCOM556"
-description = "This Attachment is the default one."
+name = "USA S556"
+description = "5.56mm suppressor."
 type = 1
 attachment_point = 1
 mass = 0.35

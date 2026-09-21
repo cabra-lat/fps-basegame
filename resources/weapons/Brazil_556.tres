@@ -27,5 +27,6 @@ firerate = 40.0
 base_mass = 4.7
 base_reload_time = 6.0
 base_accuracy = 4.0
-name = "AGLC"
+name = "Brazil 556"
+description = "5.56x45mm assault rifle, 30-round magazine."
 view_model = ExtResource("5_qki5l")
