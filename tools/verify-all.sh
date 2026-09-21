@@ -16,12 +16,13 @@
 #   8. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
 #   9. meta_progression    src/meta/validate_meta_progression.gd (hard)
 #  10. meta_market         src/meta/validate_meta_market.gd     (hard)
-#  11. invariants          test/validate_invariants.gd          (hard; cross-system
+#  11. meta_flea           src/meta/validate_meta_flea.gd       (hard)
+#  12. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#  12. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  13. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  13. export              optional, --with-export only (SKIP if no templates)
+#  14. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -231,6 +232,11 @@ gate_uid_tracking() {
 }
 
 # ─── HARNESS GATE ───────────────────────────────────
+# NOTE: the truth is the EXIT CODE + the "RESULT: PASS" line. A harness log may
+# ALSO contain STARTUP errors from a script chain that names an autoload singleton
+# (e.g. "Identifier not found: Debug" -> "Failed to load script"); the harness
+# still runs and passes once the autoloads register. Do NOT turn log text into a
+# gate verdict — see the harness-hazard note in test/check_scripts.gd.
 gate_harness() { # name script
   local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1
   while :; do
@@ -352,6 +358,7 @@ else
   gate_harness "meta_persistence" "res://src/meta/validate_meta_persistence.gd"
   gate_harness "meta_progression" "res://src/meta/validate_meta_progression.gd"
   gate_harness "meta_market" "res://src/meta/validate_meta_market.gd"
+  gate_harness "meta_flea" "res://src/meta/validate_meta_flea.gd"
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
   gate_harness "factions" "res://scenes/validate_factions.gd"
   if [ "$NO_QA" -eq 1 ]; then
