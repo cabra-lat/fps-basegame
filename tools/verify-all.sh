@@ -296,7 +296,11 @@ echo ""
 # timeout is generous so a genuinely stuck run cannot block forever.
 mkdir -p /tmp/shooter
 if command -v flock >/dev/null 2>&1; then
-  exec 9>"/tmp/shooter/verify-all.lock"
+  # Per-REPO lock (keyed on the repo root): the lock protects THIS project's
+  # .godot/ cache, so a clone or a second checkout must not block on it. meta hit
+  # a 300s hang from the old fixed path while a clone waited on the main repo.
+  LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
+  exec 9>"$LOCK_FILE"
   flock -w 900 9 || echo "verify-all: WARNING: lock not acquired in 900s; proceeding (results may be flaky)" >&2
 fi
 
