@@ -11,15 +11,17 @@
 #   3. assets              test/validate_assets.gd              (hard)
 #   4. ballistics          test/validate_ballistics.gd          (hard)
 #   5. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
-#   6. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
-#   7. meta_progression    src/meta/validate_meta_progression.gd (hard)
-#   8. meta_market         src/meta/validate_meta_market.gd     (hard)
-#   9. invariants          test/validate_invariants.gd          (hard; cross-system
+#   6. inventory_ux        test/validate_inventory_ux.gd        (hard)
+#   7. factions            scenes/validate_factions.gd          (hard)
+#   8. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
+#   9. meta_progression    src/meta/validate_meta_progression.gd (hard)
+#  10. meta_market         src/meta/validate_meta_market.gd     (hard)
+#  11. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#  10. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  12. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  11. export              optional, --with-export only (SKIP if no templates)
+#  13. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -230,16 +232,33 @@ gate_uid_tracking() {
 
 # ─── HARNESS GATE ───────────────────────────────────
 gate_harness() { # name script
-  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n
-  "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
-  rc=$?
-  n="$(count_checks "$log")"
-  if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log"; then
-    record "$name" "PASS" "$n checks"
-  else
-    record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
-    HARD_FAILS=$((HARD_FAILS + 1))
-  fi
+  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1
+  while :; do
+    "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
+    rc=$?
+    n="$(count_checks "$log")"
+    if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log"; then
+      if [ "$attempt" -eq 1 ]; then
+        record "$name" "PASS" "$n checks"
+      else
+        record "$name" "PASS" "$n checks (retried after re-import: transient .godot cache race)"
+      fi
+      return
+    fi
+    if [ "$attempt" -ge 2 ]; then
+      record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
+    fi
+    # First failure: refresh the import cache and retry ONCE. Concurrent `godot`
+    # processes (other agents; NOT covered by our flock) can rewrite
+    # .godot/global_script_class_cache.cfg mid-run, which makes every harness that
+    # names a global class fail with "Identifier X not declared" — a FALSE red.
+    # A real regression still fails on the retry.
+    echo "verify-all: $name failed (rc=$rc) — re-import + retry once (transient .godot race?)" >&2
+    "$GODOT_BIN" --headless --path . --import >"$LOG_DIR/reimport.$name.log" 2>&1
+    attempt=$((attempt + 1))
+  done
 }
 
 # ─── GATE 8: qa quality audit ───────────────────────
@@ -334,6 +353,7 @@ else
   gate_harness "meta_progression" "res://src/meta/validate_meta_progression.gd"
   gate_harness "meta_market" "res://src/meta/validate_meta_market.gd"
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
+  gate_harness "factions" "res://scenes/validate_factions.gd"
   if [ "$NO_QA" -eq 1 ]; then
     record "qa_audit" "SKIP" "--no-qa"
   else
