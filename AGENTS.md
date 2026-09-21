@@ -29,6 +29,9 @@ bash tools/verify-all.sh --with-export  # + Linux/Windows export
 tools/godot-lock.sh --headless --path . --import            # not `godot ... --import`
 tools/godot-lock.sh --clean-tmp --headless --path . --import # also clears 0-byte leftovers
 
+# ⚠️ Do NOT wrap the wrapper in a short `timeout`: it WAITS on the lock (`flock -w 900`),
+# so a short timeout returns exit 124 — that LOOKS like a broken harness but is lock-wait.
+
 # Play a scene with GPU rendering, INVISIBLE (awesomewm-safe):
 # app window lives on dummy :99, GL ships to NVIDIA via VirtualGL.
 DISPLAY=:99 nix shell nixpkgs#virtualgl -c vglrun -d :0 \
