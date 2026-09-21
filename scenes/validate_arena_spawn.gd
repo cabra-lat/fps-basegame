@@ -44,6 +44,11 @@ const PLAYER_ID := 0
 ## Switch the arena to TDM and re-spawn, then check it: FFA gives every bot its
 ## own team (1,2,3), but "two teams with two colours" is the TDM case.
 const TDM_CHECK_FRAME := FLOOR_FRAMES + 4
+## Wall-clock guard: the whole frame plan (134 frames of a headless scene) takes a
+## couple of seconds. If the engine is starved (the shared .godot cache under
+## contention), the harness would otherwise sit here until the gate timeout kills
+## it, leaving a silent log. Fail fast with a diagnostic instead.
+const TIME_BUDGET_MS := 120000
 const FLOOR_Y := 3.0
 
 const SPAWN_POINTS: Array[Vector3] = [
@@ -74,6 +79,11 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	if _done:
+		return true
+	if Time.get_ticks_msec() > TIME_BUDGET_MS:
+		print("TIMEOUT: %d frames in %d ms — the engine is starved (shared .godot cache under contention?); re-run, or clear .godot/uid_cache.bin + .godot/editor/filesystem_cache10" % [_frame, Time.get_ticks_msec()])
+		v.check(false, "the frame plan finished inside the %d ms budget" % TIME_BUDGET_MS)
+		quit(1)
 		return true
 	_frame += 1
 	if _frame == 3:
