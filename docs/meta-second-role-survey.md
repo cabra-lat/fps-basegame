@@ -10,17 +10,42 @@ about save migration found while grounding this in the current code.
 
 | Thing | Where | Consequence for this feature |
 |---|---|---|
-| `PlayerProfile.Faction {PMC, SCAV}` | `scenes/player_profile.gd:8` | The two roles already exist as an enum — but with borrowed names (identity rule: rename to neutral `CONTRACTOR`/`DRIFTER`). |
-| `profile.faction` is **live** | read by `ExtractionPoint.can_use()` (`extraction_point.gd:58-64`), printed by `arena_manager.gd:281` | Role is already a runtime field that gates content. No new concept needed: keep `faction` as the **active** role. |
-| `ExtractionPoint.Faction {ALL, PMC_ONLY, SCAV_ONLY}` | `extraction_point.gd:9` | Per-role extraction gates exist. Rename values only. |
+| `PlayerProfile.faction: String` | `scenes/player_profile.gd:17` (post `range` 2026-09-21) | **Affiliation**, an id into the faction pack — NOT a role, and no longer an enum. `playable` gates profile selection only. |
+| `profile.faction` is **live** | read by `ExtractionPoint.can_use()` (`allowed_factions.has(profile.faction)`), printed by `arena_manager.gd:281` | The affiliation is already a runtime field that gates content. Keep it as the **active affiliation**; per-faction state hangs off it. |
+| `ExtractionPoint.allowed_factions: Array[String]` | `extraction_point.gd` (post `range`) | Per-faction extraction gates already exist (empty = open). Nothing new to invent — gate on the same axis. |
 | One `stash`, one `loadout`, one `currency`, one `inventory` | `src/meta/meta_profile.gd` | The economy is already single-account. This is what makes "one save, per-role state" cheap. |
 | `prepare_raid()` moves `loadout` → Equipment; `resolve_raid()` loot → `stash`, kit kept on survive / forfeited on death | `meta_service.gd` | The kit lifecycle is already a two-slot model (`loadout` = deployed, `stash` = banked). Per-role kits slot into it without changing resolution. |
-| `VERSION := 1`, and `ProfileStore` **quarantines** any other version | `meta_profile.gd:9`, `profile_store.gd:53-57` | ⚠️ **Blocking**: bumping the version for `roles` would *discard* every existing save (fresh profile + `.corrupt-*`). See §6. |
+| `VERSION := 2` + `MetaProfile.migrate()` (done 2026-09-21, `ef69f57`) | `meta_profile.gd`, `profile_store.gd` | ✅ The earlier blocking finding is **resolved**: an older save is migrated, never quarantined. The bump needed no pack. |
 
 ## 2. State shape: one profile, per-role state
 
-Keep `faction` as the **active role** (so every existing reader keeps working), and add a
-per-role state map alongside it:
+> ⚠️ **Correction (2026-09-21, after `range` landed faction-as-data): role is NOT faction.**
+> `PlayerProfile.faction` is now a **String id into a faction pack** (`scenes/faction.gd` +
+> `scenes/faction_registry.gd`, data in `resources/meta/factions/*.tres`) — the profile's **affiliation**.
+> The old `Faction` enum **exited** (it was not renamed). `playable` on a faction is a
+> **profile-selection** flag (the `FactionRegistry.playable()` subset); `raider` is `playable=false` and
+> `validate_faction()` rejects it with "NPC-only" — it does NOT mean "NPC faction with different
+> mechanics". `playable` is **orthogonal to role**: a role belongs to the profile, a faction is the
+> affiliation.
+>
+> The **registry loads the pack, not the meta lane**: the arena calls
+> `FactionRegistry.default_registry()` at raid setup and passes it to
+> `ExtractionPoint.bind(profile, raid, factions)`. `MetaProfile.from_dict()` must keep using the pure
+> helper `faction_from_saved()` (no pack) — which is exactly why the `v1 -> v2` migration needed nothing
+> from the pack and the profile-load vs pack-load order does not matter. To validate on load, call
+> `profile.validate_faction(FactionRegistry.default_registry())` explicitly (what the arena does).
+> Registry API (use these names, do not invent): `load_dir`, `add`, `has(id)`, **`get_faction(id)`**
+> (not `get` — GDScript refuses to shadow `Object.get`), `require(id)`, `all()`, `ids()`, `count()`,
+> `playable()`, `display_name(id)`, `color(id)`, `default_registry()`.
+>
+> **Consequence:** read "per-role" below as **per-faction** — the state map is keyed by the faction id,
+> the same axis `ExtractionPoint.allowed_factions` gates on. Any "role → default faction" mapping, *if*
+> the coordinator decides role is a separate axis, must be **data** (a field on the role, or a list in the
+> faction `.tres`), never hardcoded. **Open question for the coordinator:** is `role == faction` (one axis,
+> state keyed by faction id — recommended), or are they two axes (then the default is data)?
+
+Keep `faction` as the **active affiliation** (so every existing reader keeps working), and add a
+per-faction state map alongside it:
 
 ```
 MetaProfile
