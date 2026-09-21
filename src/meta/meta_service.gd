@@ -227,6 +227,13 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	# uses the current raid counter, so process before incrementing it).
 	profile.insurance.process_returns(profile)
 	profile.raids += 1
+	# Per-faction counters (the faction is the axis: `role_state()` is the ACTIVE one).
+	var role := profile.role_state()
+	role["raids"] = int(role["raids"]) + 1
+	if report.survived:
+		role["survived"] = int(role["survived"]) + 1
+	else:
+		role["kia"] = int(role["kia"]) + 1
 	profile.total_exp += report.exp
 	# Stock reset counter advances on every resolved raid; flea listings expire
 	# and fair-priced ones sell on the same raid clock.
@@ -252,11 +259,25 @@ func _merge_loadout(body: Dictionary, leftovers: Dictionary) -> Dictionary:
 				arr.append(data)
 	return merged
 
+## Choose the faction the NEXT raid starts as. Legal only BETWEEN raids: a prepared
+## or running raid owns the active kit, and switching then would strand it. The
+## switch itself is a two-slot SWAP of kits (never a copy) — see
+## `MetaProfile.switch_faction`. Returns {ok, reason} like the economy API.
+func set_active_role(faction_id: String) -> Dictionary:
+	if profile == null:
+		return {"ok": false, "reason": "sem perfil"}
+	if _prepared or (raid != null and raid.is_active()):
+		return {"ok": false, "reason": "raid em andamento"}
+	return profile.switch_faction(faction_id)
+
 ## Seed a fresh profile with the starting kit (only when truly empty).
+## The starter kit is granted ONCE PER FACTION (`roles[id].starter_granted`): with a
+## second playable faction, the old "profile is empty" guard would either hand out a
+## free kit on every switch or none at all.
 func grant_starter_loadout(sl: StarterLoadout) -> int:
 	if sl == null or profile == null:
 		return 0
-	if not profile.loadout.is_empty() or profile.stash_item_count() > 0:
+	if bool(profile.role_state().get("starter_granted", false)):
 		return 0
 	var added := 0
 	for slot_name in sl.slots:
@@ -271,6 +292,7 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 			profile.loadout[slot_name] = arr
 	if profile.currency <= 0:
 		profile.currency = sl.currency
+	profile.role_state()["starter_granted"] = true
 	return added
 
 func reload() -> MetaProfile:

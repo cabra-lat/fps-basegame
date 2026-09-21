@@ -16,8 +16,17 @@ const VERSION := 2
 var version: int = VERSION
 var stash: Stash
 ## slot_name -> Array[Dictionary] (ItemCodec encoding). Items in "body" state
-## while a raid runs; restored on survival, forfeited on death.
+## while a raid runs; restored on survival, forfeited on death. This is the kit of
+## the ACTIVE faction (`faction`); every other faction's kit lives in `roles`.
 var loadout: Dictionary = {}
+## Per-faction state, keyed by the faction id (the same axis `faction` and
+## `ExtractionPoint.allowed_factions` use — one axis, not a second "role" concept):
+##   { faction_id: { "kit": Dictionary, "karma": int,
+##                   "raids": int, "survived": int, "kia": int,
+##                   "starter_granted": bool } }
+## ADDITIVE key: an older save (v2) loads with `roles` empty and behaves exactly as
+## before, so this needs NO version bump — `from_dict` defaults it.
+var roles: Dictionary = {}
 ## Reserved for later phases; shape lives in the save from day one.
 var progress: Dictionary = {"skills": {}, "quests": {}, "traders": {}, "insurance": {}, "flea": {}}
 var total_exp: int = 0
@@ -48,6 +57,46 @@ func _init() -> void:
 
 func character_level() -> int:
 	return clampi(1 + int(total_exp / XP_PER_LEVEL), 1, MAX_CHARACTER_LEVEL)
+
+# ─── PER-FACTION STATE (one axis: the faction id is the key) ───
+
+## State of `faction_id` (defaults to the active faction), created on first use so
+## callers never have to deal with a missing key.
+func role_state(faction_id: String = "") -> Dictionary:
+	var id := faction_id if faction_id != "" else faction
+	if id == "":
+		id = PlayerProfile.DEFAULT_FACTION
+	if not roles.has(id) or not (roles[id] is Dictionary):
+		roles[id] = _fresh_role_state()
+	return roles[id]
+
+static func _fresh_role_state() -> Dictionary:
+	return {"kit": {}, "karma": 0, "raids": 0, "survived": 0, "kia": 0, "starter_granted": false}
+
+## The kit of `faction_id`: the LIVE `loadout` when it is the active faction, else
+## its stored kit. Keeping exactly one copy is what makes the switch conservative
+## (nothing is duplicated into both a role slot and the active slot).
+func role_kit(faction_id: String) -> Dictionary:
+	if faction_id == faction:
+		return loadout
+	return role_state(faction_id)["kit"] as Dictionary
+
+## Switch the active faction BETWEEN raids. The two kits are SWAPPED, never copied:
+## the active kit is stored in the outgoing faction's slot and the incoming
+## faction's kit becomes active. Mass over `stash + loadout + all role kits` is
+## therefore identical before and after.
+## The caller is responsible for the "between raids" part (MetaService.set_active_role
+## refuses while a raid is prepared/running).
+func switch_faction(target_id: String) -> Dictionary:
+	if target_id == "":
+		return {"ok": false, "reason": "faccao invalida"}
+	if target_id == faction:
+		return {"ok": false, "reason": "ja e' a faccao ativa"}
+	role_state(faction)["kit"] = loadout.duplicate(true)
+	var incoming: Dictionary = role_state(target_id)["kit"]
+	loadout = incoming.duplicate(true)
+	faction = target_id
+	return {"ok": true, "reason": ""}
 
 ## Push the live skill/quest/market/insurance objects into the raw progress dict
 ## before saving.
@@ -91,6 +140,9 @@ func to_dict() -> Dictionary:
 			"items": ItemCodec.encode_container(stash),
 		},
 		"loadout": loadout,
+		# ADDITIVE (no version bump): an older v2 save has no `roles` and loads with
+		# it empty, behaving exactly as before. See the `roles` docs on the var.
+		"roles": roles,
 	}
 
 static func from_dict(data: Dictionary) -> MetaProfile:
@@ -124,6 +176,15 @@ static func from_dict(data: Dictionary) -> MetaProfile:
 	var lo = data.get("loadout", {})
 	if lo is Dictionary:
 		p.loadout = lo
+	var rl = data.get("roles", {})
+	if rl is Dictionary:
+		p.roles = rl
+	if not data.has("roles"):
+		# Legacy save (written before per-faction state). "Already has gear" means
+		# "already granted", so a migrated profile cannot claim a second starter kit
+		# for its active faction — the old guard was exactly this test.
+		if not p.loadout.is_empty() or p.stash_item_count() > 0:
+			p.role_state()["starter_granted"] = true
 	return p
 
 static func _restore_stash(p: MetaProfile, sd) -> void:

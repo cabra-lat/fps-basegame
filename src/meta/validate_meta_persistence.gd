@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_scenario_corrupt()
 	_scenario_missing_and_atomic()
 	_scenario_v1_migration()
+	_scenario_role_state()
 
 	quit(v.finish())
 
@@ -195,6 +196,10 @@ func _scenario_v1_migration() -> void:
 	var v1 := src.to_dict()
 	v1["version"] = 1
 	v1["faction"] = legacy_index
+	# A genuine pre-roles save has no `roles` key at all (it was written before the
+	# per-faction state existed) — the fixture must model that, not just an old version.
+	v1.erase("roles")
+	_check(not v1.has("roles"), "fixture really models a pre-roles save")
 	var path := TEST_DIR + "/v1.save"
 	_write_json(path, v1)
 
@@ -208,6 +213,9 @@ func _scenario_v1_migration() -> void:
 	_check(migrated.raids == 3 and migrated.survived == 2 and migrated.kia == 1, "counters preserved (raids=%d survived=%d kia=%d)" % [migrated.raids, migrated.survived, migrated.kia])
 	_check(migrated.total_exp == 1500, "EXP preserved (%d)" % migrated.total_exp)
 	_check(_no_corrupt_backup_for("v1.save"), "a migratable v1 save is NOT quarantined")
+	# Legacy save with gear: "already has gear" means "already granted", so a migrated
+	# profile cannot claim a second starter kit for its active faction.
+	_check(bool(migrated.role_state().get("starter_granted", false)), "a migrated save with gear counts as already granted (no free starter kit)")
 
 	# The migrated profile is written back in the new shape.
 	ProfileStore.save(migrated, path)
@@ -240,6 +248,81 @@ func _no_corrupt_backup_for(name: String) -> bool:
 		if f.begins_with(name + ".corrupt-"):
 			return false
 	return true
+
+func _scenario_role_state() -> void:
+	print("\n[7] per-faction state: kit swap is conservative, KIA isolates the other kit")
+	var profile := MetaProfile.new()
+	profile.faction = "contractor"
+	# Contractor kit: two items. Drifter kit: one different item.
+	profile.loadout = {"primary": [ItemCodec.encode_item(ItemCodec.item_from_path("res://resources/weapons/M4_Carbine.tres"))]}
+	profile.stash.deposit(ItemCodec.item_from_path(BANDAGE))
+	profile.role_state("drifter")["kit"] = {"primary": [ItemCodec.encode_item(ItemCodec.item_from_path("res://resources/weapons/AK_74.tres"))]}
+
+	# The active faction's kit is the LIVE loadout (one copy, never both).
+	_check(profile.role_kit("contractor") == profile.loadout, "active faction's kit IS the live loadout")
+	var mass_before := _role_mass(profile)
+
+	# Swap twice; mass must be conserved exactly and each kit must land where it belongs.
+	var sw := profile.switch_faction("drifter")
+	_check(sw.get("ok", false), "switch to drifter ok (%s)" % sw.get("reason", ""))
+	_check(profile.faction == "drifter", "active faction is now drifter")
+	_check(profile.loadout.has("primary") and not profile.loadout.is_empty(), "drifter kit is active")
+	var drifter_kit_is_ak := String((profile.loadout["primary"] as Array)[0].get("path", "")).contains("AK_74")
+	_check(drifter_kit_is_ak, "the ACTIVE kit is the drifter's (AK_74), not the contractor's")
+	var back := profile.switch_faction("contractor")
+	_check(back.get("ok", false), "switch back to contractor ok (%s)" % back.get("reason", ""))
+	var contractor_back := String((profile.loadout["primary"] as Array)[0].get("path", "")).contains("M4_Carbine")
+	_check(contractor_back, "the contractor kit came back intact (M4_Carbine)")
+	_check(is_equal_approx(_role_mass(profile), mass_before), "mass over stash + all kits conserved across 2 swaps (%.4f -> %.4f)" % [mass_before, _role_mass(profile)])
+	_check(not profile.switch_faction("contractor").get("ok", false), "switching to the active faction is refused")
+	_check(not profile.switch_faction("").get("ok", false), "switching to an empty id is refused")
+
+	# KIA forfeits ONLY the active kit: the other faction's kit is untouched.
+	var service := MetaService.new()
+	service.save_path = TEST_DIR + "/roles.save"
+	service.use_profile(profile, TEST_DIR + "/roles.save")
+	var other_before := (profile.role_kit("drifter") as Dictionary).duplicate(true)
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	service.prepare_raid()
+	var report := service.resolve_raid(Raid.Outcome.KIA, 0)
+	_check(report != null and not report.survived, "KIA resolved")
+	_check(profile.loadout.is_empty(), "the ACTIVE kit was forfeited")
+	_check(profile.role_kit("drifter") == other_before, "the INACTIVE faction's kit is byte-identical after the KIA")
+	_check(int(profile.role_state("contractor")["kia"]) == 1, "per-faction kia counter incremented (%d)" % int(profile.role_state("contractor")["kia"]))
+	_check(int(profile.role_state("drifter")["kia"]) == 0, "the other faction's counter is untouched")
+
+	# A switch is refused while a raid is prepared.
+	service.prepare_raid()
+	var blocked := service.set_active_role("drifter")
+	_check(not blocked.get("ok", false) and String(blocked.get("reason", "")).contains("raid"), "switch refused while a raid is prepared (%s)" % blocked.get("reason", ""))
+
+	# Per-faction persistence round-trip.
+	profile.roles["drifter"]["karma"] = 7
+	ProfileStore.save(profile, TEST_DIR + "/roles.save")
+	var loaded := ProfileStore.load_profile(TEST_DIR + "/roles.save")
+	_check(loaded != null, "profile with roles reloads")
+	_check(int(loaded.role_state("drifter")["karma"]) == 7, "per-faction karma persisted (%d)" % int(loaded.role_state("drifter")["karma"]))
+	_check(loaded.role_kit("drifter").size() == 1, "the inactive faction's kit persisted")
+	_check(loaded.faction == profile.faction, "active faction persisted (%s)" % loaded.faction)
+
+func _role_mass(profile: MetaProfile) -> float:
+	var total: float = profile.stash.get_total_mass() + _kit_mass(profile.loadout)
+	for id in profile.roles:
+		if id == profile.faction:
+			continue # the active faction's kit IS the live loadout; do not double count
+		total += _kit_mass(profile.roles[id].get("kit", {}))
+	return total
+
+func _kit_mass(kit: Dictionary) -> float:
+	var total := 0.0
+	for slot_name in kit:
+		for data in kit[slot_name]:
+			var item := ItemCodec.decode_item(data)
+			if item != null:
+				total += item.get_mass()
+	return total
 
 # ─── HELPERS ────────────────────────────────────────
 
