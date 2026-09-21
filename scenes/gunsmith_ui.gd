@@ -379,7 +379,24 @@ func _rebuild_preview() -> void:
 			continue
 		marker.add_child(vis)
 		vis.transform = att.model_transform
+		# Tag the mounted instance: a weapon scene may ship a BAKED instance of the
+		# very same scene under the marker, so "the mounted one" is identified by
+		# this meta, not by scene path (and not by child order).
+		vis.set_meta("gunsmith_mount_point", point)
+		_hide_marker_siblings(marker, vis)
 		_neutralize_descendants(vis)
+
+
+## The weapon scene ships its default optic BAKED under the marker (authoring
+## convention: `weapon_ar15.tscn` has a red dot, `weapon_aglc.tscn` a sniper
+## scope). Mounting an attachment must not show two optics: the baked siblings of
+## the marker are hidden while an attachment owns the point — the same rule the
+## in-hands rigs apply, so preview and hands stay identical. Nothing needs to be
+## restored: the preview rebuilds the weapon from scratch on every refresh.
+func _hide_marker_siblings(marker: Node3D, keep: Node3D) -> void:
+	for c in marker.get_children():
+		if c != keep and c is Node3D:
+			(c as Node3D).visible = false
 
 
 ## Poses a body: frozen, out of the collision world and ungrabbed — the same

@@ -1,7 +1,7 @@
 # res://scenes/validate_gunsmith_preview.gd
 #
 # Headless gate for the in-raid gunsmith preview (scenes/gunsmith_ui.gd). Guards
-# two defects that shipped silently:
+# defects that shipped silently:
 #
 #   [1] the preview used a hardcoded name->scene map (6 names), so an attachment
 #       whose RESOURCE carried `model_scene` still showed no model ("attachments
@@ -10,24 +10,34 @@
 #       its own _ready(), which re-enables physics one frame later, so a one-shot
 #       freeze at mount time was undone (AGENTS rule 5: a held/worn item is never
 #       simulated; the preview poses, it does not simulate).
+#   [3] the weapon scene ships a BAKED default optic under the marker, so mounting
+#       an attachment showed two optics. The baked siblings must yield (same rule
+#       the in-hands rigs apply).
 #
 # Checks:
 #   - every compatible attachment mounts, on a marker from
 #     Weapon3D.marker_names_for_point(point), with the resource model_transform
 #     (both an AR15-style "Scope" marker and an AK-style "ScopePoint" one)
 #   - every rigid body in the preview is frozen/ungrabbed/collision-free,
-#     including the optics baked into the weapon scene, and STILL is after frames
-#     (no drift)
+#     including the baked optics, and STILL is after frames (no drift)
+#   - the baked optic is the default look with nothing mounted, and is hidden
+#     (never two optics) once an attachment owns that marker
 #   - a magazine (Weapon.MAGAZINE_POINT) mounts on the MagazinePoint marker
 #
+# The mounted instance is located by the meta `gunsmith_mount_point` the preview
+# sets on it, NOT by scene path: a weapon scene can ship a baked instance of the
+# very same scene (weapon_ar15.tscn bakes a red dot), which would match a
+# path-based lookup first.
+#
 # Run:
-#   godot --headless --path . --script res://scenes/validate_gunsmith_preview.gd
+#   tools/godot-lock.sh --headless --path . --script res://scenes/validate_gunsmith_preview.gd
 # Exit code: 0 = every check passed, 1 = at least one failure.
 extends SceneTree
 
 const ATTACH_DIR := "res://resources/attachments"
 const M4 := "res://resources/weapons/M4_Carbine.tres"
 const AK := "res://resources/weapons/AK_47.tres"
+const MOUNT_META := "gunsmith_mount_point"
 const DRIFT_FRAMES := 6
 
 var v: ValidateUtil
@@ -62,6 +72,7 @@ func _process(_delta: float) -> bool:
 		_check_weapon(AK, files)
 		_check_magazine()
 		_check_baked_optics()
+		_check_baked_optic_toggle()
 		_leave_risky_mounted()
 		return false
 	if _frame >= DRIFT_FRAMES:
@@ -105,7 +116,7 @@ func _check_weapon(weapon_path: String, files: Array[String]) -> void:
 		weapon.attachments = {}
 		weapon.attachments[point] = att
 		_ui.open_for_weapon(weapon)
-		var found := _find_scene_root(_ui.preview_holder, att.model_scene.resource_path)
+		var found := _find_mounted(_ui.preview_holder, point)
 		if found == null:
 			v.check(false, "%s: '%s' mounted from its own model_scene" % [weapon.name, att.name])
 			continue
@@ -116,6 +127,8 @@ func _check_weapon(weapon_path: String, files: Array[String]) -> void:
 			% [weapon.name, att.name, point, found.get_parent().name])
 		v.check((found as Node3D).transform == att.model_transform,
 			"%s: '%s' uses the resource model_transform" % [weapon.name, att.name])
+		v.check(found.scene_file_path == att.model_scene.resource_path,
+			"%s: '%s' mounts the scene the resource declares" % [weapon.name, att.name])
 		if found is RigidBody3D:
 			v.check(_is_posed(found as RigidBody3D),
 				"%s: '%s' (RigidBody3D) mounted posed: frozen, ungrabbed, no collision"
@@ -142,7 +155,7 @@ func _check_magazine() -> void:
 	weapon.attachments = {}
 	weapon.attachments[Weapon.MAGAZINE_POINT] = mag
 	_ui.open_for_weapon(weapon)
-	var found := _find_scene_root(_ui.preview_holder, mag.model_scene.resource_path)
+	var found := _find_mounted(_ui.preview_holder, Weapon.MAGAZINE_POINT)
 	v.check(found != null, "'%s' art IS mounted (from the resource)" % mag.name)
 	if found != null:
 		v.check(String(found.get_parent().name) == "MagazinePoint",
@@ -165,6 +178,32 @@ func _check_baked_optics() -> void:
 	v.check(bad == 0, "every baked body is posed, not simulated (%d bad of %d)" % [bad, bodies.size()])
 
 
+## The baked optic IS the default look; with an attachment on that marker it must
+## yield, so the player never sees two optics stacked.
+func _check_baked_optic_toggle() -> void:
+	v.section("[BAKED OPTIC TOGGLE]")
+	var weapon := load(M4) as Weapon
+	var point := Weapon.AttachmentPoint.TOP_RAIL
+	weapon.attachments = {}
+	_ui.open_for_weapon(weapon)
+	var baked := _visible_children(_top_marker(_ui.preview_holder), null)
+	v.check(baked > 0, "no attachment mounted -> the baked optic is the default look (%d visible)" % baked)
+	var att := _first_attachment_for(point)
+	if att == null:
+		v.check(false, "a top-rail attachment exists for the toggle check")
+		return
+	weapon.attachments = {}
+	weapon.attachments[point] = att
+	_ui.open_for_weapon(weapon)
+	var found := _find_mounted(_ui.preview_holder, point)
+	if found == null:
+		v.check(false, "'%s' mounted for the toggle check" % att.name)
+		return
+	v.check((found as Node3D).visible, "'%s' is visible once mounted" % att.name)
+	var left := _visible_children(found.get_parent(), found)
+	v.check(left == 0, "no baked optic stays visible next to the mounted one (%d)" % left)
+
+
 ## Leaves an optic mounted (a RigidBody3D that grabs itself in _ready) so the
 ## drift check can see whether it stays put across frames.
 func _leave_risky_mounted() -> void:
@@ -180,7 +219,7 @@ func _leave_risky_mounted() -> void:
 		weapon.attachments = {}
 		weapon.attachments[Weapon.AttachmentPoint.TOP_RAIL] = candidate
 		_ui.open_for_weapon(weapon)
-		var root := _find_scene_root(_ui.preview_holder, candidate.model_scene.resource_path)
+		var root := _find_mounted(_ui.preview_holder, Weapon.AttachmentPoint.TOP_RAIL)
 		if root is RigidBody3D:
 			att = candidate
 			_held = root
@@ -210,19 +249,51 @@ func _is_posed(rb: RigidBody3D) -> bool:
 		and rb.collision_layer == 0 and rb.collision_mask == 0
 
 
+func _first_attachment_for(point: int) -> Attachment:
+	for f in _attachment_files():
+		var att := load(f) as Attachment
+		if att != null and att.model_scene != null and att.attachment_point == point:
+			return att
+	return null
+
+
+## The instance the preview mounted, found by the meta it sets (not by scene path).
+func _find_mounted(root: Node, point: int) -> Node:
+	if root.has_meta(MOUNT_META) and int(root.get_meta(MOUNT_META)) == point:
+		return root
+	for c in root.get_children():
+		var r := _find_mounted(c, point)
+		if r != null:
+			return r
+	return null
+
+
+## The top-rail marker of the previewed weapon (first candidate the addon knows).
+func _top_marker(root: Node) -> Node3D:
+	var vm := root.get_child(0)
+	if vm == null:
+		return null
+	for marker_name in Weapon3D.marker_names_for_point(Weapon.AttachmentPoint.TOP_RAIL):
+		var n := vm.get_node_or_null(String(marker_name))
+		if n is Node3D:
+			return n
+	return null
+
+
+## Visible Node3D children of a node, ignoring one (the mounted instance).
+func _visible_children(parent: Node, keep: Node) -> int:
+	if parent == null:
+		return 0
+	var n := 0
+	for c in parent.get_children():
+		if c != keep and c is Node3D and (c as Node3D).visible:
+			n += 1
+	return n
+
+
 func _all_rigid_bodies(node: Node, out: Array = []) -> Array:
 	if node is RigidBody3D:
 		out.append(node)
 	for c in node.get_children():
 		_all_rigid_bodies(c, out)
 	return out
-
-
-func _find_scene_root(root: Node, scene_path: String) -> Node:
-	if root.scene_file_path == scene_path:
-		return root
-	for c in root.get_children():
-		var r := _find_scene_root(c, scene_path)
-		if r != null:
-			return r
-	return null
