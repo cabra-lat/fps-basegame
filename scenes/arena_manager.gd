@@ -48,7 +48,7 @@ var shots := 0
 var _player_team := 0
 var _match_over := false
 var _raid_over := false
-var _step_acc := 0.0
+var _footsteps := Footsteps.new()
 var _switch_cd := 0.0
 var _intents: Array = [] # [kind, arg] consumed in _physics_process
 var _weapon_kit := {} # Weapon -> [weapon_template, ammo_template, mag_n]
@@ -76,8 +76,6 @@ var dir_marker: ColorRect
 var pause_panel: PanelContainer
 var _feed: Array[String] = []
 var _hud_t := 0.0
-var _flash_mesh: SphereMesh
-var _flash_mat: StandardMaterial3D
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -85,7 +83,7 @@ func _ready() -> void:
 	plate_mat.name = "Arena Blockout"
 	plate_mat.type = BallisticMaterial.Type.METAL_MEDIUM
 	plate_mat.hardness = 300.0
-	_setup_fps_view()
+	ViewSetup.configure_fps(player)
 	_equip_loadout()
 	player.insert_ammo_feed.connect(_on_reserve_mag)
 	_connect_player_health()
@@ -292,7 +290,7 @@ func _physics_process(delta: float) -> void:
 	_consume_intents()
 	if _switch_cd > 0.0:
 		_switch_cd = move_toward(_switch_cd, 0.0, delta)
-	_tick_footsteps(delta)
+	_footsteps.tick(audio, player, delta)
 	if not _match_over:
 		game_mode.tick(delta)
 		_check_match_over()
@@ -303,20 +301,6 @@ func _physics_process(delta: float) -> void:
 		_hud_t = 0.0
 		_refresh_top("")
 		_refresh_raid_hud()
-
-## Footsteps by distance timer while walking (AGENTS.md: physics only).
-func _tick_footsteps(delta: float) -> void:
-	if audio == null or player == null:
-		return
-	var v := player.velocity
-	v.y = 0.0
-	if not player.is_on_floor() or v.length() < 1.5:
-		_step_acc = 0.0
-		return
-	_step_acc += v.length() * delta
-	if _step_acc >= 2.4:
-		_step_acc = 0.0
-		audio.play_step(false) # arena floor is concrete
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -348,25 +332,6 @@ func _consume_intents() -> void:
 			"interact":
 				_try_pickup()
 	_intents.clear()
-
-# ─── player view / gun (copied pattern from debug_range.gd) ───
-
-const BODY_HIDE_LAYER := 4 # layer 3: hidden from the FPS camera only
-
-func _setup_fps_view() -> void:
-	var spring = player.get_node_or_null("SpringArm3D") as SpringArm3D
-	if spring:
-		spring.spring_length = 0.1
-	var cam: Camera3D = player.camera
-	if cam:
-		cam.cull_mask &= ~BODY_HIDE_LAYER
-	_hide_body_recursive(player)
-
-func _hide_body_recursive(n: Node) -> void:
-	if n is MeshInstance3D:
-		(n as MeshInstance3D).layers = BODY_HIDE_LAYER
-	for child in n.get_children():
-		_hide_body_recursive(child)
 
 # ─── multi-weapon loadout (public Equipment flow only) ───
 # Slots primary/secondary hold one Weapon each; ammo lives on the Weapon
@@ -645,58 +610,16 @@ func _shot_excludes() -> Array[RID]:
 
 func _resolve_shot(_fired_weapon: Weapon, round: Ammo) -> void:
 	shots += 1
-	var cam: Camera3D = player.camera
-	if cam == null:
-		return
-	var space := get_world_3d().direct_space_state
-	var center := get_viewport().get_visible_rect().size / 2.0
-	var origin := cam.project_ray_origin(center)
-	var end := origin + cam.project_ray_normal(center) * SHOT_RANGE
-	var query := PhysicsRayQueryParameters3D.create(origin, end)
-	# ADS self-hit (spotter): the held viewmodel bodies ride in front of the
-	# camera and the ray tags them at ~0m. Exclude the whole held subtree
-	# (gun + attachments) by RID every shot — rebuilt on switch/equip.
-	query.exclude = _shot_excludes()
-	query.collide_with_areas = false
-	var result := space.intersect_ray(query)
-	if result.is_empty():
+	# Raycast + impact + hit application live in ShotResolver (shared with range).
+	var r := ShotResolver.resolve(player.camera, get_world_3d(),
+		get_viewport().get_visible_rect().size / 2.0, round, plate_mat,
+		SHOT_RANGE, _shot_excludes())
+	if not r.get("hit", false):
 		_set_center("miss")
 		return
-	var dist: float = origin.distance_to(result.position)
-	var dir: Vector3 = (result.position - origin).normalized()
-	var ang := rad_to_deg(acos(clampf(-dir.dot(result.normal), -1.0, 1.0)))
-	var impact := BallisticsCalculator.calculate_impact(round, plate_mat, 3.0, dist, ang)
-	_spawn_hit_flash(result.position)
-	var collider: Object = result.collider
-	if collider and collider.has_method("range_hit"):
-		collider.range_hit(impact, round)
-		if audio:
-			if collider is NpcBot:
-				audio.play_hit_flesh(result.position)
-			else:
-				audio.play_hit_steel(result.position)
-	elif collider is RigidBody3D and audio:
-		audio.play_hit_steel(result.position) # loot / props
-	_set_center("HIT %.0fm %.0fJ" % [dist, impact.hit_energy])
-
-func _spawn_hit_flash(pos: Vector3) -> void:
-	# Shared mesh/material (P0 perf): no per-hit resource allocation.
-	# One-shot tween -> queue_free is intentional (self-freeing transient FX).
-	if _flash_mesh == null:
-		_flash_mesh = SphereMesh.new()
-		_flash_mesh.radius = 0.06
-		_flash_mesh.height = 0.12
-		_flash_mat = StandardMaterial3D.new()
-		_flash_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_flash_mat.albedo_color = Color(1.0, 0.9, 0.5)
-	var mi := MeshInstance3D.new()
-	mi.mesh = _flash_mesh
-	mi.material_override = _flash_mat
-	add_child(mi)
-	mi.global_position = pos
-	var tween := create_tween()
-	tween.tween_property(mi, "scale", Vector3.ONE * 2.5, 0.18)
-	tween.tween_callback(mi.queue_free)
+	var impact: BallisticsImpact = r["impact"]
+	ShotResolver.apply_hit(self, r["collider"], impact, round, r["position"], audio)
+	_set_center("HIT %.0fm %.0fJ" % [r["distance"], impact.hit_energy])
 
 func _on_mag_empty(_w: Weapon, _feed: AmmoFeed) -> void:
 	_set_center("MAG EMPTY - press R")

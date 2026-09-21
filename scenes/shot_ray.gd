@@ -7,7 +7,9 @@ extends RefCounted
 ## "viewmodel" group, and all of those CollisionObject3D RIDs are excluded.
 ## Cheap: one small tree walk per shot, immune to reference leaks.
 
-const GROUP := "viewmodel"
+## Single source of truth for the exclude group: viewmodels AND the player's
+## own body colliders are tagged into it by PlayerBodyVisibility.
+const GROUP: String = PlayerBodyVisibility.SHOT_EXCLUDE_GROUP
 const VM_NAME := "WeaponModel"
 
 ## RIDs to exclude for [player] (any CollisionObject3D): its own body, every
