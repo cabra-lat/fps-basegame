@@ -51,6 +51,17 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
      The worktree is SHARED, so the INDEX carries whatever other lanes staged; a
      pathless `git commit` sweeps their work (proven: board commit `a403a54` reverted
      the NPC body swap that another lane had staged for an A/B test).
+   - **Better: commit from a THROWAWAY index** (immune to others' staging *by construction*):
+     ```bash
+     export GIT_INDEX_FILE=/tmp/shooter/x.index
+     rm -f "$GIT_INDEX_FILE"; git read-tree HEAD   # clean index = HEAD, nothing of anyone else
+     git add <your files>; git commit -m "..."
+     unset GIT_INDEX_FILE; git reset -q -- <your files>   # (see trap)
+     ```
+     Trap: after a throwaway-index commit the REAL index is stale for those paths
+     (`git status` shows `D ` staged) — a lane committing without a pathspec would then
+     DELETE your files. Always close with **`git reset -q -- <your files>`** (path-scoped,
+     never a bare `git reset`, which would drop other lanes' staging).
    - **Never `git checkout <rev> -- <path>`, `git add -A` or `git stash` for testing** —
      the first two write the INDEX. For A/B use `git worktree add` or copy the file to /tmp.
 2. **Scratch goes to `/tmp/shooter/`** (screenshots, strips, GIFs, logs).
