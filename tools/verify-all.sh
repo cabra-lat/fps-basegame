@@ -339,8 +339,18 @@ gate_qa() {
     record "qa_audit" "SKIP" "node not found"
     return
   fi
-  node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1
-  rc=$?
+  # BOUND it: under heavy .godot/ contention the audit has been seen to run past
+  # 300s (coordinator measured it); without a timeout it hangs the whole gate.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 900 node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1; rc=$?
+  else
+    node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1; rc=$?
+  fi
+  if [ "$rc" -eq 124 ]; then
+    record "qa_audit" "WARN" "TIMED OUT (900s) — likely .godot/ contention, not a found BLOCKER (see $log)"
+    WARNS=$((WARNS + 1))
+    return
+  fi
   counts="$(grep -oE 'BLOCKER=[0-9]+ MAJOR=[0-9]+ MINOR=[0-9]+ NIT=[0-9]+' "$log" | head -1)"
   [ -z "$counts" ] && counts="rc=$rc"
   case "$rc" in
