@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d2bipdhwif8s4"
-path="res://.godot/imported/weapons_imbel_aglc.png-fd2fbb5aec07c49bcf896dc3fd521720.ctex"
+uid="uid://bitji0liuxkii"
+path="res://.godot/imported/weapons_brazil_556.png-b5196702d2d1ac60097f016fe4be6871.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/inventory/generated/weapons_imbel_aglc.png"
-dest_files=["res://.godot/imported/weapons_imbel_aglc.png-fd2fbb5aec07c49bcf896dc3fd521720.ctex"]
+source_file="res://assets/ui/inventory/generated/weapons_brazil_556.png"
+dest_files=["res://.godot/imported/weapons_brazil_556.png-b5196702d2d1ac60097f016fe4be6871.ctex"]
 
 [params]
 

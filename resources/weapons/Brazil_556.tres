@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="3_qki5l"]
 [ext_resource type="PackedScene" uid="uid://buhidaqt8us0h" path="res://src/ammo/cartridges.tscn" id="4_as1ph"]
 [ext_resource type="PackedScene" uid="uid://bwdft47nkirba" path="res://src/weapons/weapon_aglc.tscn" id="5_qki5l"]
-[ext_resource type="Texture2D" uid="uid://d2bipdhwif8s4" path="res://assets/ui/inventory/generated/weapons_imbel_aglc.png" id="icon"]
+[ext_resource type="Texture2D" uid="uid://bitji0liuxkii" path="res://assets/ui/inventory/generated/weapons_brazil_556.png" id="icon"]
 
 [sub_resource type="Resource" id="Resource_as1ph"]
 script = ExtResource("3_qki5l")

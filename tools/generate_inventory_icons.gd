@@ -555,11 +555,11 @@ func _category_of(item: Item) -> String:
 
 func _weapon_category(path: String) -> String:
 	var n := path.get_file().get_basename().to_lower()
-	if n.contains("glock") or n.contains("colt") or n.contains("eagle") or n.contains("uzi") or n.contains("mp5"):
+	if n.contains("austria_p9") or n.contains("m1911") or n.contains("usa_p50") or n.contains("smg"):
 		return "pistol"
-	if n.contains("mossberg") or n.contains("saiga"):
+	if n.contains("russia_12") or n.contains("usa_pump") or n.contains("shotgun"):
 		return "shotgun"
-	if n.contains("remington") or n.contains("barrett") or n.contains("dragunov") or n.contains("m14"):
+	if n.contains("dragunov") or n.contains("m14") or n.contains("m24") or n.contains("m82") or n.contains("sniper"):
 		return "sniper"
 	return "rifle"
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://m3chldvd0erq"
-path="res://.godot/imported/weapons_mossberg_500.png-8d590412c1968e8b2827ce4bf9378aab.ctex"
+uid="uid://bsj1d6bbdyryw"
+path="res://.godot/imported/placeholder_weapon_rifle.png-bfcf31b5885b7097e24fcb9b258c9d44.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/inventory/generated/weapons_mossberg_500.png"
-dest_files=["res://.godot/imported/weapons_mossberg_500.png-8d590412c1968e8b2827ce4bf9378aab.ctex"]
+source_file="res://assets/ui/inventory/generated/placeholder_weapon_rifle.png"
+dest_files=["res://.godot/imported/placeholder_weapon_rifle.png-bfcf31b5885b7097e24fcb9b258c9d44.ctex"]
 
 [params]
 

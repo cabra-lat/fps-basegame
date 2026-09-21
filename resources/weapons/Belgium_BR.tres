@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="1_633jq"]
 [ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_geat3"]
-[ext_resource type="Texture2D" uid="uid://d04528pi1mb5q" path="res://assets/ui/inventory/generated/weapons_fn_fal.png" id="icon"]
+[ext_resource type="Texture2D" uid="uid://bsj1d6bbdyryw" path="res://assets/ui/inventory/generated/placeholder_weapon_rifle.png" id="icon"]
 
 [sub_resource type="Resource" id="Resource_tr3tt"]
 script = ExtResource("1_633jq")

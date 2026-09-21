@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d04528pi1mb5q"
-path="res://.godot/imported/weapons_fn_fal.png-4433ac6d5f0806d0c4c4f5ea7380ab9d.ctex"
+uid="uid://dlsos5735auvp"
+path="res://.godot/imported/weapons_usa_pump.png-3bddd62442bc7f2e2eea055bcbd55b05.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/inventory/generated/weapons_fn_fal.png"
-dest_files=["res://.godot/imported/weapons_fn_fal.png-4433ac6d5f0806d0c4c4f5ea7380ab9d.ctex"]
+source_file="res://assets/ui/inventory/generated/weapons_usa_pump.png"
+dest_files=["res://.godot/imported/weapons_usa_pump.png-3bddd62442bc7f2e2eea055bcbd55b05.ctex"]
 
 [params]
 
