@@ -77,6 +77,7 @@ func _process(_delta: float) -> bool:
 		_done = true
 		_check_nobody_launched()
 		_check_mid_raid_bots_landed()
+		_check_free_spawn_dedup()
 		quit(v.finish())
 		return true
 	return false
@@ -147,9 +148,11 @@ func _check_nobody_launched() -> void:
 		var body := b as CharacterBody3D
 		var y := body.global_position.y
 		max_y = maxf(max_y, y)
-		if y > FLOOR_Y or not body.is_on_floor():
+		# A launched body goes to ~100 m; `is_on_floor()` alone is NOT the signal
+		# (a bot walking off a ledge is legitimately airborne for a frame).
+		if y > FLOOR_Y:
 			launched.append("%s y=%.1f floor=%s" % [body.name, y, body.is_on_floor()])
-	v.check(launched.is_empty(), "every bot is on the floor (max y=%.1f m, limit %.1f; offenders: %s)"
+	v.check(launched.is_empty(), "no bot is in the air (max y=%.1f m, limit %.1f; offenders: %s)"
 		% [max_y, FLOOR_Y, " | ".join(PackedStringArray(launched)) if not launched.is_empty() else "none"])
 
 
@@ -192,10 +195,33 @@ func _check_mid_raid_bots_landed() -> void:
 	v.check(_mid_run_names.size() == 2, "spawned %d bot(s) mid-raid (the race scenario)" % _mid_run_names.size())
 	for bot_name in _mid_run_names:
 		var bot := _arena.get_node_or_null(NodePath(bot_name)) as CharacterBody3D
-		v.check(bot != null and bot.global_position.y <= FLOOR_Y and bot.is_on_floor(),
-			"%s spawned mid-raid stays on the floor (y=%.2f, floor=%s)"
+		v.check(bot != null and bot.global_position.y <= FLOOR_Y,
+			"%s spawned mid-raid stays on the ground (y=%.2f, floor=%s)"
 			% [bot_name, bot.global_position.y if bot != null else -999.0,
 				str(bot.is_on_floor()) if bot != null else "missing"])
+
+
+## The DETERMINISTIC core of the spawn fix, tested directly (npc-body's
+## suggestion): 8 calls is more than the 4 spawn points, so the per-team cursor
+## wraps and the dedup in _free_spawn() has to hold. This discriminates in a way
+## the order-based check cannot: with `randi()` (or with the nudge removed) two
+## points coincide and the assertion fails; no physics step is involved.
+## Threshold is 0.5 m, not the 0.9 m step: a point that needs SEVERAL nudges
+## (step 1 + step 2 at different angles) can end closer than one step length.
+func _check_free_spawn_dedup() -> void:
+	v.section("[arena: _free_spawn never repeats a point]")
+	var team: int = int(_arena.get("_player_team"))
+	var seen: Array[Vector3] = []
+	for i in range(8):
+		seen.append(_arena._free_spawn(team))
+	v.check(seen.size() == 8, "_free_spawn returned %d points (8 > the 4 spawn points, so it wrapped)" % seen.size())
+	var min_d := 999.0
+	for i in range(seen.size()):
+		for j in range(i + 1, seen.size()):
+			var a := seen[i]
+			var c := seen[j]
+			min_d = minf(min_d, Vector2(a.x - c.x, a.z - c.z).length())
+	v.check(min_d >= 0.5, "every pair of _free_spawn points is apart in XZ (min %.2f m, threshold 0.5)" % min_d)
 
 
 # ─── HELPERS ───

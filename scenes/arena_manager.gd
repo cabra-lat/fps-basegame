@@ -22,6 +22,12 @@ const LOOT_EXP := 50
 const RAID_DURATION := 2100.0 # 35 min, genre-typical long raid
 
 const SLOT_ORDER: Array[String] = ["primary", "secondary"]
+## Spawn separation used by _free_spawn(): a candidate must clear this of every
+## point already handed out (and of live bodies) to be accepted.
+const SPAWN_SEPARATION := 0.7
+## Candidate space for the last-resort ring search: rings x angles per ring.
+const SPAWN_RINGS := 3
+const SPAWN_RING_ANGLES := 8
 
 const BotScene: PackedScene = preload("res://src/npcs/bot/bot.tscn")
 
@@ -693,31 +699,50 @@ func _spawn_bots() -> void:
 		_spawn_bot(_free_spawn(team), team)
 
 
-## Spawn position for a participant, nudged off any point already taken this
-## round. `game_mode.get_spawn()` is a deterministic per-team cursor (distinct
-## until a team's slice wraps), so this is the second line of defence: two
-## CharacterBody3D created on the SAME point in one frame get depenetrated
-## UPWARDS and launched (npc-body measured 2/2 bots at y~100 after 120 frames).
-## Golden-angle steps of 0.9 m, at most 8 tries, no randomness (testable).
+## Spawn position for a participant, never on a point already taken this round.
+## `game_mode.get_spawn()` is a deterministic per-team cursor (distinct until a
+## team's slice wraps), so this is the second line of defence: two
+## CharacterBody3D on the SAME point overlap and the depenetration LAUNCHES them
+## (npc-body: 2/2 bots at y~100 after 120 frames).
+## Order of preference: (1) the cursor's point; (2) another AUTHORED spawn point
+## that is free; (3) a deterministic ring of offsets around the cursor position,
+## taking the first candidate that clears SPAWN_SEPARATION of everything used.
+## The ring candidates are computed from the BASE, never cumulatively: cumulative
+## golden-angle steps can cancel each other out and land back near another spawn
+## (the gate caught exactly that: 0.16 m between two spawns).
 func _free_spawn(team: int) -> Vector3:
-	var at := game_mode.get_spawn(team)
-	var step := 0
-	while step < 8 and _spawn_taken(at):
-		step += 1
-		at += Vector3(cos(step * 2.399), 0.0, sin(step * 2.399)) * 0.9
+	var base := game_mode.get_spawn(team)
+	var at := base
+	if _spawn_taken(at):
+		for p in _spawn_points():
+			if not _spawn_taken(p):
+				at = p
+				break
+	var attempt := 0
+	while _spawn_taken(at) and attempt < SPAWN_RINGS * SPAWN_RING_ANGLES:
+		at = _spawn_candidate(base, attempt)
+		attempt += 1
 	_round_spawns.append(at)
 	return at + Vector3(0, 0.5, 0)
+
+
+## The n-th deterministic candidate around `base`: rings of growing radius, each
+## with SPAWN_RING_ANGLES angles. Always measured from `base` (see _free_spawn).
+func _spawn_candidate(base: Vector3, attempt: int) -> Vector3:
+	var ring := 1 + attempt / SPAWN_RING_ANGLES
+	var angle := float(attempt % SPAWN_RING_ANGLES) * TAU / float(SPAWN_RING_ANGLES)
+	return base + Vector3(cos(angle), 0.0, sin(angle)) * (SPAWN_SEPARATION * float(ring))
 
 
 ## Taken = handed out earlier this round, or a live bot/player already stands there.
 func _spawn_taken(at: Vector3) -> bool:
 	for u in _round_spawns:
-		if u.distance_to(at) < 0.7:
+		if u.distance_to(at) < SPAWN_SEPARATION:
 			return true
-	if player != null and player.global_position.distance_to(at) < 0.7:
+	if player != null and player.global_position.distance_to(at) < SPAWN_SEPARATION:
 		return true
 	for b in get_tree().get_nodes_in_group("bots"):
-		if b is Node3D and (b as Node3D).global_position.distance_to(at) < 0.7:
+		if b is Node3D and (b as Node3D).global_position.distance_to(at) < SPAWN_SEPARATION:
 			return true
 	return false
 
