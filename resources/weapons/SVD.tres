@@ -19,7 +19,7 @@ max_capacity = 30
 [resource]
 script = ExtResource("1_m28xj")
 icon = ExtResource("icon")
-name = "Dragunov_SVD"
+name = "SVD"
 ammo_feed = SubResource("Resource_w5l5x")
 attach_points = 25
 firemodes = 4

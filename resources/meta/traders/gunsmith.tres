@@ -18,7 +18,7 @@ sell_price = 1200
 stock_max = 8
 min_loyalty = 1
 
-[sub_resource type="Resource" id="o_barter_aimpoint"]
+[sub_resource type="Resource" id="o_barter_sweden_r1"]
 script = ExtResource("2_o")
 item_path = "res://resources/attachments/Sweden_R1.tres"
 buy_price = 5000
@@ -43,7 +43,7 @@ id = "gunsmith"
 name = "Gunsmith"
 description = "Armas e anexos. Aceita barters de acessorios."
 currency = "CR"
-offers = Array[TraderOffer]([SubResource("o_flash_hider"), SubResource("o_barter_aimpoint"), SubResource("o_m4")])
+offers = Array[TraderOffer]([SubResource("o_flash_hider"), SubResource("o_barter_sweden_r1"), SubResource("o_m4")])
 loyalty = Array[TraderLoyalty]([SubResource("ll1")])
 reset_every_raids = 4
 reputation_per_trade = 2
