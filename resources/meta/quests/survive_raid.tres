@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="Quest" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/meta/quest.gd" id="1_q"]
+[ext_resource type="Script" path="res://src/meta/quest_objective.gd" id="2_obj"]
+
+[sub_resource type="Resource" id="obj_survive_full"]
+script = ExtResource("2_obj")
+kind = 3
+amount = 1
+weapon_filter = ""
+item_filter = ""
+tag_filter = ""
+point_filter = ""
+
+[resource]
+script = ExtResource("1_q")
+id = "survive_raid"
+title = "Sobrevivente"
+description = "Sobreviva a uma raid inteira e saia pela extracao (RUN_THROUGH nao conta)."
+objectives = Array[QuestObjective]([SubResource("obj_survive_full")])
+reward_currency = 6000
+reward_exp = 250
+reward_items = []
+reward_skill_xp = {
+"vitality": 20
+}
+requires = Array[String]([])
+auto_claim = true
+hud_tracked = true

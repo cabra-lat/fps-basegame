@@ -1,0 +1,215 @@
+# res://src/meta/validate_meta_persistence.gd
+#
+# Headless persistence gate for the meta lane. Proves the extraction loop
+# survives closing the game:
+#   [1] enter raid -> extract with 2 items -> save -> reload: 2 items in stash,
+#       currency up, loadout + EXP + counters persisted
+#   [2] die in a raid with 1 item -> reload: stash identical to before the raid
+#   [3] weapon + loaded magazine + mounted attachment survive a stash round-trip
+#   [4] corrupt save -> clean profile, no crash, bad file quarantined
+#   [5] missing save -> clean profile; atomic write leaves no temp and a
+#       versioned JSON save
+#
+# Run:
+#   godot --headless --path . --script res://src/meta/validate_meta_persistence.gd
+# Exit code: 0 = every check passed, 1 = at least one failure.
+extends SceneTree
+
+const TEST_DIR := "user://meta_test"
+const SAVE := "user://meta_test/profile.save"
+const STARTER := "res://resources/meta/starter_loadout.tres"
+const BANDAGE := "res://resources/medical/army_bandage.tres"
+const AMMO_9MM := "res://resources/ammo/9_19mm_VPAM_PM2.tres"
+
+var v: ValidateUtil
+
+func _check(cond: bool, msg: String) -> void:
+	v.check(cond, msg)
+
+func _initialize() -> void:
+	v = ValidateUtil.new("validate_meta_persistence")
+	v.begin()
+	DirAccess.make_dir_recursive_absolute(TEST_DIR)
+	_cleanup()
+
+	_scenario_survive_roundtrip()
+	_scenario_death_preserves_stash()
+	_scenario_weapon_state()
+	_scenario_corrupt()
+	_scenario_missing_and_atomic()
+
+	quit(v.finish())
+
+# ─── SCENARIOS ──────────────────────────────────────
+
+func _scenario_survive_roundtrip() -> void:
+	print("\n[1] extract with 2 items -> save -> reload")
+	var service := MetaService.new()
+	service.save_path = SAVE
+	var profile := MetaProfile.new()
+	service.use_profile(profile, SAVE)
+
+	var starter := load(STARTER) as StarterLoadout
+	_check(starter != null, "starter_loadout.tres loads")
+	var granted := service.grant_starter_loadout(starter)
+	_check(granted == 2, "starter granted 2 loadout items (got %d)" % granted)
+
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	var moved := service.prepare_raid()
+	_check(moved == 2, "prepare_raid equipped 2 items (got %d)" % moved)
+
+	_add_loot(bag, BANDAGE, 1)
+	_add_loot(bag, AMMO_9MM, 30)
+	var currency_before := profile.currency
+	var report := service.resolve_raid(Raid.Outcome.SURVIVED, 250)
+	_check(report != null and report.survived, "report marks SURVIVED")
+	_check(report.gained.size() == 2, "report recorded 2 gains (got %d)" % report.gained.size())
+	_check(profile.currency > currency_before, "currency rose %d -> %d" % [currency_before, profile.currency])
+
+	var loaded := ProfileStore.load_profile(SAVE)
+	_check(loaded != null, "reload returns a profile")
+	_check(loaded.stash.count_items() == 2, "stash has the 2 extracted items (got %d)" % loaded.stash.count_items())
+	_check(loaded.currency == profile.currency, "currency persisted (%d vs %d)" % [loaded.currency, profile.currency])
+	_check(not loaded.loadout.is_empty(), "loadout restored for the next raid")
+	_check(loaded.total_exp == 250, "EXP persisted (got %d)" % loaded.total_exp)
+	_check(loaded.raids == 1 and loaded.survived == 1, "raid counters persisted (raids=%d survived=%d)" % [loaded.raids, loaded.survived])
+	_check(loaded.stash.get_total_mass() > 0.0, "stash mass accounted (%.4f kg)" % loaded.stash.get_total_mass())
+	_check(loaded.last_report.get("survived", false) == true, "last raid report persisted")
+
+func _scenario_death_preserves_stash() -> void:
+	print("\n[2] die in a raid with 1 item -> stash untouched")
+	var profile := ProfileStore.load_profile(SAVE)
+	var before := _snapshot(profile.stash)
+	_check(before != "", "pre-raid stash snapshot is non-empty")
+
+	var service := MetaService.new()
+	service.use_profile(profile, SAVE)
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	var moved := service.prepare_raid()
+	_check(moved == 2, "loadout equipped from profile (got %d)" % moved)
+
+	_add_loot(bag, BANDAGE, 1)
+	var report := service.resolve_raid(Raid.Outcome.KIA, 0)
+	_check(report != null and not report.survived, "report marks KIA")
+	_check(report.lost.size() == 2, "2 equipped items forfeited (got %d)" % report.lost.size())
+
+	var reloaded := ProfileStore.load_profile(SAVE)
+	_check(_snapshot(reloaded.stash) == before, "stash identical to before the raid")
+	_check(reloaded.loadout.is_empty(), "equipped loadout forfeited")
+	_check(reloaded.kia == 1, "kia counter persisted (got %d)" % reloaded.kia)
+	_check(reloaded.stash.count_items() == 2, "stash still holds the previous 2 items")
+
+func _scenario_weapon_state() -> void:
+	print("\n[3] weapon + magazine + attachment survive a stash save/reload")
+	var wpath := "res://resources/weapons/M4_Carbine.tres"
+	var apath := "res://resources/attachments/A2_Flash_Hider.tres"
+	var ammo_path := "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
+	var item := ItemCodec.item_from_path(wpath)
+	var w := item.extra as Weapon if item != null else null
+	_check(w != null, "weapon item built from path")
+	if w != null:
+		var feed := w.ammo_feed
+		if feed == null:
+			feed = AmmoFeed.new()
+			feed.max_capacity = 30
+			w.ammo_feed = feed
+		feed.contents.clear()
+		feed.compatible_calibers = PackedStringArray(["5.56x45mm NATO"])
+		for i in range(5):
+			feed.insert(load(ammo_path))
+		var att := load(apath) as Attachment
+		_check(w.attach_attachment(Weapon.AttachmentPoint.MUZZLE, att), "attachment mounted in memory")
+
+	var profile := MetaProfile.new()
+	profile.stash.deposit(item)
+	var wpath_save := TEST_DIR + "/weapon.save"
+	ProfileStore.delete(wpath_save)
+	ProfileStore.save(profile, wpath_save)
+	var loaded := ProfileStore.load_profile(wpath_save)
+	_check(loaded.stash.count_items() == 1, "weapon persisted as one stash entry")
+	var decoded: Weapon = null
+	if not loaded.stash.items.is_empty():
+		var extra = loaded.stash.items[0].extra
+		if extra is Weapon:
+			decoded = extra
+	_check(decoded != null, "weapon decoded from disk")
+	if decoded != null:
+		_check(decoded.ammo_feed != null and decoded.ammo_feed.capacity == 5, "loaded magazine has 5 rounds (got %s)" % ("null" if decoded.ammo_feed == null else str(decoded.ammo_feed.capacity)))
+		_check(decoded.get_attachment(Weapon.AttachmentPoint.MUZZLE) != null, "muzzle attachment restored")
+
+func _scenario_corrupt() -> void:
+	print("\n[4] corrupt save")
+	var cpath := TEST_DIR + "/corrupt.save"
+	var f := FileAccess.open(cpath, FileAccess.WRITE)
+	f.store_string("{ this is definitely not json ]")
+	f.close()
+	var profile := ProfileStore.load_profile(cpath)
+	_check(profile != null, "corrupt save does not crash")
+	_check(profile.stash.count_items() == 0, "corrupt save falls back to a clean stash")
+	_check(profile.currency == PlayerProfile.new().currency, "corrupt save falls back to default currency")
+	_check(_has_corrupt_backup(), "corrupt file kept as .corrupt backup")
+
+func _scenario_missing_and_atomic() -> void:
+	print("\n[5] missing save + atomic versioned write")
+	var mpath := TEST_DIR + "/missing.save"
+	ProfileStore.delete(mpath)
+	var profile := ProfileStore.load_profile(mpath)
+	_check(profile != null and profile.stash.count_items() == 0, "missing save -> clean profile")
+
+	ProfileStore.save(profile, mpath)
+	_check(FileAccess.file_exists(mpath), "save file written")
+	_check(not FileAccess.file_exists(mpath + ".tmp"), "atomic save leaves no temp file")
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(mpath))
+	_check(parsed is Dictionary, "save is valid JSON")
+	if parsed is Dictionary:
+		_check(int(parsed.get("version", -1)) == MetaProfile.VERSION, "save carries version %d" % MetaProfile.VERSION)
+
+	# Future version must not be trusted: clean start + quarantine.
+	var fpath := TEST_DIR + "/future.save"
+	var f := FileAccess.open(fpath, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"version": MetaProfile.VERSION + 999, "currency": 1}))
+	f.close()
+	var future := ProfileStore.load_profile(fpath)
+	_check(future.currency == PlayerProfile.new().currency, "future-version save ignored, starts clean")
+
+# ─── HELPERS ────────────────────────────────────────
+
+func _add_loot(bag: InventoryContainer, path: String, stack: int) -> void:
+	var res := load(path)
+	if res == null:
+		push_warning("loot resource missing: %s" % path)
+		return
+	var item: InventoryItem
+	if res is Ammo:
+		item = InventorySystem.create_inventory_item(res as Item, stack)
+	else:
+		item = InventoryItem.slurp(res as Item)
+	if item == null or not bag.add_item(item, Vector2i(-1, -1)):
+		push_warning("could not add loot: %s" % path)
+
+func _snapshot(stash: Stash) -> String:
+	var names: Array[String] = []
+	for item in stash.items:
+		names.append("%s x%d" % [item.name, item.stack_count])
+	names.sort()
+	return " | ".join(names)
+
+func _has_corrupt_backup() -> bool:
+	var d := DirAccess.open(TEST_DIR)
+	if d == null:
+		return false
+	for f in d.get_files():
+		if f.begins_with("corrupt.save.corrupt-"):
+			return true
+	return false
+
+func _cleanup() -> void:
+	var d := DirAccess.open(TEST_DIR)
+	if d == null:
+		return
+	for f in d.get_files():
+		d.remove(f)

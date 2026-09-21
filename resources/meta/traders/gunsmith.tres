@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="Trader" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/meta/trader.gd" id="1_t"]
+[ext_resource type="Script" path="res://src/meta/trader_offer.gd" id="2_o"]
+[ext_resource type="Script" path="res://src/meta/trader_loyalty.gd" id="3_l"]
+
+[sub_resource type="Resource" id="ll1"]
+script = ExtResource("3_l")
+level = 1
+required_character_level = 1
+required_reputation = 0
+
+[sub_resource type="Resource" id="o_flash_hider"]
+script = ExtResource("2_o")
+item_path = "res://resources/attachments/A2_Flash_Hider.tres"
+buy_price = 3000
+sell_price = 1200
+stock_max = 8
+min_loyalty = 1
+
+[sub_resource type="Resource" id="o_barter_aimpoint"]
+script = ExtResource("2_o")
+item_path = "res://resources/attachments/Aimpoint_T1.tres"
+buy_price = 5000
+sell_price = 8000
+stock_max = 4
+min_loyalty = 1
+barter_required = {
+"res://resources/attachments/A2_Flash_Hider.tres": 1
+}
+
+[sub_resource type="Resource" id="o_m4"]
+script = ExtResource("2_o")
+item_path = "res://resources/weapons/M4_Carbine.tres"
+buy_price = 48000
+sell_price = 22000
+stock_max = 2
+min_loyalty = 1
+
+[resource]
+script = ExtResource("1_t")
+id = "gunsmith"
+name = "Gunsmith"
+description = "Armas e anexos. Aceita barters de acessorios."
+currency = "RUB"
+offers = Array[TraderOffer]([SubResource("o_flash_hider"), SubResource("o_barter_aimpoint"), SubResource("o_m4")])
+loyalty = Array[TraderLoyalty]([SubResource("ll1")])
+reset_every_raids = 4
+reputation_per_trade = 2

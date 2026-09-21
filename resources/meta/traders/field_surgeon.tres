@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="Trader" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/meta/trader.gd" id="1_t"]
+[ext_resource type="Script" path="res://src/meta/trader_offer.gd" id="2_o"]
+[ext_resource type="Script" path="res://src/meta/trader_loyalty.gd" id="3_l"]
+
+[sub_resource type="Resource" id="ll1"]
+script = ExtResource("3_l")
+level = 1
+required_character_level = 1
+required_reputation = 0
+
+[sub_resource type="Resource" id="ll2"]
+script = ExtResource("3_l")
+level = 2
+required_character_level = 2
+required_reputation = 30
+
+[sub_resource type="Resource" id="o_bandage"]
+script = ExtResource("2_o")
+item_path = "res://resources/medical/army_bandage.tres"
+buy_price = 900
+sell_price = 400
+stock_max = 30
+min_loyalty = 1
+
+[sub_resource type="Resource" id="o_salewa"]
+script = ExtResource("2_o")
+item_path = "res://resources/medical/salewa_first_aid_kit.tres"
+buy_price = 12000
+sell_price = 6000
+stock_max = 6
+min_loyalty = 1
+
+[sub_resource type="Resource" id="o_barter_tourniquet"]
+script = ExtResource("2_o")
+item_path = "res://resources/medical/cat_hemostatic_tourniquet.tres"
+buy_price = 0
+sell_price = 500
+stock_max = 5
+min_loyalty = 1
+barter_required = {
+"res://resources/medical/army_bandage.tres": 2
+}
+
+[resource]
+script = ExtResource("1_t")
+id = "field_surgeon"
+name = "Field Surgeon"
+description = "Medica: itens medicos e barters de suprimentos."
+currency = "RUB"
+offers = Array[TraderOffer]([SubResource("o_bandage"), SubResource("o_salewa"), SubResource("o_barter_tourniquet")])
+loyalty = Array[TraderLoyalty]([SubResource("ll1"), SubResource("ll2")])
+reset_every_raids = 3
+reputation_per_trade = 2

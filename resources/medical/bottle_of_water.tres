@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MedicalItem" load_steps=2 format=3 uid="uid://cmedwater000001"]
+
+[ext_resource type="Script" uid="uid://du1gbtym1dxnh" path="res://addons/cabra.lat_shooters/src/core/health/medical_item.gd" id="1_med"]
+
+[resource]
+script = ExtResource("1_med")
+name = "Bottle of water (0.6L)"
+description = "Drinking water. +60 hydration."
+kind = 7
+use_time = 3.0
+max_uses = 1
+uses_left = 1
+energy = 0.0
+hydration = 60.0
+mass = 0.65

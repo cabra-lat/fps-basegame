@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="Quest" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/meta/quest.gd" id="1_q"]
+[ext_resource type="Script" path="res://src/meta/quest_objective.gd" id="2_obj"]
+
+[sub_resource type="Resource" id="obj_kill_3"]
+script = ExtResource("2_obj")
+kind = 0
+amount = 3
+weapon_filter = ""
+item_filter = ""
+tag_filter = ""
+point_filter = ""
+
+[resource]
+script = ExtResource("1_q")
+id = "hunter_3"
+title = "Cacador"
+description = "Elimine 3 hostis na arena."
+objectives = Array[QuestObjective]([SubResource("obj_kill_3")])
+reward_currency = 8000
+reward_exp = 300
+reward_items = ["res://resources/medical/army_bandage.tres"]
+reward_skill_xp = {
+"endurance": 30
+}
+requires = Array[String]([])
+auto_claim = true
+hud_tracked = true

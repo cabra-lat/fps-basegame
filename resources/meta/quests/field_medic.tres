@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="Quest" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://src/meta/quest.gd" id="1_q"]
+[ext_resource type="Script" path="res://src/meta/quest_objective.gd" id="2_obj"]
+
+[sub_resource type="Resource" id="obj_medical_2"]
+script = ExtResource("2_obj")
+kind = 1
+amount = 2
+weapon_filter = ""
+item_filter = ""
+tag_filter = "medical"
+point_filter = ""
+
+[sub_resource type="Resource" id="obj_extract_ponte"]
+script = ExtResource("2_obj")
+kind = 2
+amount = 1
+weapon_filter = ""
+item_filter = ""
+tag_filter = ""
+point_filter = "Ponte"
+
+[sub_resource type="Resource" id="obj_survive_1"]
+script = ExtResource("2_obj")
+kind = 3
+amount = 1
+weapon_filter = ""
+item_filter = ""
+tag_filter = ""
+point_filter = ""
+
+[resource]
+script = ExtResource("1_q")
+id = "field_medic"
+title = "Medico de Campo"
+description = "Extraia pela Ponte com 2 itens medicos na mochila."
+objectives = Array[QuestObjective]([SubResource("obj_medical_2"), SubResource("obj_extract_ponte"), SubResource("obj_survive_1")])
+reward_currency = 12000
+reward_exp = 500
+reward_items = ["res://resources/medical/cms_surgical_kit.tres"]
+reward_skill_xp = {
+"vitality": 40
+}
+requires = Array[String]([])
+auto_claim = true
+hud_tracked = true

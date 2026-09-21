@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="Trader" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/meta/trader.gd" id="1_t"]
+[ext_resource type="Script" path="res://src/meta/trader_offer.gd" id="2_o"]
+[ext_resource type="Script" path="res://src/meta/trader_loyalty.gd" id="3_l"]
+
+[sub_resource type="Resource" id="ll1"]
+script = ExtResource("3_l")
+level = 1
+required_character_level = 1
+required_reputation = 0
+
+[sub_resource type="Resource" id="ll2"]
+script = ExtResource("3_l")
+level = 2
+required_character_level = 2
+required_reputation = 20
+
+[sub_resource type="Resource" id="o_ammo"]
+script = ExtResource("2_o")
+item_path = "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
+buy_price = 120
+sell_price = 60
+stock_max = 200
+min_loyalty = 1
+
+[sub_resource type="Resource" id="o_bandage"]
+script = ExtResource("2_o")
+item_path = "res://resources/medical/army_bandage.tres"
+buy_price = 800
+sell_price = 300
+stock_max = 20
+min_loyalty = 1
+
+[sub_resource type="Resource" id="o_m4_ll2"]
+script = ExtResource("2_o")
+item_path = "res://resources/weapons/M4_Carbine.tres"
+buy_price = 45000
+sell_price = 20000
+stock_max = 3
+min_loyalty = 2
+
+[resource]
+script = ExtResource("1_t")
+id = "quartermaster"
+name = "Quartermaster"
+description = "Suprimentos militares: municao e itens de campo."
+currency = "RUB"
+offers = Array[TraderOffer]([SubResource("o_ammo"), SubResource("o_bandage"), SubResource("o_m4_ll2")])
+loyalty = Array[TraderLoyalty]([SubResource("ll1"), SubResource("ll2")])
+reset_every_raids = 5
+reputation_per_trade = 1

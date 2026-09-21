@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StarterLoadout" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/meta/starter_loadout.gd" id="1_sl"]
+
+[resource]
+script = ExtResource("1_sl")
+currency = 25000
+slots = {
+"primary": ["res://resources/weapons/M4_Carbine.tres"],
+"secondary": ["res://resources/weapons/AK_47.tres"]
+}

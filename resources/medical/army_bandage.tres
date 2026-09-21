@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MedicalItem" load_steps=2 format=3 uid="uid://cmedbandage001"]
+
+[ext_resource type="Script" uid="uid://du1gbtym1dxnh" path="res://addons/cabra.lat_shooters/src/core/health/medical_item.gd" id="1_med"]
+
+[resource]
+script = ExtResource("1_med")
+name = "Army bandage"
+description = "A sterile field bandage. Stops light bleeding."
+kind = 1
+use_time = 2.0
+max_uses = 1
+uses_left = 1
+heals_hp = 0.0
+stops_light_bleeding = true
+stops_heavy_bleeding = false
+fixes_fracture = false
+surgery = false
+pain_relief_seconds = 0.0
+energy = 0.0
+hydration = 0.0
+applies_fresh_wound = false
+mass = 0.043

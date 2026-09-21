@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MedicalItem" load_steps=2 format=3 uid="uid://cmedcat00000001"]
+
+[ext_resource type="Script" uid="uid://du1gbtym1dxnh" path="res://addons/cabra.lat_shooters/src/core/health/medical_item.gd" id="1_med"]
+
+[resource]
+script = ExtResource("1_med")
+name = "CAT hemostatic tourniquet"
+description = "Combat application tourniquet. Stops heavy bleeding; leaves a fresh wound."
+kind = 2
+use_time = 3.0
+max_uses = 1
+uses_left = 1
+stops_light_bleeding = false
+stops_heavy_bleeding = true
+fixes_fracture = false
+surgery = false
+pain_relief_seconds = 0.0
+energy = 0.0
+hydration = 0.0
+applies_fresh_wound = true
+mass = 0.08

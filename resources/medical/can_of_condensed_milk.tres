@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MedicalItem" load_steps=2 format=3 uid="uid://cmedmilk0000001"]
+
+[ext_resource type="Script" uid="uid://du1gbtym1dxnh" path="res://addons/cabra.lat_shooters/src/core/health/medical_item.gd" id="1_med"]
+
+[resource]
+script = ExtResource("1_med")
+name = "Can of condensed milk"
+description = "Sweet and filling. +75 energy, -65 hydration."
+kind = 6
+use_time = 4.0
+max_uses = 1
+uses_left = 1
+energy = 75.0
+hydration = -65.0
+mass = 0.44
