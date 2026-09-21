@@ -53,11 +53,20 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
      the NPC body swap that another lane had staged for an A/B test).
    - **Better: commit from a THROWAWAY index** (immune to others' staging *by construction*):
      ```bash
+     base=$(git rev-parse HEAD)                       # record HEAD
      export GIT_INDEX_FILE=/tmp/shooter/x.index
-     rm -f "$GIT_INDEX_FILE"; git read-tree HEAD   # clean index = HEAD, nothing of anyone else
-     git add <your files>; git commit -m "..."
+     rm -f "$GIT_INDEX_FILE"; git read-tree "$base"   # clean index, nothing of anyone else
+     git add <your files>
+     [ "$(git rev-parse HEAD)" = "$base" ] || { git read-tree HEAD; git add <your files>; }  # HEAD moved? redo
+     git commit -m "..."
      unset GIT_INDEX_FILE; git reset -q -- <your files>   # (see trap)
+     git show --stat --format="" HEAD                 # MUST list ONLY your files
      ```
+     A throwaway index is immune to others' STAGING, but **not** to HEAD MOVING between
+     `read-tree` and `commit` — then your commit's tree lacks the in-between commits and
+     REVERTS them. So record `base`, redo the `read-tree` if HEAD moved, and confirm with
+     `git show --stat HEAD` that only your files entered (a "board" commit listing 3 NPC
+     files is how `a403a54` would have been caught in 2 seconds).
      Trap: after a throwaway-index commit the REAL index is stale for those paths
      (`git status` shows `D ` staged) — a lane committing without a pathspec would then
      DELETE your files. Always close with **`git reset -q -- <your files>`** (path-scoped,
