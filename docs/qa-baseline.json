@@ -1,0 +1,45 @@
+{
+  "generated": "2026-09-21T15:28:21.681Z",
+  "toolVersion": "2.1.0",
+  "scope": [
+    "addons/cabra.lat_shooters/src",
+    "src",
+    "scenes"
+  ],
+  "counts": {
+    "BLOCKER": 0,
+    "MAJOR": 48,
+    "MINOR": 36,
+    "NIT": 14
+  },
+  "byRule": {
+    "long-function": 11,
+    "unused-field": 29,
+    "pending-consumer": 14,
+    "deep-nesting": 4,
+    "debug-print": 13,
+    "unused-func": 15,
+    "lambda-leak": 3,
+    "god-object": 2,
+    "connect-leak": 4,
+    "dead-api": 2,
+    "node-churn": 1
+  },
+  "rules": [
+    "connect-leak",
+    "dead-api",
+    "debug-print",
+    "deep-nesting",
+    "god-object",
+    "lambda-leak",
+    "long-function",
+    "node-churn",
+    "pending-consumer",
+    "unused-field",
+    "unused-func"
+  ],
+  "snapshot": {
+    "files": 117,
+    "lines": 16945
+  }
+}

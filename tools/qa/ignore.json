@@ -1,0 +1,86 @@
+[
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "alert_state_name",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/HUD hook; no caller today"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "is_reloading",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/HUD hook"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "is_target_visible",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/spotter hook"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "has_clue",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/spotter hook"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "cover_position",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/spotter hook"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "squad_target",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug/spotter hook"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "set_tier",
+    "confirmed_by": "npc-body",
+    "reason": "API hook for spawner/levels, kept documented"
+  },
+  {
+    "file": "src/npcs/bot/bot.gd",
+    "rule": "unused-func",
+    "name": "set_debug_perception",
+    "confirmed_by": "npc-body",
+    "reason": "documented debug toggle hook"
+  },
+  {
+    "file": "src/npcs/wave_spawner.gd",
+    "rule": "unused-func",
+    "name": "is_running",
+    "confirmed_by": "npc-body",
+    "reason": "spawner API hook; no caller today"
+  },
+  {
+    "file": "addons/cabra.lat_shooters/src/core/weapon/weapon.gd",
+    "rule": "unused-func",
+    "name": "get_effective_sight_height",
+    "confirmed_by": "ballistics",
+    "reason": "forward optic-override API consumed by player-rig's ADS eye-alignment queue"
+  },
+  {
+    "file": "addons/cabra.lat_shooters/src/core/weapon/weapon.gd",
+    "rule": "unused-func",
+    "name": "get_effective_zero_distance",
+    "confirmed_by": "ballistics",
+    "reason": "forward optic-override API consumed by player-rig's ADS queue"
+  },
+  {
+    "file": "addons/cabra.lat_shooters/src/core/weapon/weapon.gd",
+    "rule": "unused-func",
+    "name": "get_effective_magnification",
+    "confirmed_by": "ballistics",
+    "reason": "forward optic-override API consumed by player-rig's ADS/FOV queue"
+  }
+]
