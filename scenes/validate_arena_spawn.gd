@@ -41,6 +41,9 @@ const MID_RUN_FRAME := 30
 ## The arena's player participant id (`arena_manager.PLAYER_ID`); kept here so the
 ## attribution checks can assert who was credited.
 const PLAYER_ID := 0
+## Switch the arena to TDM and re-spawn, then check it: FFA gives every bot its
+## own team (1,2,3), but "two teams with two colours" is the TDM case.
+const TDM_CHECK_FRAME := FLOOR_FRAMES + 4
 const FLOOR_Y := 3.0
 
 const SPAWN_POINTS: Array[Vector3] = [
@@ -52,6 +55,10 @@ var _arena
 var _frame := 0
 var _done := false
 var _mid_run_names: Array[String] = []
+var _tdm_names: Array[String] = []
+## The frame-130 block must run exactly once and must NOT end the gate (TDM still follows).
+var _tdm_started := false
+## The frame-130 block must run exactly once, and must not end the gate.
 
 
 func _initialize() -> void:
@@ -76,12 +83,19 @@ func _process(_delta: float) -> bool:
 	if _frame == MID_RUN_FRAME:
 		_spawn_mid_raid()
 		return false
-	if _frame >= FLOOR_FRAMES:
-		_done = true
+	if _frame >= FLOOR_FRAMES and not _tdm_started:
+		# NOT _done yet: the TDM section below still has to run (the gate only ends
+		# in the block after TDM_CHECK_FRAME).
+		_tdm_started = true
 		_check_nobody_launched()
 		_check_mid_raid_bots_landed()
 		_check_free_spawn_dedup()
 		_check_teams_and_attribution()
+		_switch_to_tdm_and_spawn()
+		return false
+	if _frame >= TDM_CHECK_FRAME:
+		_done = true
+		_check_tdm_two_teams()
 		quit(v.finish())
 		return true
 	return false
@@ -311,6 +325,74 @@ func _victim_for_player(bots: Array) -> NpcBot:
 		if bot.team != player_team:
 			return bot
 	return null
+
+
+## Replaces the mode with TDM and spawns a fresh group through the same arena path,
+## so the two-team case (and its tint) is exercised for real, not asserted from the
+## mode's own math.
+func _switch_to_tdm_and_spawn() -> void:
+	_tdm_names.clear()
+	var mode := TDMMode.new()
+	mode.setup(_arena._spawn_points())
+	_arena.game_mode = mode
+	_arena._player_team = mode.assign_team(PLAYER_ID)
+	for i in range(3):
+		var seq: int = int(_arena.get("_bot_seq")) + 1
+		var team: int = mode.assign_team(seq)
+		_arena._spawn_bot(_arena._free_spawn(team), team)
+		_tdm_names.append("Bot%d" % seq)
+
+
+func _check_tdm_two_teams() -> void:
+	v.section("[arena: TDM gives exactly two teams, tinted and hostile]")
+	var bots: Array[NpcBot] = []
+	for n in _tdm_names:
+		var b := _arena.get_node_or_null(NodePath(n)) as NpcBot
+		if b != null:
+			bots.append(b)
+	v.check(bots.size() == 3, "spawned %d bot(s) under TDM" % bots.size())
+	var teams := {}
+	var tinted := 0
+	for bot in bots:
+		teams[bot.team] = true
+		v.check(bot.team == _arena.game_mode.assign_team(bot.npc_id),
+			"%s team=%d matches assign_team(%d)" % [bot.name, bot.team, bot.npc_id])
+		var rig := bot.get_node_or_null("Skeleton3D") as HumanoidRig
+		var mats := rig.own_materials() if rig != null else []
+		var col: Color = Color.TRANSPARENT
+		var has_col := false
+		if not mats.is_empty():
+			var got := mats[0].get_shader_parameter("modulate_color") as Color
+			if got != null:
+				col = got
+				has_col = true
+		var want := NpcVisuals.team_color(bot.team)
+		var ok: bool = has_col and col.is_equal_approx(want)
+		if ok:
+			tinted += 1
+		v.check(ok, "%s is tinted with its team colour (%s vs %s)" % [bot.name, str(col), str(want)])
+	v.check(teams.size() == 2, "TDM produced exactly 2 distinct teams (%s)" % str(teams.keys()))
+	v.check(tinted == bots.size(), "every TDM bot tinted (%d/%d)" % [tinted, bots.size()])
+	var mates := _pair_with_same_team(bots)
+	if mates.is_empty():
+		v.check(false, "a teammate pair exists for the TDM friendly-fire check")
+	else:
+		v.check(not NpcTargeting.is_hostile(mates[1] as Node, (mates[0] as NpcBot).team, false),
+			"TDM teammates (%d == %d) are NOT hostile" % [(mates[0] as NpcBot).team, (mates[1] as NpcBot).team])
+	var enemies := _killer_victim_pair(bots)
+	if enemies.is_empty():
+		v.check(false, "an enemy pair exists for the TDM hostility check")
+	else:
+		v.check(NpcTargeting.is_hostile(enemies[1] as Node, (enemies[0] as NpcBot).team, false),
+			"TDM enemies (%d vs %d) are hostile" % [(enemies[0] as NpcBot).team, (enemies[1] as NpcBot).team])
+
+
+func _pair_with_same_team(bots: Array) -> Array:
+	for i in range(bots.size()):
+		for j in range(i + 1, bots.size()):
+			if (bots[i] as NpcBot).team == (bots[j] as NpcBot).team:
+				return [bots[i], bots[j]]
+	return []
 
 
 # ─── HELPERS ───
