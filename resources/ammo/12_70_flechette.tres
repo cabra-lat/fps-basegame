@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_ammo"]
+
+[resource]
+script = ExtResource("1_ammo")
+name = "12_70_flechette"
+caliber = "12 Gauge flechette"
+description = "12/70 flechette (8 projectiles)"
+type = 11
+base_damage = 25
+bullet_mass = 0.65
+cartridge_mass = 40.0
+muzzle_velocity = 320.0
+reference_penetration = 9.0
+penetration_at_500m = 3.3
+ballistic_coefficient = 0.03
+bullet_length = 30.0
+bullet_diameter = 4.5
+sectional_density = 40.869
+armor_modifier = 0.8
+flesh_modifier = 1.0
+ricochet_angle = 35.0
+armor_damage = 0.26
+bleeding_chance = 0.25
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 5.0
+light_bleed_chance = 0.25
+heavy_bleed_chance = 0.25
+feed_failure = 1
+misfire = 3
+durability_burn = 60.0
+heat = 115.9
+projectile_count = 8
+projectile_damage = 25

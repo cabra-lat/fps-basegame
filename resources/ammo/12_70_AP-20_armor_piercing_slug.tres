@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_ammo"]
+
+[resource]
+script = ExtResource("1_ammo")
+name = "12_70_AP20_slug"
+caliber = "12 Gauge AP-20 slug"
+description = "12/70 AP-20 armor-piercing slug"
+type = 10
+base_damage = 164
+bullet_mass = 24.0
+cartridge_mass = 52.0
+muzzle_velocity = 510.0
+reference_penetration = 11.0
+penetration_at_500m = 4.8
+ballistic_coefficient = 0.08
+bullet_length = 25.0
+bullet_diameter = 18.5
+sectional_density = 89.285
+armor_modifier = 1.3
+flesh_modifier = 1.0
+ricochet_angle = 30.0
+armor_damage = 0.65
+bleeding_chance = 0.1
+ricochet_chance = 0.1
+fragment_chance = 0.0
+accuracy = 2.5
+light_bleed_chance = 0.0
+heavy_bleed_chance = 0.1
+feed_failure = 1
+misfire = 3
+durability_burn = 120.0
+heat = 148.5
+projectile_count = 1
+projectile_damage = 164

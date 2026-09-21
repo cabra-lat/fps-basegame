@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_ammo"]
+
+[resource]
+script = ExtResource("1_ammo")
+name = "12_70_lead_slug"
+caliber = "12 Gauge lead slug"
+description = "12/70 lead slug"
+type = 10
+base_damage = 167
+bullet_mass = 35.0
+cartridge_mass = 58.0
+muzzle_velocity = 370.0
+reference_penetration = 4.5
+penetration_at_500m = 2.1
+ballistic_coefficient = 0.09
+bullet_length = 23.0
+bullet_diameter = 18.5
+sectional_density = 130.207
+armor_modifier = 0.9
+flesh_modifier = 1.0
+ricochet_angle = 30.0
+armor_damage = 0.55
+bleeding_chance = 0.15
+ricochet_chance = 0.1
+fragment_chance = 0.0
+accuracy = 3.5
+light_bleed_chance = 0.1
+heavy_bleed_chance = 0.15
+feed_failure = 1
+misfire = 2
+durability_burn = 50.0
+heat = 110.8
+projectile_count = 1
+projectile_damage = 167

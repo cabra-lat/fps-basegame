@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://w05l4msgrtp2"]
 
-[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_0q424"]
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_0q424"]
 
 [resource]
 script = ExtResource("1_0q424")
@@ -12,6 +12,8 @@ bullet_mass = 48.2
 cartridge_mass = 81.94
 muzzle_velocity = 830.0
 penetration_value = 42.5024
+reference_penetration = 20.0
+penetration_at_500m = 17.0
 ballistic_coefficient = 0.41
 bullet_length = 108.0
 bullet_diameter = 12.7
@@ -23,8 +25,14 @@ ricochet_angle = 25.0
 tracer_duration = 0.0
 incendiary_chance = 0.8
 fragmentation_chance = 0.0
-armor_damage = 0.0
+armor_damage = 0.88
 bleeding_chance = 0.0
 ricochet_chance = 0.2
 fragment_chance = 0.0
 accuracy = 1.0
+light_bleed_chance = 0.0
+heavy_bleed_chance = 0.0
+feed_failure = 2
+misfire = 2
+durability_burn = 0.0
+heat = 0.0

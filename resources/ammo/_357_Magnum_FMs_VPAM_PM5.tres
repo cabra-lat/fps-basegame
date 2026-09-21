@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dv1th71l4adp5"]
 
-[ext_resource type="Script" uid="uid://bdyogq2oufx0o" path="res://addons/cabra.lat_shooters/src/core/ammo.gd" id="1_jn76v"]
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_jn76v"]
 
 [resource]
 script = ExtResource("1_jn76v")
@@ -12,6 +12,8 @@ bullet_mass = 7.1
 cartridge_mass = 12.07
 muzzle_velocity = 580.0
 penetration_value = 1.19422
+reference_penetration = 5.5
+penetration_at_500m = 3.7
 ballistic_coefficient = 0.165
 bullet_length = 33.0
 bullet_diameter = 9.07

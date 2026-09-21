@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_ammo"]
+
+[resource]
+script = ExtResource("1_ammo")
+name = "12_70_85mm_Magnum_buck"
+caliber = "12 Gauge 8.5mm Magnum buckshot"
+description = "12/70 8.5mm Magnum buckshot (8 pellets)"
+type = 11
+base_damage = 50
+bullet_mass = 3.2
+cartridge_mass = 50.0
+muzzle_velocity = 385.0
+reference_penetration = 0.6
+penetration_at_500m = 0.2
+ballistic_coefficient = 0.02
+bullet_length = 8.0
+bullet_diameter = 8.5
+sectional_density = 56.393
+armor_modifier = 0.9
+flesh_modifier = 1.0
+ricochet_angle = 30.0
+armor_damage = 0.26
+bleeding_chance = 0.2
+ricochet_chance = 0.0
+fragment_chance = 0.0
+accuracy = 4.0
+light_bleed_chance = 0.2
+heavy_bleed_chance = 0.1
+feed_failure = 1
+misfire = 3
+durability_burn = 0.0
+heat = 146.0
+projectile_count = 8
+projectile_damage = 50
