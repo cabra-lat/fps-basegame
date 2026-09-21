@@ -342,6 +342,26 @@ function isDebugBuildGuarded(lines, indents, idx) {
   return false;
 }
 
+// Comment text attached to a declaration: the trailing comment on the line plus
+// the contiguous `##`/`#` block directly above it. Used to recognise an
+// owner-documented intentional hook (`hook`, `no caller yet`, ...) so a planned
+// consumer is not reported as dead API.
+function docComment(lines, idx) {
+  const parts = [];
+  const tm = lines[idx].match(/#(.*)$/);
+  if (tm) parts.push(tm[1]);
+  for (let j = idx - 1; j >= 0 && j >= idx - 12; j--) {
+    const t = lines[j].trim();
+    if (t.startsWith('#')) { parts.push(t.replace(/^#+\s?/, '')); continue; }
+    if (t === '') continue;
+    // Keep walking past sibling declarations: consecutive consts/vars often
+    // share one `##` doc block that documents them all as hooks.
+    if (/^(const|static\s+var|var|@export)\b/.test(t)) continue;
+    break;
+  }
+  return parts.join(' ');
+}
+
 function analyzeGd(path, rel) {
   const raw = readText(path);
   const lines = raw.split('\n');
@@ -410,13 +430,13 @@ function analyzeGd(path, rel) {
       const em = line.match(/^@export[^\n]*?\bvar\s+([A-Za-z_]\w*)/);
       const vm = line.match(/^var\s+([A-Za-z_]\w*)\s*(?::|=|$)/);
       const km = line.match(/^const\s+([A-Za-z_]\w*)\s*(?::|=|$)/);
-      if (em) info.fields.push({ name: em[1], line: ln, exported: true });
-      else if (vm) info.fields.push({ name: vm[1], line: ln, exported: false });
-      else if (km) info.fields.push({ name: km[1], line: ln, exported: false, const: true });
+      if (em) info.fields.push({ name: em[1], line: ln, exported: true, doc: docComment(lines, i) });
+      else if (vm) info.fields.push({ name: vm[1], line: ln, exported: false, doc: docComment(lines, i) });
+      else if (km) info.fields.push({ name: km[1], line: ln, exported: false, const: true, doc: docComment(lines, i) });
       // computed property: `var x: T:` (getter on the next line) or `...: get = ...`
       const pm = line.match(/^var\s+([A-Za-z_]\w*)\s*:[^:=]+:/) || line.match(/^var\s+([A-Za-z_]\w*)\s*:.*\bget\b/);
       if (pm) {
-        info.fields.push({ name: pm[1], line: ln, exported: false, computed: true });
+        info.fields.push({ name: pm[1], line: ln, exported: false, computed: true, doc: docComment(lines, i) });
       }
     }
 
@@ -445,6 +465,7 @@ function analyzeGd(path, rel) {
       length,
       isPublic: !name.startsWith('_'),
       returnsValue: /\breturn\b\s+\S/.test(body),
+      doc: docComment(lines, i),
     });
     if (length >= FUNC_MIN_LINES) {
       const bodyDepth = Math.floor(Math.max(...indents.slice(i + 1, end + 1), 0) / 4);
@@ -650,6 +671,11 @@ function buildFindings(scans, refCorpus, refCorpusRaw, importGate, openTasksText
   // consumer (work in flight), not real debt.
   const mentionedOpen = (name) =>
     new RegExp(`(?<![A-Za-z0-9_])${escapeRe(name)}(?![A-Za-z0-9_])`).test(openTasksText);
+  // Owner-documented intentional hook (planned consumer), e.g.
+  // `## ... No caller yet.` / `## ... documented hooks until M7 is wired.`
+  // Deliberately explicit phrases, NOT bare "hook": `hook` is common in this
+  // codebase (skill/event hooks) and would reclassify real dead API.
+  const isHookDoc = (doc) => /no caller yet|pending consumer|consumidor-pendente|documented hook/i.test(doc || '');
 
   // BLOCKER: import gate
   if (importGate && (importGate.code !== 0 || importGate.errorLines.length > 0)) {
@@ -726,7 +752,7 @@ function buildFindings(scans, refCorpus, refCorpusRaw, importGate, openTasksText
       if (!f.isPublic) continue;
       const refs = countWordRefs(refCorpusRaw, f.name);
       if (refs <= 1) {
-        if (f.returnsValue && !mentionedOpen(f.name)) {
+        if (f.returnsValue && !mentionedOpen(f.name) && !isHookDoc(f.doc)) {
           add('MAJOR', 'unused-func', s.path, f.start,
             `dead API: ${f.name}() computes a value but no caller consumes it (grep-based; confirm it is not an engine/duck-typed hook)`,
             `refs=${refs}`);
@@ -748,7 +774,11 @@ function buildFindings(scans, refCorpus, refCorpusRaw, importGate, openTasksText
         }
         continue;
       }
-      if (refs <= 1) {
+      if (refs <= 1 && isHookDoc(fld.doc)) {
+        add('NIT', 'pending-consumer', s.path, fld.line,
+          `pending consumer: ${fld.name} is a documented hook with no caller yet (informational, not debt)`,
+          `refs=${refs}`);
+      } else if (refs <= 1) {
         const kind = fld.exported ? '@export var' : fld.const ? 'const' : 'var';
         add('MAJOR', 'unused-field', s.path, fld.line,
           `dead API: ${kind} ${fld.name} never referenced anywhere (grep-based, confirm it is not read by a scene/resource)`,
@@ -1119,7 +1149,7 @@ function renderReport(findings, scans, importGate, dupes, manualStats, ignoreRes
   L.push('');
   L.push('- **Indentation is split by repo, not messy per file.** The addon (`addons/`) is dominantly **4-space**; the game repo (`src/`, `scenes/`) is dominantly **tab**. No shipped file mixes both styles (see census). Proposed rule: keep the addon at 4 spaces and the game repo at tabs; do **not** mass-rewrite either.');
   L.push('- Debug `print()` is forbidden in shipping paths (`src/`, `scenes/`, addon `src/`); test harnesses (`validate_*.gd`, `test/`) may print. Prints on, or inside, an `if OS.is_debug_build():` guard are debug-only and are **not** counted as `debug-print` findings.');
-  L.push('- **Dead-API triage (three classes).** `morto-real` = a value-returning function, computed property or field that exists and is never consumed -> **MAJOR debt** (`unused-func`, `unused-field`, `dead-api`). `consumidor-pendente` = a void hook/API with no caller yet -> **NIT, informational, not debt** (`pending-consumer`). `falso-positivo-de-scan` = the matcher missed a real caller -> **tool bug, never counted**. The caller matcher covers `<inst>.<name>(`, `.<name>.connect(`, `.tscn`/`.tres` signal connections and properties, and `Callable("<name>")` strings.');
+  L.push('- **Dead-API triage (three classes).** `morto-real` = a value-returning function, computed property or field that exists and is never consumed -> **MAJOR debt** (`unused-func`, `unused-field`, `dead-api`). `consumidor-pendente` = a void hook/API with no caller yet -> **NIT, informational, not debt** (`pending-consumer`); a value-returning API/field whose declaration is documented as an intentional hook (doc comment containing `no caller yet`, `pending consumer` or `documented hook`) is also `consumidor-pendente`, so a planned consumer is not misreported as debt. `falso-positivo-de-scan` = the matcher missed a real caller -> **tool bug, never counted**. `falso-positivo-de-scan` = the matcher missed a real caller -> **tool bug, never counted**. The caller matcher covers `<inst>.<name>(`, `.<name>.connect(`, `.tscn`/`.tres` signal connections and properties, and `Callable("<name>")` strings.');
   L.push('- **Identity rule (AGENTS.md):** `ip-name` / `ip-tarkov` scan shipped code+resources for commercial-game proper nouns AND real firearm/accessory brands (`IP_BRANDS`: Glock, Magpul, Surefire, Aimpoint, EOTech, Vortex, Trijicon/ACOG, Beretta, Remington, Barrett, Colt, FN, HK, Kalashnikov, ...). Brands are matched in file contents AND in shipped filenames (`assets/**` included) so a branded `.tres`/`.png`/`.glb` cannot regress. Technical standards and authors (GOST, NIJ, VPAM, STANAG, RHA, HIC, Recht-Ipson, Poncelet) are public references and are NOT findings, and `docs/**` may cite sources. A proper noun/brand in a resource `name`, a `.tres`/`.tscn` filename, or a player-facing string is a BLOCKER; elsewhere (scripts, art filenames) MAJOR.');
   L.push('- **Reference integrity:** `broken-ref` reports `res://` paths that do not exist (latent export/shader failure); `case-mismatch` reports names that only exist with different case (case-sensitive export breakage).');
   L.push('- Contract checks a static tool cannot prove (rule 4 physics queries in `_physics_process`; rule 5 held items never simulated) are hand-reviewed in `tools/qa/manual-findings.json` and merged into the Findings table above (they carry an Owner and a `QA-NNN` id in the evidence).');
