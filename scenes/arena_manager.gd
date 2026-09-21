@@ -772,6 +772,8 @@ func _spawn_bot(at: Vector3, team: int) -> void:
 	# only ever targeted the player), no squad blackboard (it needs team >= 0) and
 	# died_with_team() reported -1. `npc_id` matters too: it is the id a bot records
 	# as its attacker, so without it bot-vs-bot kills cannot be attributed.
+	# set_team() BEFORE add_child is safe and is what NpcWaveSpawner does: the tint
+	# is applied by NpcBot._ready() (the pre-ready call bails on _rig == null).
 	bot.set_team(team)
 	bot.npc_id = _bot_seq
 	bot.friendly_fire = game_mode.friendly_fire
