@@ -280,8 +280,19 @@ gate_uid_tracking() {
 gate_harness() { # name script
   local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1 lerr lse luid
   while :; do
-    "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
-    rc=$?
+    # BOUND the harness: without a timeout a hung harness (stale .godot, a scene
+    # that never boots) hangs the WHOLE gate forever — observed: the arena_spawn
+    # harness ran 891 s and my full verify-all never reached the summary.
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 600 "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1; rc=$?
+    else
+      "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1; rc=$?
+    fi
+    if [ "$rc" -eq 124 ]; then
+      record "$name" "FAIL" "harness TIMED OUT (600s) — hung; suspect stale .godot or a scene that never boots (see $log)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
+    fi
     n="$(count_checks "$log")"
     # A harness must not PASS over a REAL log error (gate honesty):
     #   - `SCRIPT ERROR` (incl. a script chain that names an autoload -> the
