@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# tools/verify-all.sh — single verification entry point for fps-basegame.
+#
+# Runs every headless gate in sequence and returns ONE aggregate exit code, so a
+# human and CI run the exact same thing. Test toolchain only; it never edits
+# game code or other owners' harnesses — it just calls them.
+#
+# Gates, in order:
+#   1. import/parse        godot --headless --path . --import   (hard)
+#   2. assets              test/validate_assets.gd              (hard)
+#   3. ballistics          test/validate_tarkov_ballistics.gd   (hard)
+#   4. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
+#   5. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
+#   6. meta_progression    src/meta/validate_meta_progression.gd (hard)
+#   7. meta_market         src/meta/validate_meta_market.gd     (hard)
+#   8. invariants          test/validate_invariants.gd         (hard; cross-system
+#                                                                regression probes
+#                                                                promoted from *_tmp.gd)
+#   9. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#                                                                     MAJOR regression = WARN)
+#  10. export              optional, --with-export only (SKIP if no templates)
+#
+# Why run ALL gates instead of stopping at the first hard failure? Each harness is
+# independent and cheap; a full matrix shows every regression in one pass instead
+# of revealing them one CI cycle at a time. The aggregate exit code is still
+# non-zero as soon as any hard gate fails.
+#
+# Usage:
+#   tools/verify-all.sh                 # full local gate
+#   tools/verify-all.sh --quick         # parse + assets only
+#   tools/verify-all.sh --with-export   # also build Linux/Windows binaries
+#   tools/verify-all.sh --no-qa         # skip the qa quality gate
+#   tools/verify-all.sh --qa-fast       # qa without re-probing manual findings
+#   tools/verify-all.sh --qa-soft       # qa BLOCKER becomes a warning
+#
+# Exit codes: 0 = all hard gates pass | 1 = at least one hard gate failed
+#             | 64 = usage error.
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+GODOT_BIN="${GODOT_BIN:-godot}"
+LOG_DIR="${VERIFY_LOG_DIR:-/tmp/shooter/verify}"
+mkdir -p "$LOG_DIR"
+
+QUICK=0 WITH_EXPORT=0 NO_QA=0 QA_FAST=0 QA_SOFT=0
+
+usage() {
+  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --quick) QUICK=1 ;;
+    --with-export) WITH_EXPORT=1 ;;
+    --no-qa) NO_QA=1 ;;
+    --qa-fast) QA_FAST=1 ;;
+    --qa-soft) QA_SOFT=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "verify-all: unknown flag '$arg'" >&2; usage >&2; exit 64 ;;
+  esac
+done
+
+if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
+  echo "verify-all: godot not found (set GODOT_BIN)" >&2
+  exit 64
+fi
+
+# ─── result bookkeeping ─────────────────────────────
+declare -a R_NAME R_STATUS R_DETAIL
+HARD_FAILS=0
+WARNS=0
+
+record() { # name status detail
+  R_NAME+=("$1"); R_STATUS+=("$2"); R_DETAIL+=("$3")
+}
+
+count_checks() { # logfile -> prints a check count or "?"
+  local f="$1" n=""
+  n="$(grep -oE 'checks passed[[:space:]]+[0-9]+' "$f" | grep -oE '[0-9]+' | head -1)"
+  [ -z "$n" ] && n="$(grep -oE 'checks:[[:space:]]*[0-9]+ pass' "$f" | grep -oE '[0-9]+' | head -1)"
+  [ -z "$n" ] && n="$(grep -oE '^[[:space:]]*passed[[:space:]]+[0-9]+' "$f" | grep -oE '[0-9]+' | head -1)"
+  echo "${n:-?}"
+}
+
+# ─── GATE 1: import / parse ─────────────────────────
+# Two independent checks, because neither alone is a real gate:
+#   (a) `godot --import` exits 0 even with parse errors, so we also scan its
+#       output (catches broken referenced scripts / resource import errors).
+#   (b) check_scripts.gd compiles EVERY project .gd (catches a stray broken file
+#       that --import never touches). This is the bug the old CI step had: a
+#       "parse gate" that could never fail.
+CHECK_SCRIPTS_SCRIPT="res://addons/cabra.lat_shooters/test/check_scripts.gd"
+gate_import() {
+  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n
+  "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1
+  rc=$?
+  errs="$(grep -cE 'SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile' "$ilog")"
+  "$GODOT_BIN" --headless --path . --script "$CHECK_SCRIPTS_SCRIPT" >"$clog" 2>&1
+  crc=$?
+  cfail="$(grep -oE 'failures: [0-9]+' "$clog" | grep -oE '[0-9]+' | head -1)"
+  n="$(grep -oE 'scripts compiled: [0-9]+' "$clog" | grep -oE '[0-9]+' | head -1)"
+  if [ "$rc" -ne 0 ] || [ "$errs" -gt 0 ] || [ "$crc" -ne 0 ]; then
+    record "import/parse" "FAIL" "import rc=$rc errs=$errs; scripts rc=$crc failures=${cfail:-?} (see $ilog, $clog)"
+    HARD_FAILS=$((HARD_FAILS + 1))
+  else
+    record "import/parse" "PASS" "0 parse errors, ${n:-?} scripts compiled"
+  fi
+}
+
+# ─── HARNESS GATE ───────────────────────────────────
+gate_harness() { # name script
+  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n
+  "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
+  rc=$?
+  n="$(count_checks "$log")"
+  if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log"; then
+    record "$name" "PASS" "$n checks"
+  else
+    record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
+    HARD_FAILS=$((HARD_FAILS + 1))
+  fi
+}
+
+# ─── GATE 8: qa quality audit ───────────────────────
+gate_qa() {
+  local log="$LOG_DIR/qa_audit.log" rc counts
+  local args=(--check --no-import)
+  [ "$QA_FAST" -eq 1 ] && args+=(--no-verify)
+  if ! command -v node >/dev/null 2>&1; then
+    record "qa_audit" "SKIP" "node not found"
+    return
+  fi
+  node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1
+  rc=$?
+  counts="$(grep -oE 'BLOCKER=[0-9]+ MAJOR=[0-9]+ MINOR=[0-9]+ NIT=[0-9]+' "$log" | head -1)"
+  [ -z "$counts" ] && counts="rc=$rc"
+  case "$rc" in
+    0) record "qa_audit" "PASS" "$counts" ;;
+    1) if [ "$QA_SOFT" -eq 1 ]; then
+         record "qa_audit" "WARN" "BLOCKER present (soft): $counts (see $log)"
+         WARNS=$((WARNS + 1))
+       else
+         record "qa_audit" "FAIL" "BLOCKER present: $counts (see $log)"
+         HARD_FAILS=$((HARD_FAILS + 1))
+       fi ;;
+    2) record "qa_audit" "WARN" "MAJOR regressed vs baseline (informative): $counts (see $log)"
+       WARNS=$((WARNS + 1)) ;;
+    *) record "qa_audit" "FAIL" "audit error rc=$rc (see $log)"
+       HARD_FAILS=$((HARD_FAILS + 1)) ;;
+  esac
+}
+
+# ─── GATE 9: export (conditional) ───────────────────
+gate_export() {
+  local ver tpl_dir out rc log="$LOG_DIR/export.log"
+  ver="$("$GODOT_BIN" --version 2>/dev/null | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+\.[a-z]+).*/\1/')"
+  tpl_dir="${HOME}/.local/share/godot/export_templates/${ver}"
+  if [ ! -d "$tpl_dir" ]; then
+    record "export" "SKIP" "export templates not installed ($ver)"
+    return
+  fi
+  out="$LOG_DIR/export"; mkdir -p "$out"
+  "$GODOT_BIN" --headless --path . --export-release "Linux/X11" "$out/fps-basegame.x86_64" >"$log" 2>&1
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    record "export" "FAIL" "Linux/X11 export rc=$rc (see $log)"
+    HARD_FAILS=$((HARD_FAILS + 1))
+    return
+  fi
+  "$GODOT_BIN" --headless --path . --export-release "Windows Desktop" "$out/fps-basegame.exe" >>"$log" 2>&1
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    record "export" "FAIL" "Windows export rc=$rc (see $log)"
+    HARD_FAILS=$((HARD_FAILS + 1))
+  else
+    record "export" "PASS" "Linux/X11 + Windows Desktop"
+  fi
+}
+
+# ─── RUN ────────────────────────────────────────────
+echo "=== verify-all ===  root=$ROOT  godot=$("$GODOT_BIN" --version 2>/dev/null)"
+echo "logs: $LOG_DIR"
+echo ""
+
+gate_import
+
+if [ "$QUICK" -eq 1 ]; then
+  gate_harness "assets" "res://addons/cabra.lat_shooters/test/validate_assets.gd"
+  echo "(quick mode: import + assets only)"
+else
+  gate_harness "assets" "res://addons/cabra.lat_shooters/test/validate_assets.gd"
+  gate_harness "ballistics" "res://addons/cabra.lat_shooters/test/validate_tarkov_ballistics.gd"
+  gate_harness "weapon_mechanics" "res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd"
+  gate_harness "meta_persistence" "res://src/meta/validate_meta_persistence.gd"
+  gate_harness "meta_progression" "res://src/meta/validate_meta_progression.gd"
+  gate_harness "meta_market" "res://src/meta/validate_meta_market.gd"
+  gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
+  if [ "$NO_QA" -eq 1 ]; then
+    record "qa_audit" "SKIP" "--no-qa"
+  else
+    gate_qa
+  fi
+  if [ "$WITH_EXPORT" -eq 1 ]; then
+    gate_export
+  else
+    record "export" "SKIP" "pass --with-export to include"
+  fi
+fi
+
+# ─── SUMMARY ────────────────────────────────────────
+echo ""
+echo "=== verify-all summary ==="
+i=0
+while [ "$i" -lt "${#R_NAME[@]}" ]; do
+  printf '  %-4s %-17s %s\n' "${R_STATUS[$i]}" "${R_NAME[$i]}" "${R_DETAIL[$i]}"
+  i=$((i + 1))
+done
+
+if [ "$HARD_FAILS" -gt 0 ]; then
+  echo ""
+  echo "RESULT: FAIL ($HARD_FAILS hard gate(s) failed, $WARNS warning(s))"
+  exit 1
+fi
+echo ""
+if [ "$WARNS" -gt 0 ]; then
+  echo "RESULT: PASS ($WARNS non-blocking warning(s))"
+else
+  echo "RESULT: PASS"
+fi
+exit 0

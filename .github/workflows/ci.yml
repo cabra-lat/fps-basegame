@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.1"
+
+jobs:
+  gates:
+    name: Headless gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout game repo
+        uses: actions/checkout@v4
+
+      # addons/* are separate repos declared in .gitmodules with SSH URLs;
+      # rewrite to HTTPS so a public CI runner can fetch them.
+      # INFRA GATE (not solved here, by decision): if those addon repos are
+      # private, the runner needs a token/secret. Until then the gates below
+      # only run where the submodules are cloneable.
+      - name: Fetch addon submodules (HTTPS)
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive --depth 1
+
+      - name: Cache Godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          mkdir -p "$HOME/godot"
+          cd "$HOME/godot"
+          if [ ! -x godot ]; then
+            curl -fsSL -o godot.zip \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            unzip -o godot.zip
+            mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+            chmod +x godot
+          fi
+          echo "$HOME/godot" >> "$GITHUB_PATH"
+
+      # Import cache: `.godot/` is Godot's import DB + compiled resource caches.
+      # A warm cache makes the ~90 s cold import an incremental refresh, which
+      # buys CI time WITHOUT weakening any gate: gate 1 still re-runs
+      # `godot --import` + check_scripts, so a stale cache can never let a
+      # broken script pass — it can only cost (or save) wall time. Preferred
+      # over dropping the qa re-probe (`--qa-fast`), which is where the quality
+      # gate's teeth live. Falls back to the latest cache for this OS/version.
+      - name: Cache Godot import (.godot)
+        uses: actions/cache@v4
+        with:
+          path: .godot
+          key: godot-import-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('project.godot') }}
+          restore-keys: |
+            godot-import-${{ runner.os }}-${{ env.GODOT_VERSION }}-
+
+      # Single verification entry point — the SAME command a human runs.
+      # Replaces the old per-harness steps AND the old import-only "parse gate"
+      # (which could never fail: `godot --import` exits 0 on a broken script).
+      # verify-all runs: import+check_scripts (parse), validate_assets,
+      # validate_tarkov_ballistics, validate_weapon_mechanics, the three
+      # validate_meta_* harnesses, validate_invariants (cross-system regression
+      # probes promoted from *_tmp.gd), and the qa quality audit (BLOCKER hard).
+      - name: verify-all
+        run: bash tools/verify-all.sh
+
+  export:
+    name: Export binaries (needs templates)
+    runs-on: ubuntu-latest
+    needs: gates
+    # Opt-in: set the repo variable RUN_EXPORT=true once export templates are
+    # provisioned. Left off by default so a missing template cannot redden CI.
+    if: ${{ vars.RUN_EXPORT == 'true' }}
+    steps:
+      - name: Checkout game repo
+        uses: actions/checkout@v4
+
+      # INFRA GATE (documented, not solved): same private-submodule token
+      # requirement as the gates job.
+      - name: Fetch addon submodules (HTTPS)
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive --depth 1
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          mkdir -p "$HOME/godot"
+          cd "$HOME/godot"
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -o godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
+          echo "$HOME/godot" >> "$GITHUB_PATH"
+
+      - name: Install export templates
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          curl -fsSL -o /tmp/templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p /tmp/tpl && (cd /tmp/tpl && unzip -o /tmp/templates.tpz)
+          mv /tmp/tpl/templates "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
+      - name: Import
+        run: godot --headless --path . --import
+
+      - name: Export Linux/X11
+        run: |
+          mkdir -p "$RUNNER_TEMP/export"
+          godot --headless --path . --export-release "Linux/X11" "$RUNNER_TEMP/export/fps-basegame.x86_64"
+
+      - name: Export Windows Desktop
+        run: |
+          mkdir -p "$RUNNER_TEMP/export"
+          godot --headless --path . --export-release "Windows Desktop" "$RUNNER_TEMP/export/fps-basegame.exe"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fps-basegame-build
+          path: ${{ runner.temp }}/export/
+          if-no-files-found: error
