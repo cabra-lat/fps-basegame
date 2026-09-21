@@ -128,10 +128,14 @@ gate_import() {
 # addon the runner could not fetch) is skipped rather than faked green.
 UID_REPOS=("." "addons/cabra.lat_shooters")
 gate_uid_tracking() {
-  local repo f n total=0 details="" list="$LOG_DIR/uid_missing.log" tracked="$LOG_DIR/.uid_tracked"
+  local repo f n total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log" tracked="$LOG_DIR/.uid_tracked"
   : >"$list"
   for repo in "${UID_REPOS[@]}"; do
-    git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || continue
+    if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+      skipped+="$repo "
+      continue
+    fi
+    checked=$((checked + 1))
     git -C "$repo" ls-files -- '*.uid' >"$tracked"
     n=0
     while IFS= read -r f; do
@@ -146,11 +150,19 @@ gate_uid_tracking() {
       details+="$repo:$n "
     fi
   done
-  if [ "$total" -gt 0 ]; then
-    record "uid_tracking" "FAIL" "$total tracked script(s) without a tracked .uid ($details) — list in $list"
+  local skip_note=""
+  [ -n "$skipped" ] && skip_note="; SKIPPED (no git checkout): $skipped"
+  if [ "$checked" -eq 0 ]; then
+    # Nothing was actually checked, so it MUST NOT report PASS: a clean clone
+    # without the (private) addon would otherwise look green. Mirrors the export
+    # gate's honest SKIP. Found by `verifier` (sandbox: addon .git removed ->
+    # PASS with an empty missing list).
+    record "uid_tracking" "SKIP" "no git checkout to check (skipped: ${skipped:-none})"
+  elif [ "$total" -gt 0 ]; then
+    record "uid_tracking" "FAIL" "$total tracked script(s) without a tracked .uid ($details) — list in $list$skip_note"
     HARD_FAILS=$((HARD_FAILS + 1))
   else
-    record "uid_tracking" "PASS" "every tracked script has a tracked .uid"
+    record "uid_tracking" "PASS" "every tracked script in $checked repo(s) has a tracked .uid$skip_note"
   fi
 }
 
@@ -229,6 +241,18 @@ echo "=== verify-all ===  root=$ROOT  godot=$("$GODOT_BIN" --version 2>/dev/null
 echo "logs: $LOG_DIR"
 echo ""
 
+# Serialize concurrent verify-all runs. Two Godot processes importing/loading
+# against the SAME .godot/ cache can corrupt it and make a harness fail
+# spuriously (meta saw market 7/45 with "invalid UID"/"Resource file not found",
+# green again after a solo --import) — the same class of race the per-run LOG_DIR
+# above fixes for the logs. flock makes a second run WAIT instead of race; the
+# timeout is generous so a genuinely stuck run cannot block forever.
+mkdir -p /tmp/shooter
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"/tmp/shooter/verify-all.lock"
+  flock -w 900 9 || echo "verify-all: WARNING: lock not acquired in 900s; proceeding (results may be flaky)" >&2
+fi
+
 gate_import
 gate_uid_tracking
 
@@ -239,6 +263,7 @@ else
   gate_harness "assets" "res://addons/cabra.lat_shooters/test/validate_assets.gd"
   gate_harness "ballistics" "res://addons/cabra.lat_shooters/test/validate_tarkov_ballistics.gd"
   gate_harness "weapon_mechanics" "res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd"
+  gate_harness "inventory_ux" "res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd"
   gate_harness "meta_persistence" "res://src/meta/validate_meta_persistence.gd"
   gate_harness "meta_progression" "res://src/meta/validate_meta_progression.gd"
   gate_harness "meta_market" "res://src/meta/validate_meta_market.gd"
