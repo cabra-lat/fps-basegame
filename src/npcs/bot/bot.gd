@@ -427,14 +427,15 @@ func _physics_process(delta: float) -> void:
 				move_dir = to_loot.normalized()
 			else:
 				_consume_loot(_loot_target)
-	elif not waypoints.is_empty():
-		var target: Vector3 = waypoints[_wp_index]
-		var to_wp := target - global_position
-		to_wp.y = 0.0
-		if to_wp.length() < 0.6:
-			_wp_index = (_wp_index + 1) % waypoints.size()
 		else:
-			move_dir = to_wp.normalized()
+			# No loot in range: KEEP PATROLLING. Before this fallthrough the
+			# loot branch swallowed the patrol branch, so an idle bot with loot
+			# enabled stopped walking for good once `loot_idle_delay` elapsed
+			# (found by the facing probe: 0 m travelled; the spotter's strip saw
+			# the same "walks then stops" in the arena).
+			move_dir = _patrol_dir()
+	elif not waypoints.is_empty():
+		move_dir = _patrol_dir()
 	if move_dir != Vector3.ZERO:
 		_face(move_dir, delta)
 		velocity.x = move_dir.x * speed
@@ -453,6 +454,20 @@ func _face(dir: Vector3, _delta: float) -> void:
 		return
 	var yaw := atan2(-dir.x, -dir.z)
 	rotation.y = lerp_angle(rotation.y, yaw, 0.15)
+
+
+## Next patrol step toward the current waypoint (ZERO when there is none, or on
+## the frame the waypoint is reached and the index advances).
+func _patrol_dir() -> Vector3:
+	if waypoints.is_empty():
+		return Vector3.ZERO
+	var target: Vector3 = waypoints[_wp_index]
+	var to_wp := target - global_position
+	to_wp.y = 0.0
+	if to_wp.length() < 0.6:
+		_wp_index = (_wp_index + 1) % waypoints.size()
+		return Vector3.ZERO
+	return to_wp.normalized()
 
 
 # ─── PERCEPTION ───
