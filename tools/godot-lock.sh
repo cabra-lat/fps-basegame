@@ -36,7 +36,20 @@ mkdir -p /tmp/shooter
 if command -v flock >/dev/null 2>&1; then
   LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
   exec 9>"$LOCK_FILE"
-  flock -w 900 9 || echo "godot-lock: WARNING: lock not acquired in 900s; proceeding (may race the gate)" >&2
+  if flock -n 9; then
+    # Lock was FREE -> any `godot` already running is NOT holding it (bypass).
+    if command -v pgrep >/dev/null 2>&1; then
+      others="$(pgrep -c -x godot 2>/dev/null || echo 0)"
+      [ "${others:-0}" -gt 0 ] && echo "godot-lock: WARNING: ${others} 'godot' process(es) running WITHOUT the lock — .godot may still race (use this wrapper everywhere)" >&2
+    fi
+  else
+    # Say so BEFORE blocking: a caller that wraps us in a short `timeout` then sees
+    # exit 124 and may think the harness broke — it is just the lock wait.
+    echo "godot-lock: waiting for the gate lock (${LOCK_FILE})..." >&2
+    _t0="$(date +%s)"
+    flock -w 900 9 || echo "godot-lock: WARNING: lock not acquired in 900s; proceeding (may race the gate)" >&2
+    echo "godot-lock: lock acquired after $(( $(date +%s) - _t0 ))s" >&2
+  fi
 fi
 
 if [ "$CLEAN_TMP" -eq 1 ]; then
