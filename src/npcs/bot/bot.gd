@@ -27,17 +27,6 @@ extends CharacterBody3D
 ## Combat contract kept intact: GameMode teams, friendly-fire, died(bot) +
 ## died_with_team(bot, team), range_hit(impact, ammo, killer_id), death corpse
 ## 10 s + fade + white hit flash.
-##
-## Body (shared rig): the visual body is the player-rig `humanoid_rig.tscn`,
-## instanced in `bot.tscn` as a child NAMED "Skeleton3D" at
-## `HumanoidRig.GROUND_PLACEMENT_Y` — the clip tracks address the skeleton by
-## that node name, and the `AnimationPlayer` (holding
-## `humanoid_body_anims.res`) sits INSIDE the rig with `root_node = "../.."`.
-## Get that binding wrong and `play()` returns true while nothing moves (the
-## paths resolve to a node that does not exist) — see the rig probe notes.
-## The collider stays the bot's own capsule (r0.35/h1.7) so the range resolver
-## keeps hitting `NpcBot`; eye/chest heights (1.5/1.2) stay root-relative for
-## numeric parity with the spotter's checks.
 
 signal died(bot: NpcBot)
 signal died_with_team(bot: NpcBot, team: int)
@@ -95,8 +84,6 @@ enum AlertState { IDLE, SUSPICIOUS, ENGAGED, SEARCH }
 @export var despawn_delay: float = 10.0 ## Corpse lifetime after death (s).
 @export var corpse_fade_time: float = 2.0 ## Fade-out at the end of corpse life (s).
 @export var visual_variation: bool = true ## Per-bot tint/scale variety at spawn.
-@export var anim_lod_distance: float = 45.0 ## Past this the clip is frozen (0 = off).
-@export var hide_lod_distance: float = 90.0 ## Past this the body is hidden (0 = off).
 @export var debug_perception: bool = false ## Draw perception/cover/squad debug.
 @export var debug_hearing_loudness: float = 1.0 ## Reference loudness for circle.
 
@@ -148,28 +135,16 @@ var _fall_t: float = 0.0
 var _base_basis: Basis
 # ── hit feedback + corpse visuals ──
 const HIT_FLASH_TIME: float = 0.12
-const FIRE_ANIM_TIME: float = 0.25 ## 'fire' pose lock before the state anim resumes.
+const HIT_FLASH_ENERGY: float = 3.0
 const RETARGET_INTERVAL: float = 0.5 ## Seconds between enemy rescans.
 const SEARCH_ARRIVE_RADIUS: float = 0.8
 const SEARCH_LOOK_SPEED: float = 1.8 ## rad/s while sweeping a clue.
 const CLOSE_REACTION_SCALE: float = 0.35 ## Reaction gate inside engage_range.
 const LOOT_RESCAN_INTERVAL: float = 1.0
 const DEBUG_REFRESH_HZ: float = 10.0
-## Semantic animation keys published by the shared rig library.
-const ANIM_IDLE := &"idle"
-const ANIM_WALK := &"walk"
-const ANIM_RUN := &"run"
-const ANIM_AIM := &"aim_idle"
-const ANIM_FIRE := &"fire"
-const ANIM_RELOAD := &"reload"
 var _hit_flash_t: float = 0.0
-## Body tint currently applied (team colour or per-bot variation); the corpse
-## fade reuses it so the alpha ramp keeps the tint.
-var _tint: Color = Color.WHITE
-var _rig: HumanoidRig = null ## Shared humanoid rig (child "Skeleton3D").
-var _playing: StringName = &""
-var _anim_lock_t: float = 0.0
-var _moving: bool = false
+var _mat: StandardMaterial3D = null ## Per-instance body material (tint/flash/fade).
+var _base_albedo: Color = Color(0.8, 0.1, 0.1, 1.0)
 var _debug_mi: MeshInstance3D = null
 var _debug_mesh: ImmediateMesh = null
 var _debug_t: float = 0.0
@@ -177,14 +152,11 @@ var _debug_t: float = 0.0
 
 func _ready() -> void:
 	add_to_group("bots")
-	_rig = get_node_or_null("Skeleton3D") as HumanoidRig
-	if _rig != null:
-		_rig.set_tint(_tint)
-		_rig.play(ANIM_IDLE)
-		_playing = ANIM_IDLE
+	_ensure_own_material()
 	if visual_variation:
 		_apply_visual_variation()
-	_apply_team_tint()
+	if team >= 0:
+		_apply_team_tint()
 	_apply_tier()
 	_base_basis = global_transform.basis
 	if health == null:
@@ -372,7 +344,6 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_flash(delta)
 	_attack_t = maxf(0.0, _attack_t - delta)
-	_anim_lock_t = maxf(0.0, _anim_lock_t - delta)
 	_noise_boost_t = maxf(0.0, _noise_boost_t - delta)
 	_under_fire_t = maxf(0.0, _under_fire_t - delta)
 	if _reloading:
@@ -442,9 +413,6 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, speed * delta)
 		velocity.z = move_toward(velocity.z, 0.0, speed * delta)
-	_moving = move_dir != Vector3.ZERO
-	_tick_anim()
-	_tick_lod()
 	move_and_slide()
 
 
@@ -676,9 +644,6 @@ func _try_attack() -> void:
 	impact.angle = 0.0
 	h.take_ballistic_damage(impact, BodyPart.Type.UPPER_CHEST, null)
 	_shots_in_burst += 1
-	if _rig != null and _rig.play(ANIM_FIRE):
-		_playing = ANIM_FIRE
-		_anim_lock_t = FIRE_ANIM_TIME
 	if burst_shots > 0 and _shots_in_burst >= burst_shots:
 		_shots_in_burst = 0
 		start_reload()
@@ -693,10 +658,8 @@ func _die(_cause: String = "") -> void:
 	velocity = Vector3.ZERO
 	set_collision_layer(0)
 	set_collision_mask(0)
-	# Corpse keeps its last pose: freeze the clip instead of letting it keep
-	# playing while the body is dragged down by the fall tilt.
-	if _rig != null:
-		_rig.set_anim_enabled(false)
+	if _mat != null:
+		_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	died.emit(self)
 	died_with_team.emit(self, team)
 
@@ -709,9 +672,12 @@ func _tick_death(delta: float) -> void:
 			_base_basis * rot, global_position)
 		move_and_slide()
 	_despawn_t -= delta
-	if corpse_fade_time > 0.0 and _despawn_t <= corpse_fade_time:
+	if _mat != null and corpse_fade_time > 0.0 \
+			and _despawn_t <= corpse_fade_time:
 		var a := clampf(_despawn_t / corpse_fade_time, 0.0, 1.0)
-		NpcVisuals.corpse_alpha(_rig, _tint, a)
+		var c := _base_albedo
+		c.a = a
+		_mat.albedo_color = c
 	if _despawn_t <= 0.0:
 		queue_free()
 
@@ -770,24 +736,32 @@ func _state_debug_color() -> Color:
 		_: return Color(0.9, 0.9, 0.9, 0.6)
 
 
-# ─── visuals: team tint, hit flash, corpse fade (all on the shared rig) ───
+# ─── visuals: own material, variation, team tint, hit flash ───
 
-## Per-bot identity: body scale + a near-white tint jitter. Runs before
+## Duplicate the shared tscn material so tint/flash/fade stay per-bot.
+func _ensure_own_material() -> void:
+	_mat = NpcVisuals.own_material(
+		get_node_or_null("MeshInstance3D") as MeshInstance3D)
+	if _mat != null:
+		_base_albedo = _mat.albedo_color
+
+
+## Slight per-bot identity: body scale + reddish tint jitter. Runs before
 ## _base_basis capture so the corpse keeps its scale.
 func _apply_visual_variation() -> void:
 	scale = Vector3.ONE * randf_range(0.94, 1.06)
-	_tint = NpcVisuals.varied_tint(_tint)
-	if _rig != null:
-		_rig.set_tint(_tint)
+	if _mat != null:
+		_base_albedo = NpcVisuals.varied_albedo(_base_albedo)
+		_mat.albedo_color = _base_albedo
 
 
-## Team tint goes through the rig's per-instance material (M4).
+## Team tint reuses the per-instance material; keeps the varied scale.
 func _apply_team_tint() -> void:
-	if _rig == null or _dead or team < 0:
+	if _mat == null or _dead or team < 0:
 		return
 	var c := NpcVisuals.team_color(team)
-	_tint = Color(c.r, c.g, c.b, 1.0)
-	_rig.set_tint(_tint)
+	_base_albedo = Color(c.r, c.g, c.b, 1.0)
+	_mat.albedo_color = _base_albedo
 
 
 ## Any non-fatal Health damage path flashes and marks the bot under fire.
@@ -806,47 +780,5 @@ func _tick_flash(delta: float) -> void:
 	_apply_flash()
 
 
-## `flash_amount` is 0..1 (the shader mixes albedo and adds emission).
 func _apply_flash() -> void:
-	if _rig == null:
-		return
-	_rig.set_flash(_hit_flash_t / HIT_FLASH_TIME)
-
-
-# ─── animation + LOD (the rig owns the AnimationPlayer/library) ───
-
-## State -> clip: one clip per alert state, `fire`/`reload` win while they run.
-func _want_anim() -> StringName:
-	if _reloading:
-		return ANIM_RELOAD
-	if alert_state == AlertState.ENGAGED:
-		return ANIM_RUN if _moving else ANIM_AIM
-	if alert_state == AlertState.SUSPICIOUS or alert_state == AlertState.SEARCH:
-		return ANIM_WALK
-	return ANIM_WALK if _moving else ANIM_IDLE
-
-
-func _tick_anim() -> void:
-	if _rig == null or _anim_lock_t > 0.0:
-		return
-	var want := _want_anim()
-	if want == _playing:
-		return
-	if _rig.play(want):
-		_playing = want
-
-
-## Distance valve (M9): anim frozen far away, rig hidden further out.
-func _tick_lod() -> void:
-	if _rig == null:
-		return
-	var cam := get_viewport().get_camera_3d()
-	if cam == null:
-		return
-	var d := global_position.distance_to(cam.global_position)
-	if hide_lod_distance > 0.0 and d > hide_lod_distance:
-		_rig.set_lod(2)
-	elif anim_lod_distance > 0.0 and d > anim_lod_distance:
-		_rig.set_lod(1)
-	else:
-		_rig.set_lod(0)
+	NpcVisuals.apply_flash(_mat, _hit_flash_t, HIT_FLASH_TIME, HIT_FLASH_ENERGY)

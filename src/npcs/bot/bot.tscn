@@ -1,8 +1,15 @@
-[gd_scene load_steps=5 format=3 uid="uid://cnpcbotv1000001"]
+[gd_scene load_steps=6 format=3 uid="uid://cnpcbotv1000001"]
 
 [ext_resource type="Script" path="res://src/npcs/bot/bot.gd" id="1_bot"]
-[ext_resource type="PackedScene" path="res://addons/cabra.lat_shooters/src/player/scenes/humanoid_rig.tscn" id="2_rig"]
-[ext_resource type="AnimationLibrary" path="res://addons/cabra.lat_shooters/src/player/humanoid_body_anims.res" id="3_anims"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bot"]
+albedo_color = Color(0.8, 0.1, 0.1, 1)
+roughness = 0.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_bot"]
+material = SubResource("StandardMaterial3D_bot")
+radius = 0.35
+height = 1.7
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bot"]
 radius = 0.35
@@ -11,14 +18,9 @@ height = 1.7
 [node name="NpcBot" type="CharacterBody3D"]
 script = ExtResource("1_bot")
 
-[node name="Skeleton3D" parent="." instance=ExtResource("2_rig")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.893, 0)
-
-[node name="AnimationPlayer" type="AnimationPlayer" parent="Skeleton3D"]
-root_node = NodePath("../..")
-libraries = {
-&"": ExtResource("3_anims")
-}
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+mesh = SubResource("CapsuleMesh_bot")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
