@@ -38,6 +38,9 @@ const FLOOR_FRAMES := 130
 ## A spawn that happens while the raid is RUNNING (not from _ready) is the case
 ## that used to stack the bots on the arena origin, inside the floor.
 const MID_RUN_FRAME := 30
+## The arena's player participant id (`arena_manager.PLAYER_ID`); kept here so the
+## attribution checks can assert who was credited.
+const PLAYER_ID := 0
 const FLOOR_Y := 3.0
 
 const SPAWN_POINTS: Array[Vector3] = [
@@ -78,6 +81,7 @@ func _process(_delta: float) -> bool:
 		_check_nobody_launched()
 		_check_mid_raid_bots_landed()
 		_check_free_spawn_dedup()
+		_check_teams_and_attribution()
 		quit(v.finish())
 		return true
 	return false
@@ -186,7 +190,9 @@ func _spawn_mid_raid() -> void:
 	v.section("[arena: mid-raid spawn race]")
 	for i in range(2):
 		var seq: int = int(_arena.get("_bot_seq")) + 1
-		var team: int = _arena.game_mode.assign_team(900 + i)
+		# Same id/team scheme the arena uses in _spawn_bots(), or the team check
+		# below would (correctly) complain that the probe invented a team.
+		var team: int = _arena.game_mode.assign_team(seq)
 		_arena._spawn_bot(_arena._free_spawn(team), team)
 		_mid_run_names.append("Bot%d" % seq)
 
@@ -222,6 +228,89 @@ func _check_free_spawn_dedup() -> void:
 			var c := seen[j]
 			min_d = minf(min_d, Vector2(a.x - c.x, a.z - c.z).length())
 	v.check(min_d >= 0.5, "every pair of _free_spawn points is apart in XZ (min %.2f m, threshold 0.5)" % min_d)
+
+
+## The arena used to spawn bots with team -1: the team was written to a meta but
+## never applied to the bot, which silently disabled team tint, per-team
+## hostility (in FFA the bots never fought each other, they only targeted the
+## player), the squad blackboard (needs team >= 0) and died_with_team(). npc-body
+## found it. Real teams also require real attribution: the arena credited the
+## PLAYER for every bot death, which only stayed invisible while bots could not
+## kill each other.
+func _check_teams_and_attribution() -> void:
+	v.section("[arena: bots carry a real team + kills are attributed]")
+	var bots := _bots()
+	v.check(bots.size() >= 2, "%d bot(s) to check" % bots.size())
+	for b in bots:
+		var bot := b as NpcBot
+		var meta_id: int = int(bot.get_meta("id", -1))
+		v.check(bot.team >= 0 and bot.team == _arena.game_mode.assign_team(meta_id),
+			"%s carries a real team (%d) matching assign_team(%d)" % [bot.name, bot.team, meta_id])
+		v.check(bot.npc_id == meta_id, "%s npc_id=%d matches its participant id" % [bot.name, bot.npc_id])
+		v.check(bot.friendly_fire == _arena.game_mode.friendly_fire,
+			"%s friendly_fire=%s matches the mode" % [bot.name, str(bot.friendly_fire)])
+	if bots.size() < 2:
+		return
+	# Hostility: two bots on DIFFERENT teams are hostile with friendly fire off.
+	var a := bots[0] as NpcBot
+	var b2 := bots[1] as NpcBot
+	if a.team != b2.team:
+		v.check(NpcTargeting.is_hostile(b2 as Node, a.team, false),
+			"a bot treats a different team (%d vs %d) as hostile" % [a.team, b2.team])
+	else:
+		v.check(not NpcTargeting.is_hostile(b2 as Node, a.team, false),
+			"teammates (%d == %d) are not hostile with friendly fire off" % [a.team, b2.team])
+	# Attribution, in the mode's own score key (FFA: id, TDM: team).
+	var pair := _killer_victim_pair(bots)
+	if pair.is_empty():
+		v.check(false, "a non-teammate pair exists to check kill attribution")
+		return
+	var killer := pair[0] as NpcBot
+	var victim := pair[1] as NpcBot
+	var key := _score_key(killer.npc_id)
+	var before_killer: int = _arena.game_mode.get_score_of(key)
+	var before_player: int = _arena.game_mode.get_score_of(_score_key(PLAYER_ID))
+	victim.set_attacker(killer.npc_id)
+	_arena._on_bot_health_died("gate", victim)
+	v.check(_arena.game_mode.get_score_of(key) == before_killer + 1,
+		"a bot-vs-bot kill scores for the killer bot (id %d)" % killer.npc_id)
+	v.check(_arena.game_mode.get_score_of(_score_key(PLAYER_ID)) == before_player,
+		"a bot-vs-bot kill does NOT score for the player")
+	# No recorded attacker (environment / the range resolver leaves it at -1): the
+	# player is credited, exactly as before this change.
+	var spare := _victim_for_player(bots)
+	if spare == null:
+		v.check(false, "a bot not on the player's team exists for the player-kill check")
+		return
+	var before_player2: int = _arena.game_mode.get_score_of(_score_key(PLAYER_ID))
+	spare.set_attacker(-1)
+	_arena._on_bot_health_died("gate", spare)
+	v.check(_arena.game_mode.get_score_of(_score_key(PLAYER_ID)) == before_player2 + 1,
+		"a kill with no recorded attacker still scores for the player")
+
+
+## FFA scores per participant id, TDM per team: the mode owns the key.
+func _score_key(id: int) -> int:
+	return _arena.game_mode.assign_team(id) if _arena.game_mode.team_count > 1 else id
+
+
+func _killer_victim_pair(bots: Array) -> Array:
+	for i in range(bots.size()):
+		for j in range(bots.size()):
+			var k := bots[i] as NpcBot
+			var v2 := bots[j] as NpcBot
+			if k != v2 and k.team != v2.team:
+				return [k, v2]
+	return []
+
+
+func _victim_for_player(bots: Array) -> NpcBot:
+	var player_team: int = _arena.game_mode.assign_team(PLAYER_ID)
+	for b in bots:
+		var bot := b as NpcBot
+		if bot.team != player_team:
+			return bot
+	return null
 
 
 # ─── HELPERS ───

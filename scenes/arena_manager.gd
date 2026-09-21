@@ -766,8 +766,17 @@ func _spawn_bot(at: Vector3, team: int) -> void:
 	# root sits at the origin, so to_local() is a no-op today and stays correct if
 	# the root is ever moved.
 	bot.position = to_local(at)
+	# Same contract as NpcWaveSpawner._spawn_one: the team has to land on the BOT,
+	# not only in a meta. Without this every arena bot stayed team -1: no team
+	# tint, no per-team hostility (in FFA the bots never fought each other, they
+	# only ever targeted the player), no squad blackboard (it needs team >= 0) and
+	# died_with_team() reported -1. `npc_id` matters too: it is the id a bot records
+	# as its attacker, so without it bot-vs-bot kills cannot be attributed.
+	bot.set_team(team)
+	bot.npc_id = _bot_seq
+	bot.friendly_fire = game_mode.friendly_fire
 	add_child(bot)
-	bot.set_meta("id", _bot_seq)
+	bot.set_meta("id", _bot_seq) # COOP extraction gates read this meta
 	bot.set_meta("team", team)
 	# Fase 1 tuning: melee dummies, gentle enough to learn the loop.
 	bot.attack_energy = 12.0
@@ -800,15 +809,26 @@ func _connect_bot(bot: Node) -> void:
 		bot.connect("target_down", _on_bot_target_down.bind(bot))
 
 func _on_bot_died(bot: NpcBot) -> void:
-	_register_kill(PLAYER_ID, _bot_id(bot), _bot_team(bot), bot.name)
-	_respawn_bot_later()
+	_register_bot_death(bot, true)
 
 func _on_bot_health_died(_cause: String, bot: Node) -> void:
-	_register_kill(PLAYER_ID, _bot_id(bot), _bot_team(bot), bot.name)
-	_respawn_bot_later()
+	_register_bot_death(bot, true)
 
 func _on_bot_target_down(bot: Node) -> void:
-	_register_kill(PLAYER_ID, _bot_id(bot), _bot_team(bot), bot.name)
+	_register_bot_death(bot, false)
+
+## Credits the kill to whoever actually did it. A bot records the attacker that
+## hit it (another bot's melee sets its `npc_id`; the range resolver leaves it at
+## -1 for the player), so hardcoding PLAYER_ID credited the PLAYER for every
+## bot-vs-bot kill as soon as the arena's bots became hostile to each other.
+## An unknown killer (environment, nothing recorded) still credits the player,
+## which is what the arena did before this.
+func _register_bot_death(bot: Node, respawn: bool) -> void:
+	var attacker = bot.get("last_attacker_id")
+	var killer: int = int(attacker) if attacker is int and int(attacker) >= 0 else PLAYER_ID
+	_register_kill(killer, _bot_id(bot), _bot_team(bot), bot.name)
+	if respawn:
+		_respawn_bot_later()
 
 ## Single kill entry: the mode owns scoring + friendly-fire + win condition.
 func _register_kill(killer_id: int, victim_id: int, victim_team: int, victim_name: String) -> void:
