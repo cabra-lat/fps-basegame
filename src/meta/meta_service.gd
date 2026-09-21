@@ -22,7 +22,7 @@ signal report_ready(summary: String)
 ## the feature can return gear without reworking resolution.
 signal insurance_claim_available(lost: Array)
 
-const SURVIVAL_REWARD := 5000 # roubles for getting out alive
+const SURVIVAL_REWARD := 5000 # credits for getting out alive
 
 var profile: MetaProfile
 var raid: Raid

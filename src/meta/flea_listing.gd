@@ -34,7 +34,7 @@ func status_name() -> String:
 
 ## HUD/report one-liner.
 func line() -> String:
-	return "#%d %s ₽%d [%s] seller=%s" % [id, item_name(), price, status_name(), seller]
+	return "#%d %s %d cr [%s] seller=%s" % [id, item_name(), price, status_name(), seller]
 
 func to_dict() -> Dictionary:
 	return {

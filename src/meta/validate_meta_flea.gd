@@ -60,7 +60,7 @@ func _scenario_list_escrow() -> void:
 	_check(listing != null and listing.status == FleaListing.Status.ACTIVE, "listing ACTIVE")
 	_check(listing != null and listing.seller == FleaMarket.PLAYER_SELLER, "seller is the player")
 	_check(profile.market.count_in_stash(BANDAGE) == before - 1, "escrow removed the item from the stash")
-	_check(profile.currency == currency_before - profile.flea.listing_fee(1000), "listing fee charged (₽%d)" % profile.flea.listing_fee(1000))
+	_check(profile.currency == currency_before - profile.flea.listing_fee(1000), "listing fee charged (%d cr)" % profile.flea.listing_fee(1000))
 	profile.flea.cancel(listing.id) # keep the pool clean for later scenarios
 
 func _scenario_list_refusals() -> void:
@@ -99,7 +99,7 @@ func _scenario_buy_npc() -> void:
 	var stash_before := profile.stash.count_items()
 	var r := profile.flea.buy(target.id)
 	_check(r.get("ok", false), "buy ok (%s)" % r.get("reason", ""))
-	_check(profile.currency == currency_before - target.price, "currency debited (₽%d)" % target.price)
+	_check(profile.currency == currency_before - target.price, "currency debited (%d cr)" % target.price)
 	_check(profile.stash.count_items() == stash_before + 1, "item delivered to the stash")
 	_check(target.status == FleaListing.Status.SOLD, "listing SOLD")
 	var again := profile.flea.buy(target.id)
@@ -140,7 +140,7 @@ func _scenario_fair_price_sale() -> void:
 	service.bind_carrier(eq, bag)
 	service.resolve_raid(Raid.Outcome.SURVIVED, 0) # resolves -> flea clock ticks
 	_check(listing.status == FleaListing.Status.SOLD, "fair listing SOLD on raid resolve")
-	_check(profile.currency > currency_before, "seller credited ₽%d" % listing.price)
+	_check(profile.currency > currency_before, "seller credited %d cr" % listing.price)
 
 ## Exercises the MetaService (autoload) wrappers the arena/HUD will call.
 func _scenario_service_api() -> void:

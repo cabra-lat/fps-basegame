@@ -102,7 +102,7 @@ func list_from_stash(path: String, price: int) -> Dictionary:
 		return _no("item nao encontrado no stash")
 	var fee := listing_fee(price)
 	if not TradeOps.can_afford(profile, fee):
-		return _no("saldo insuficiente para a taxa (₽%d)" % fee)
+		return _no("saldo insuficiente para a taxa (%d cr)" % fee)
 	var item := TradeOps.find_stash_item(profile, path)
 	if item == null:
 		return _no("item nao encontrado no stash")
@@ -123,7 +123,7 @@ func buy(listing_id: int) -> Dictionary:
 	if l.seller == PLAYER_SELLER:
 		return _no("listing proprio")
 	if not TradeOps.can_afford(profile, l.price):
-		return _no("saldo insuficiente (₽%d)" % l.price)
+		return _no("saldo insuficiente (%d cr)" % l.price)
 	var item := ItemCodec.decode_item(l.item)
 	if item == null:
 		return _no("item indisponivel")

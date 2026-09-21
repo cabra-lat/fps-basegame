@@ -7,7 +7,7 @@ extends Resource
 @export var id: String = ""
 @export var name: String = ""
 @export_multiline var description: String = ""
-@export var currency: String = "RUB"
+@export var currency: String = "CR"
 @export var offers: Array[TraderOffer] = []
 @export var loyalty: Array[TraderLoyalty] = []
 ## Stock resets every N resolved raids (simple counter; 0 = never).

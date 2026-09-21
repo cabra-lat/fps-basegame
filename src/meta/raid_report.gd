@@ -18,7 +18,7 @@ var insured: int = 0
 
 func summary() -> String:
 	if survived:
-		return "%s — %d item(ns) no stash, +%d EXP, +₽%d" % [outcome_name, gained.size(), exp, currency_delta]
+		return "%s — %d item(ns) no stash, +%d EXP, +%d cr" % [outcome_name, gained.size(), exp, currency_delta]
 	var ins := "" if insured <= 0 else ", %d segurados voltam depois" % insured
 	return "%s — %d equipamento(s) perdido(s), %d loot descartado, +%d EXP%s" % [outcome_name, lost.size(), loot_discarded, exp, ins]
 

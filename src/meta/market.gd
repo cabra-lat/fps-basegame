@@ -140,7 +140,7 @@ func can_buy(id: String, index: int) -> Dictionary:
 			if count_in_stash(String(path)) < int(offer.barter_required[path]):
 				return _no("barter insuficiente (%s)" % _short_name(String(path)))
 	if offer.buy_price > 0 and profile != null and profile.currency < offer.buy_price:
-		return _no("saldo insuficiente (₽%d)" % offer.buy_price)
+		return _no("saldo insuficiente (%d cr)" % offer.buy_price)
 	return {"ok": true, "reason": ""}
 
 func buy(id: String, index: int) -> Dictionary:

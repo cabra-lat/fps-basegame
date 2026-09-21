@@ -29,7 +29,7 @@ func display_title() -> String:
 func reward_text() -> String:
 	var parts: Array[String] = []
 	if reward_currency > 0:
-		parts.append("₽%d" % reward_currency)
+		parts.append("%d cr" % reward_currency)
 	if reward_exp > 0:
 		parts.append("%d EXP" % reward_exp)
 	if not reward_items.is_empty():

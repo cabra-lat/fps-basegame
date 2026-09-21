@@ -30,12 +30,12 @@ func price_text() -> String:
 		var parts: Array[String] = []
 		for path in barter_required:
 			parts.append("%d x %s" % [int(barter_required[path]), _short_name(String(path))])
-		var extra := "" if buy_price <= 0 else " + ₽%d" % buy_price
+		var extra := "" if buy_price <= 0 else " + %d cr" % buy_price
 		return " + ".join(parts) + extra
-	return "₽%d" % buy_price
+	return "%d cr" % buy_price
 
 func sell_text() -> String:
-	return "—" if sell_price <= 0 else "₽%d" % sell_price
+	return "—" if sell_price <= 0 else "%d cr" % sell_price
 
 func _short_name(path: String) -> String:
 	var res := load(path)
