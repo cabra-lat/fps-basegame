@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://doilsb0y284u2"
-path="res://.godot/imported/Beretta M9.fbx-9613fe46c45c385d9de3f0cc2f02e5cb.scn"
+path="res://.godot/imported/pistol_9mm.fbx-9613fe46c45c385d9de3f0cc2f02e5cb.scn"
 
 [deps]
 
-source_file="res://assets/models/weapon_pistol/Beretta M9.fbx"
-dest_files=["res://.godot/imported/Beretta M9.fbx-9613fe46c45c385d9de3f0cc2f02e5cb.scn"]
+source_file="res://assets/models/weapon_pistol/pistol_9mm.fbx"
+dest_files=["res://.godot/imported/pistol_9mm.fbx-9613fe46c45c385d9de3f0cc2f02e5cb.scn"]
 
 [params]
 

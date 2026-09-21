@@ -1,7 +1,7 @@
 [gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://cylerqk5k7ni6"]
 
 [ext_resource type="Shader" uid="uid://dje55noqqcouo" path="res://shaders/psx/psx_lit.gdshader" id="1_vwaiu"]
-[ext_resource type="Texture2D" uid="uid://dnv42nprel87" path="res://assets/models/weapon_pistol/beretta_m9.png" id="2_d5q1q"]
+[ext_resource type="Texture2D" uid="uid://dnv42nprel87" path="res://assets/models/weapon_pistol/pistol_9mm_albedo.png" id="2_d5q1q"]
 
 [resource]
 render_priority = 0

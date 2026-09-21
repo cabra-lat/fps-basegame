@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dnv42nprel87"
-path.s3tc="res://.godot/imported/beretta_m9.png-ee31a52487357fd767700c56da656854.s3tc.ctex"
+path.s3tc="res://.godot/imported/pistol_9mm_albedo.png-ee31a52487357fd767700c56da656854.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/models/weapon_pistol/beretta_m9.png"
-dest_files=["res://.godot/imported/beretta_m9.png-ee31a52487357fd767700c56da656854.s3tc.ctex"]
+source_file="res://assets/models/weapon_pistol/pistol_9mm_albedo.png"
+dest_files=["res://.godot/imported/pistol_9mm_albedo.png-ee31a52487357fd767700c56da656854.s3tc.ctex"]
 
 [params]
 
