@@ -7,7 +7,7 @@ extends Node
 @onready var ammo: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
 @onready var weapon: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
 #@onready var ammo: Ammo = preload("res://resources/ammo/7_62_51mm_DM111_VPAM_PM7.tres")
-#@onready var weapon: Weapon = preload("res://resources/weapons/IMBEL_AGLC.tres")
+#@onready var weapon: Weapon = preload("res://resources/weapons/Brazil_556.tres")
 @onready var player: PlayerController = $Player
 # END DEV/DEBUG
 
