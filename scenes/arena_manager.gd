@@ -725,10 +725,21 @@ func _spawn_bot(at: Vector3, team: int) -> void:
 	_bot_seq += 1
 	var bot := BotScene.instantiate() as NpcBot
 	bot.name = "Bot%d" % _bot_seq
+	# Position BEFORE add_child (npc-body's fix, applied to the arena too): adding
+	# the bot first leaves it at the arena origin for the rest of the frame, and a
+	# body that exists at the origin can be thrown up by the floor's depenetration
+	# instead of landing on its spawn point. They proved the direction in
+	# NpcWaveSpawner (2 bots at one point: 2/2 launched; positioned before
+	# add_child: lands at y=0.001 - commit 6d7fce4).
+	# HONEST LIMIT (measured): in the ARENA path I could not reproduce that
+	# difference - the gate's mid-raid spawn passes with either order (18/18 both
+	# ways), so here this is defence-in-depth, not a measured arena fix. The arena
+	# root sits at the origin, so to_local() is a no-op today and stays correct if
+	# the root is ever moved.
+	bot.position = to_local(at)
 	add_child(bot)
 	bot.set_meta("id", _bot_seq)
 	bot.set_meta("team", team)
-	bot.global_position = at
 	# Fase 1 tuning: melee dummies, gentle enough to learn the loop.
 	bot.attack_energy = 12.0
 	# Patrol the full arena; chase/attack logic lives in the bot.

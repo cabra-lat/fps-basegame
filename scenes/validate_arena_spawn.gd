@@ -35,6 +35,9 @@ const MIN_SEPARATION := 0.7
 ## Long enough for a launched body to be well above the floor (npc-body measured
 ## y~100 at 120 frames); a clean spawn stays at ~0 m.
 const FLOOR_FRAMES := 130
+## A spawn that happens while the raid is RUNNING (not from _ready) is the case
+## that used to stack the bots on the arena origin, inside the floor.
+const MID_RUN_FRAME := 30
 const FLOOR_Y := 3.0
 
 const SPAWN_POINTS: Array[Vector3] = [
@@ -45,6 +48,7 @@ var v: ValidateUtil
 var _arena
 var _frame := 0
 var _done := false
+var _mid_run_names: Array[String] = []
 
 
 func _initialize() -> void:
@@ -66,9 +70,13 @@ func _process(_delta: float) -> bool:
 		_check_bot_spawns()
 		_check_current_weapon()
 		return false
+	if _frame == MID_RUN_FRAME:
+		_spawn_mid_raid()
+		return false
 	if _frame >= FLOOR_FRAMES:
 		_done = true
 		_check_nobody_launched()
+		_check_mid_raid_bots_landed()
 		quit(v.finish())
 		return true
 	return false
@@ -165,7 +173,32 @@ func _check_current_weapon() -> void:
 	v.check(String(_arena.get("active_slot")) == "", "the arena's active_slot is empty after the drop")
 
 
-# ─── HELPERS ────────────────────────────────────────
+## A spawn while the raid is RUNNING (not from _ready), which is the shape the
+## wave spawner uses. HONEST LIMIT (measured): this does NOT discriminate the
+## racy order (add_child then move) from the fixed one (move then add_child) in
+## the ARENA path - both give 18/18 PASS - so it is a regression GUARD ("a
+## mid-raid spawn ends up on the floor"), not a proof of the spawn race.
+## npc-body's scenario in NpcWaveSpawner is where the order did matter.
+func _spawn_mid_raid() -> void:
+	v.section("[arena: mid-raid spawn race]")
+	for i in range(2):
+		var seq: int = int(_arena.get("_bot_seq")) + 1
+		var team: int = _arena.game_mode.assign_team(900 + i)
+		_arena._spawn_bot(_arena._free_spawn(team), team)
+		_mid_run_names.append("Bot%d" % seq)
+
+
+func _check_mid_raid_bots_landed() -> void:
+	v.check(_mid_run_names.size() == 2, "spawned %d bot(s) mid-raid (the race scenario)" % _mid_run_names.size())
+	for bot_name in _mid_run_names:
+		var bot := _arena.get_node_or_null(NodePath(bot_name)) as CharacterBody3D
+		v.check(bot != null and bot.global_position.y <= FLOOR_Y and bot.is_on_floor(),
+			"%s spawned mid-raid stays on the floor (y=%.2f, floor=%s)"
+			% [bot_name, bot.global_position.y if bot != null else -999.0,
+				str(bot.is_on_floor()) if bot != null else "missing"])
+
+
+# ─── HELPERS ───
 
 func _bots() -> Array:
 	return get_nodes_in_group("bots")
