@@ -127,7 +127,12 @@ sequence is: `set_active_role(r)` (PREP-only, performs the §3 swap) → existin
 `prepare_raid()` → `raid.begin()`. No new scene, no new menu, and `ExtractionPoint.can_use()`
 keeps working because `faction` is the active role.
 
-## 6. Blocking finding: a version bump would eat existing saves
+## 6. Blocking finding (RESOLVED 2026-09-21, `ef69f57`): a version bump would eat existing saves
+
+> ✅ **Resolved.** `VERSION` is now 2 and `ProfileStore` **migrates** an older save instead of
+> quarantining it (`MetaProfile.migrate()` + `_migrate_1_to_2()`), with the permanent gate
+> `INV-12c` guarding the direction "a migratable save is never quarantined". The section below is
+> kept as the reasoning that forced the change.
 
 `ProfileStore.load_profile()` quarantines **any** `version != MetaProfile.VERSION`
 (`profile_store.gd:53-57`) — it does not migrate. Today that is a *safe* default (unknown
