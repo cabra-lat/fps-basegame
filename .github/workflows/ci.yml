@@ -65,7 +65,7 @@ jobs:
       # Replaces the old per-harness steps AND the old import-only "parse gate"
       # (which could never fail: `godot --import` exits 0 on a broken script).
       # verify-all runs: import+check_scripts (parse), validate_assets,
-      # validate_tarkov_ballistics, validate_weapon_mechanics, the three
+      # validate_ballistics, validate_weapon_mechanics, the three
       # validate_meta_* harnesses, validate_invariants (cross-system regression
       # probes promoted from *_tmp.gd), and the qa quality audit (BLOCKER hard).
       - name: verify-all
