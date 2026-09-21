@@ -257,25 +257,29 @@ gate_uid_tracking() {
 }
 
 # ─── HARNESS GATE ───────────────────────────────────
-# NOTE: the truth is the EXIT CODE + the "RESULT: PASS" line. A harness log may
-# ALSO contain STARTUP errors from a script chain that names an autoload singleton
-# (e.g. "Identifier not found: Debug" -> "Failed to load script"); the harness
-# still runs and passes once the autoloads register. Do NOT turn log text into a
-# gate verdict — see the harness-hazard note in test/check_scripts.gd.
+# NOTE: the verdict is the EXIT CODE + the "RESULT: PASS" line, PLUS a scan for
+# REAL log errors: `SCRIPT ERROR` and `referenced non-existent resource` /
+# `Resource file not found` FAIL (a harness must not PASS over an error). Benign
+# text does NOT gate: `invalid UID ... using text path instead` (the resource
+# still loads) is only reported. Autoload-startup noise is also a `SCRIPT ERROR`
+# and IS gated — that is the harness-hazard in test/check_scripts.gd: a runner
+# that names an autoload-dependent class is a harness bug to fix.
 gate_harness() { # name script
-  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1 lerr luid
+  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1 lerr lse luid
   while :; do
     "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
     rc=$?
     n="$(count_checks "$log")"
-    # A harness can print RESULT: PASS while its log shows a LOAD error — a false
-    # green (range, 2026-09-21: `validate_assets` PASSed with a non-existent
-    # resource in its log). Fail on the SEVERE patterns. `invalid UID ... using
-    # text path instead` is a WARNING (the resource still loads via the text
-    # path), so it is reported but does NOT gate.
+    # A harness must not PASS over a REAL log error (gate honesty):
+    #   - `SCRIPT ERROR` (incl. a script chain that names an autoload -> the
+    #     harness-hazard in check_scripts.gd; that is a harness bug to fix);
+    #   - `referenced non-existent resource` / `Resource file not found`.
+    # Benign text does NOT gate: `invalid UID ... using text path instead` (the
+    # resource still loads) is only reported in the PASS detail.
     lerr="$(grep -cE 'referenced non-existent resource|Resource file not found' "$log")"
+    lse="$(grep -cE 'SCRIPT ERROR' "$log")"
     luid="$(grep -cE 'invalid UID' "$log")"
-    if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log" && [ "$lerr" -eq 0 ]; then
+    if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log" && [ "$lerr" -eq 0 ] && [ "$lse" -eq 0 ]; then
       if [ "$attempt" -eq 1 ]; then
         record "$name" "PASS" "$n checks$([ "$luid" -gt 0 ] && printf ' (%d invalid-UID warning(s))' "$luid")"
       else
@@ -284,8 +288,8 @@ gate_harness() { # name script
       return
     fi
     if [ "$attempt" -ge 2 ]; then
-      if [ "$lerr" -gt 0 ]; then
-        record "$name" "FAIL" "$n checks but $lerr load error(s) in the log — a harness must not PASS over a missing resource (see $log)"
+      if [ "$lerr" -gt 0 ] || [ "$lse" -gt 0 ]; then
+        record "$name" "FAIL" "$n checks but $((lerr + lse)) log error(s) ($lerr load, $lse script) — a harness must not PASS over an error (see $log)"
       else
         record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
       fi
@@ -297,7 +301,7 @@ gate_harness() { # name script
     # .godot/global_script_class_cache.cfg mid-run, which makes every harness that
     # names a global class fail with "Identifier X not declared" — a FALSE red.
     # A real regression still fails on the retry.
-    echo "verify-all: $name failed (rc=$rc, load_errors=$lerr) — re-import + retry once (transient .godot race?)" >&2
+    echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — re-import + retry once (transient .godot race?)" >&2
     "$GODOT_BIN" --headless --path . --import >"$LOG_DIR/reimport.$name.log" 2>&1
     attempt=$((attempt + 1))
   done
