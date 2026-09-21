@@ -5,6 +5,11 @@ extends CanvasLayer
 ## TIMED action (ACTION_TIME) — you are vulnerable while the work is done, the
 ## raid keeps running. Operates on the live equipped Weapon; the Meta layer
 ## persists it (ItemCodec encodes mounted attachments) on extraction.
+##
+## SINGLE ENTRY POINT: `open_for_weapon(w)`, driven by the inventory context menu
+## ("Modificar" on a weapon item -> player-rig hook -> the arena). There is
+## deliberately no "open whatever is equipped" path and no pause-menu screen:
+## opening without an item showed a weapon the player had not picked.
 
 signal closed
 
@@ -25,7 +30,6 @@ const MOUNT_NAMES := {
 # A hardcoded name->scene map meant an attachment with a resource but no entry
 # silently showed no model (the "attachments have no model" report).
 
-var player: PlayerController
 var audio: GameAudio
 var weapon: Weapon
 
@@ -42,8 +46,7 @@ var _pending: Array = [] # [{kind:"attach"/"detach", point:int, att:Attachment}]
 var _active: Dictionary = {}
 var _t := 0.0
 
-func bind(p_player: PlayerController, p_audio: GameAudio) -> void:
-	player = p_player
+func bind(p_audio: GameAudio) -> void:
 	audio = p_audio
 
 func _ready() -> void:
@@ -54,11 +57,8 @@ func _ready() -> void:
 func is_open() -> bool:
 	return visible
 
-func open() -> void:
-	open_for_weapon(player.current_weapon if player != null else null)
-
-## Primary entry: the inventory will ask for a specific weapon item to be
-## edited (player-rig hook). M opens for the currently equipped weapon.
+## The one entry point: the inventory asks for a specific weapon item to be
+## edited (player-rig hook). A null weapon is a no-op — never "open anyway".
 func open_for_weapon(w: Weapon) -> void:
 	if w == null:
 		return
@@ -74,12 +74,6 @@ func close() -> void:
 	_active = {}
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	closed.emit()
-
-func toggle() -> void:
-	if visible:
-		close()
-	else:
-		open()
 
 # ─── BUILD ───
 

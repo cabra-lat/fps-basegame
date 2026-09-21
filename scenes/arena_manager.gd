@@ -97,7 +97,7 @@ func _ready() -> void:
 	gunsmith = GunsmithUI.new()
 	gunsmith.name = "GunsmithUI"
 	add_child(gunsmith)
-	gunsmith.bind(player, audio)
+	gunsmith.bind(audio)
 	# Primary entry (player-rig hook): inventory -> click weapon -> Modificar.
 	# Defensive: connected only once the addon exposes the signal.
 	if player.has_signal("weapon_modify_requested"):
@@ -110,7 +110,7 @@ func _ready() -> void:
 	_spawn_bots()
 	_spawn_medical_pickups()
 	_push_feed("%s — %d bots" % [game_mode.mode_name, BOT_COUNT])
-	_refresh_top("WASD - 1/2 troca arma - G drop - E pega - H medico - M mods - R reload - Esc pausa")
+	_refresh_top("WASD - 1/2 troca arma - G drop - E pega - H medico - R reload - Esc pausa")
 	if OS.is_debug_build(): print("ARENA READY: %s + %s, mode=%s teams=%d, bots=%d, raid=%.0fs extracts=%d, ray_excludes=%d" % [_slot_weapon("primary").name if _slot_weapon("primary") else "none", _slot_weapon("secondary").name if _slot_weapon("secondary") else "none", game_mode.mode_name, game_mode.team_count, get_tree().get_nodes_in_group("bots").size(), RAID_DURATION, get_tree().get_nodes_in_group("extraction_points").size(), _shot_excludes().size()])
 
 ## Pick the mode (exported wins; else SettingsStore) and inject spawn points.
@@ -335,9 +335,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_pause()
 		return
 	if get_tree().paused:
-		return
-	if event.is_action_pressed("mod_weapon"):
-		gunsmith.open()
 		return
 	if event.is_action_pressed("weapon_slot1"):
 		_intents.append(["slot", "primary"])
@@ -1218,11 +1215,6 @@ func _build_pause() -> void:
 	btn_cont.pressed.connect(_on_pause_continue)
 	btn_cont.pressed.connect(audio.play_ui)
 	box.add_child(btn_cont)
-	var btn_mod := Button.new()
-	btn_mod.text = "Gunsmith (M)"
-	btn_mod.pressed.connect(_on_pause_gunsmith)
-	btn_mod.pressed.connect(audio.play_ui)
-	box.add_child(btn_mod)
 	var btn_restart := Button.new()
 	btn_restart.text = "Reiniciar"
 	btn_restart.pressed.connect(_on_pause_restart)
@@ -1250,13 +1242,6 @@ func _toggle_pause() -> void:
 
 func _on_pause_continue() -> void:
 	_toggle_pause()
-
-func _on_pause_gunsmith() -> void:
-	# Leave pause, then open the (mouse-driven) gunsmith over the running raid.
-	get_tree().paused = false
-	if pause_panel != null:
-		pause_panel.visible = false
-	gunsmith.open()
 
 ## Inventory "Modificar" (inventory-ux -> player-rig) -> edit that weapon.
 ## Order matters: close the inventory first (it recaptures the mouse), THEN
