@@ -691,8 +691,11 @@ func _die(_cause: String = "") -> void:
 	_despawn_t = despawn_delay
 	_fall_t = 0.0
 	velocity = Vector3.ZERO
+	# Corpse: stop being a target (layer 0) but KEEP the mask, because
+	# `_tick_death` still runs `move_and_slide` — with the mask zeroed the body
+	# found no floor and sank through the arena (measured y 0 -> -3.475 in
+	# ~0.4 s by the spotter's strip).
 	set_collision_layer(0)
-	set_collision_mask(0)
 	# Corpse keeps its last pose: freeze the clip instead of letting it keep
 	# playing while the body is dragged down by the fall tilt.
 	if _rig != null:
