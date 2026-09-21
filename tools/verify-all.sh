@@ -131,7 +131,7 @@ count_checks() { # logfile -> prints a check count or "?"
 #       "parse gate" that could never fail.
 CHECK_SCRIPTS_SCRIPT="res://addons/cabra.lat_shooters/test/check_scripts.gd"
 gate_import() {
-  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1
+  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1 loop_hits
   # Contention guard: other lanes call `godot --import` DIRECTLY (our per-repo flock
   # does NOT cover them), and concurrent imports on the shared .godot/ can hang
   # forever on a locked/stale file (verifier: `reimport | pistol_9mm_albedo.png`
@@ -148,6 +148,16 @@ gate_import() {
       "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
     fi
     [ "$rc" -ne 124 ] && break
+    # Distinguish a CONTENTION hang from a STALE-CACHE RETRY LOOP: the latter
+    # repeats the same UID reimport endlessly (`.godot/editor/filesystem_cache10`
+    # pointing at a deleted asset — range/verifier 2026-09-21). A SINGLE occurrence
+    # is benign (Godot falls back to `path=`), so trigger on REPETITION only.
+    loop_hits="$(grep -cE 'during file reimport|Unrecognized UID' "$ilog")"
+    if [ "$loop_hits" -gt 50 ]; then
+      record "import/parse" "FAIL" "import TIMED OUT in a STALE-CACHE RETRY LOOP ($loop_hits repeated reimport lines) — fix: rm -f .godot/uid_cache.bin .godot/editor/filesystem_cache10 && tools/godot-lock.sh --headless --path . --import (see $ilog)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
+    fi
     if [ "$attempt" -ge 2 ]; then
       record "import/parse" "FAIL" "import TIMED OUT (300s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
       HARD_FAILS=$((HARD_FAILS + 1))
