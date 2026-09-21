@@ -206,7 +206,10 @@ static func _decode_feed_item(d: Dictionary) -> InventoryItem:
 
 static func _decode_container(d: Dictionary) -> InventoryItem:
 	var path := String(d.get("path", ""))
-	var base := load(path)
+	# An encoded container may legitimately carry no base path (a bare Backpack built
+	# at runtime). load("") logs `Resource file not found: res://` + a backtrace, which
+	# reads like a real failure; skip the load and fall through to Backpack.new().
+	var base: Resource = load(path) if path != "" else null
 	var cont: InventoryContainer
 	if base is InventoryContainer:
 		cont = (base as InventoryContainer).duplicate(true)
@@ -242,6 +245,8 @@ static func _build_feed(fd: Dictionary) -> AmmoFeed:
 
 static func _resolve_round(r) -> Ammo:
 	if r is String:
+		if String(r) == "":
+			return null
 		return load(String(r)) as Ammo
 	if not (r is Dictionary):
 		return null
@@ -258,6 +263,8 @@ static func _resolve_round(r) -> Ammo:
 ## isolated per item by duplicating stateful resources; the original path is
 ## tagged as `base_path` so re-encoding survives the lost `resource_path`.
 static func item_from_path(path: String, stack_count: int = 1) -> InventoryItem:
+	if path == "":
+		return null
 	var res := load(path)
 	if res == null or not (res is Item):
 		push_warning("ItemCodec: item_from_path failed: %s" % path)
