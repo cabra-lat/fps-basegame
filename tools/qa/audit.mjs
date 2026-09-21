@@ -97,6 +97,49 @@ const IP_NAMES = [
   { re: /\bTarkov\b/, label: 'Tarkov', ambiguous: true, generic: true },
 ];
 
+// Real firearm / accessory manufacturer + product names. NOT commercial-game
+// proper nouns, but AGENTS.md requires shipped item/resource names to be neutral
+// placeholders invented here, and a public repo must not ship real brands in
+// resource names, filenames or player-facing strings. `ambiguous: true` terms
+// are common words/surnames matched case-SENSITIVELY to cut false positives.
+// NOTE: boundaries use lookarounds that treat `_`/`-`/`.` as separators, NOT
+// `\b` — in `Vortex_Razor`, `weapons_fn_fal.png` or `beretta_m9` the `_` is a
+// word char, so `\bBrand\b` would MISS the brand entirely.
+const B0 = '(?<![A-Za-z0-9])';
+const B1 = '(?![A-Za-z0-9])';
+const brand = (word, extra = {}) => ({ re: new RegExp(`${B0}${word}${B1}`, 'i'), label: word, brand: true, ...extra });
+const brandCS = (word, extra = {}) => ({ re: new RegExp(`${B0}${word}${B1}`), label: word, brand: true, ambiguous: true, ...extra });
+const IP_BRANDS = [
+  brand('Glock'),
+  brand('Magpul'),
+  brandCS('Surefire'),
+  brand('Aimpoint'),
+  brand('EOTech'),
+  brandCS('Vortex'),
+  brand('Steiner'),
+  brandCS('Harris'),
+  brandCS('BCM'),
+  brand('JP Enterprises'),
+  brand('Trijicon'),
+  brandCS('ACOG'),
+  brand('Imbel'),
+  brandCS('FN'),
+  brandCS('HK'),
+  brand('Uzi'),
+  brand('Saiga'),
+  brand('Desert Eagle'),
+  brand('Remington'),
+  brand('Mossberg'),
+  brand('Barrett'),
+  brandCS('Colt'),
+  brand('Beretta'),
+  brandCS('Taurus'),
+  brand('Rossi'),
+  brand('Kalashnikov'),
+  brand('Izhmash'),
+  brand('Dragunov'),
+];
+
 // Paths that may legitimately cite sources / carry research names.
 function isIpExempt(rel) {
   return rel.startsWith('docs/') || rel.endsWith('.md') || rel.startsWith('../tarkov-wiki');
@@ -780,11 +823,36 @@ function checkIpNames() {
   const findings = [];
   const roots = ['resources', 'src', 'scenes', 'addons/cabra.lat_shooters/src'];
   const files = [join(ROOT, 'project.godot')];
+  const pathFiles = [];
   for (const r of roots) {
     for (const full of walk(join(ROOT, r))) {
+      pathFiles.push(full);
       if (/\.(gd|tscn|tres|cfg|godot|txt|json)$/.test(full)) files.push(full);
     }
   }
+  // Shipped art/models carry brand names in their filenames too; content is
+  // binary so only the path is scanned. `.import`/`.uid` are generated metadata
+  // next to the real file -> skipped to avoid duplicate findings.
+  for (const full of walk(join(ROOT, 'assets'))) pathFiles.push(full);
+
+  // (a) brand in a shipped FILENAME. A resource/scene filename IS the resource
+  // name -> BLOCKER; a script/art filename -> MAJOR (identity-rule severity).
+  for (const full of pathFiles) {
+    const rel = relative(ROOT, full);
+    if (isIpExempt(rel) || /\.(import|uid)$/.test(rel)) continue;
+    for (const term of IP_BRANDS) {
+      if (term.re.global) term.re.lastIndex = 0;
+      if (!term.re.test(rel)) continue;
+      findings.push({
+        severity: /\.(tres|tscn)$/.test(rel) ? 'BLOCKER' : 'MAJOR',
+        rule: 'ip-name', file: rel, line: 1,
+        message: `real firearm/accessory brand "${term.label}" in a shipped filename (neutral-placeholder rule)`,
+        evidence: 'in path',
+      });
+    }
+  }
+
+  // (b) content scan (game names + brands) over text files.
   const tarkovByFile = new Map();
   for (const full of files) {
     const rel = relative(ROOT, full);
@@ -793,20 +861,26 @@ function checkIpNames() {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const isComment = rel.endsWith('.gd') && /^\s*#/.test(line);
-      for (const term of IP_NAMES) {
+      // Blank out packed binary arrays (vertex/mesh blobs) — short brand tokens
+      // like HK/FN/BCM match random base64 data otherwise (false positive).
+      const scanLine = line.replace(/Packed\w+Array\("[^"]*"\)/g, 'PackedArray("")');
+      for (const term of IP_NAMES.concat(IP_BRANDS)) {
         if (term.re.global) term.re.lastIndex = 0;
-        if (!term.re.test(line)) continue;
+        if (!term.re.test(scanLine)) continue;
         if (term.generic) {
           tarkovByFile.set(rel, (tarkovByFile.get(rel) || []).concat(i + 1));
           continue;
         }
-        const nameCtx = /\b(name|id|title|label)\s*=\s*"/.test(line);
-        const uiCtx = /\b(text|placeholder_text|tooltip_text|display_name)\s*=/.test(line)
-          || /set_text\s*\(|_set_center\s*\(|\.text\s*=/.test(line);
+        const nameCtx = /"?\b(name|id|title|label)\b"?\s*[:=]\s*"/.test(scanLine);
+        const uiCtx = /\b(text|placeholder_text|tooltip_text|display_name)\s*=/.test(scanLine)
+          || /set_text\s*\(|_set_center\s*\(|\.text\s*=/.test(scanLine);
         const sev = term.alwaysBlocker || nameCtx || uiCtx ? 'BLOCKER' : 'MAJOR';
+        const what = term.brand
+          ? `real firearm/accessory brand "${term.label}" (neutral-placeholder rule)`
+          : `commercial-game proper noun "${term.label}" (Identity rule)`;
         findings.push({
           severity: sev, rule: 'ip-name', file: rel, line: i + 1,
-          message: `commercial-game proper noun "${term.label}" (Identity rule)`,
+          message: what,
           evidence: isComment ? 'in comment' : 'in code/string',
         });
       }
@@ -1027,7 +1101,7 @@ function renderReport(findings, scans, importGate, dupes, manualStats, ignoreRes
   L.push('- **Indentation is split by repo, not messy per file.** The addon (`addons/`) is dominantly **4-space**; the game repo (`src/`, `scenes/`) is dominantly **tab**. No shipped file mixes both styles (see census). Proposed rule: keep the addon at 4 spaces and the game repo at tabs; do **not** mass-rewrite either.');
   L.push('- Debug `print()` is forbidden in shipping paths (`src/`, `scenes/`, addon `src/`); test harnesses (`validate_*.gd`, `test/`) may print. Prints on, or inside, an `if OS.is_debug_build():` guard are debug-only and are **not** counted as `debug-print` findings.');
   L.push('- **Dead-API triage (three classes).** `morto-real` = a value-returning function, computed property or field that exists and is never consumed -> **MAJOR debt** (`unused-func`, `unused-field`, `dead-api`). `consumidor-pendente` = a void hook/API with no caller yet -> **NIT, informational, not debt** (`pending-consumer`). `falso-positivo-de-scan` = the matcher missed a real caller -> **tool bug, never counted**. The caller matcher covers `<inst>.<name>(`, `.<name>.connect(`, `.tscn`/`.tres` signal connections and properties, and `Callable("<name>")` strings.');
-  L.push('- **Identity rule (AGENTS.md):** `ip-name` / `ip-tarkov` scan shipped code+resources for commercial-game proper nouns. Technical standards and authors (GOST, NIJ, VPAM, STANAG, RHA, HIC, Recht-Ipson, Poncelet) are public references and are NOT findings, and `docs/**` may cite sources. A proper noun in a resource `name` or player-facing string is a BLOCKER; elsewhere MAJOR.');
+  L.push('- **Identity rule (AGENTS.md):** `ip-name` / `ip-tarkov` scan shipped code+resources for commercial-game proper nouns AND real firearm/accessory brands (`IP_BRANDS`: Glock, Magpul, Surefire, Aimpoint, EOTech, Vortex, Trijicon/ACOG, Beretta, Remington, Barrett, Colt, FN, HK, Kalashnikov, ...). Brands are matched in file contents AND in shipped filenames (`assets/**` included) so a branded `.tres`/`.png`/`.glb` cannot regress. Technical standards and authors (GOST, NIJ, VPAM, STANAG, RHA, HIC, Recht-Ipson, Poncelet) are public references and are NOT findings, and `docs/**` may cite sources. A proper noun/brand in a resource `name`, a `.tres`/`.tscn` filename, or a player-facing string is a BLOCKER; elsewhere (scripts, art filenames) MAJOR.');
   L.push('- **Reference integrity:** `broken-ref` reports `res://` paths that do not exist (latent export/shader failure); `case-mismatch` reports names that only exist with different case (case-sensitive export breakage).');
   L.push('- Contract checks a static tool cannot prove (rule 4 physics queries in `_physics_process`; rule 5 held items never simulated) are hand-reviewed in `tools/qa/manual-findings.json` and merged into the Findings table above (they carry an Owner and a `QA-NNN` id in the evidence).');
   L.push('- CI: `node tools/qa/audit.mjs --check` exits 1 on any BLOCKER and 2 when MAJOR rises above `docs/qa-baseline.json`; `--update-baseline` re-snapshots.');
