@@ -13,16 +13,17 @@
 #   5. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
 #   6. inventory_ux        test/validate_inventory_ux.gd        (hard)
 #   7. factions            scenes/validate_factions.gd          (hard)
-#   8. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
-#   9. meta_progression    src/meta/validate_meta_progression.gd (hard)
-#  10. meta_market         src/meta/validate_meta_market.gd     (hard)
-#  11. meta_flea           src/meta/validate_meta_flea.gd       (hard)
-#  12. invariants          test/validate_invariants.gd          (hard; cross-system
+#   8. gunsmith_preview    scenes/validate_gunsmith_preview.gd   (hard)
+#   9. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
+#  10. meta_progression    src/meta/validate_meta_progression.gd (hard)
+#  11. meta_market         src/meta/validate_meta_market.gd     (hard)
+#  12. meta_flea           src/meta/validate_meta_flea.gd       (hard)
+#  13. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#  13. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  14. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  14. export              optional, --with-export only (SKIP if no templates)
+#  15. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -262,21 +263,32 @@ gate_uid_tracking() {
 # still runs and passes once the autoloads register. Do NOT turn log text into a
 # gate verdict — see the harness-hazard note in test/check_scripts.gd.
 gate_harness() { # name script
-  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1
+  local name="$1" script="$2" log="$LOG_DIR/$1.log" rc n attempt=1 lerr luid
   while :; do
     "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1
     rc=$?
     n="$(count_checks "$log")"
-    if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log"; then
+    # A harness can print RESULT: PASS while its log shows a LOAD error — a false
+    # green (range, 2026-09-21: `validate_assets` PASSed with a non-existent
+    # resource in its log). Fail on the SEVERE patterns. `invalid UID ... using
+    # text path instead` is a WARNING (the resource still loads via the text
+    # path), so it is reported but does NOT gate.
+    lerr="$(grep -cE 'referenced non-existent resource|Resource file not found' "$log")"
+    luid="$(grep -cE 'invalid UID' "$log")"
+    if [ "$rc" -eq 0 ] && grep -qE 'RESULT: PASS' "$log" && [ "$lerr" -eq 0 ]; then
       if [ "$attempt" -eq 1 ]; then
-        record "$name" "PASS" "$n checks"
+        record "$name" "PASS" "$n checks$([ "$luid" -gt 0 ] && printf ' (%d invalid-UID warning(s))' "$luid")"
       else
         record "$name" "PASS" "$n checks (retried after re-import: transient .godot cache race)"
       fi
       return
     fi
     if [ "$attempt" -ge 2 ]; then
-      record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
+      if [ "$lerr" -gt 0 ]; then
+        record "$name" "FAIL" "$n checks but $lerr load error(s) in the log — a harness must not PASS over a missing resource (see $log)"
+      else
+        record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
+      fi
       HARD_FAILS=$((HARD_FAILS + 1))
       return
     fi
@@ -285,7 +297,7 @@ gate_harness() { # name script
     # .godot/global_script_class_cache.cfg mid-run, which makes every harness that
     # names a global class fail with "Identifier X not declared" — a FALSE red.
     # A real regression still fails on the retry.
-    echo "verify-all: $name failed (rc=$rc) — re-import + retry once (transient .godot race?)" >&2
+    echo "verify-all: $name failed (rc=$rc, load_errors=$lerr) — re-import + retry once (transient .godot race?)" >&2
     "$GODOT_BIN" --headless --path . --import >"$LOG_DIR/reimport.$name.log" 2>&1
     attempt=$((attempt + 1))
   done
@@ -385,6 +397,7 @@ else
   gate_harness "meta_flea" "res://src/meta/validate_meta_flea.gd"
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
   gate_harness "factions" "res://scenes/validate_factions.gd"
+  gate_harness "gunsmith_preview" "res://scenes/validate_gunsmith_preview.gd"
   if [ "$NO_QA" -eq 1 ]; then
     record "qa_audit" "SKIP" "--no-qa"
   else
