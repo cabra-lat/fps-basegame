@@ -17,3 +17,13 @@ mono_crash.*.json
 
 addons/
 assets/models/weapon_thirty_twelve/
+
+# Local agent message queue (AMQ maildir, per-machine scratch)
+.agent-mail/
+
+# Agent Message Queue
+.agent-mail/
+.amqrc
+
+# Local Laya decision-model weights (large, fetched per-machine)
+laya-models/

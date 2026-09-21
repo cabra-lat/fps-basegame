@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "mcp": {
+    "godot": {
+      "type": "local",
+      "command": ["node", "/home/cabra.lat/documents/coding/godot/godot-mcp/dist/index.js"],
+      "enabled": true,
+      "environment": {
+        "GODOT_PROJECT_ROOT": "/home/cabra.lat/documents/coding/godot/fps-basegame",
+        "GODOT_BIN": "/home/cabra.lat/.nix-profile/bin/godot",
+        "GODOT_PATH": "/home/cabra.lat/.nix-profile/bin/godot"
+      }
+    }
+  },
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "question": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": {
+      "/tmp/shooter/**": "allow",
+      "/home/cabra.lat/documents/coding/godot/**": "allow"
+    }
+  }
+}
