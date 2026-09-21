@@ -82,11 +82,22 @@ fi
 # failures that look like code regressions.
 if [ ! -f "addons/cabra.lat_shooters/test/check_scripts.gd" ]; then
   echo "verify-all: FATAL: addons/cabra.lat_shooters is not checked out." >&2
-  echo "  The game repo has .gitmodules but NO gitlinks in HEAD, so a fresh clone" >&2
-  echo "  has no addons/ and 'git submodule update' does nothing. The parse gate and" >&2
-  echo "  every harness live in the addon, so NOTHING can be verified here." >&2
-  echo "  Fix (infra, coordinator): commit the gitlinks, or have CI clone each addon" >&2
-  echo "  at the intended ref. Nothing below can pass until then." >&2
+  echo "  The game repo has .gitmodules but NO gitlinks in HEAD, and .gitignore" >&2
+  echo "  ignores addons/, so a fresh clone has no addons/ and 'git submodule" >&2
+  echo "  update --init' is a no-op. The parse gate + every harness live in the" >&2
+  echo "  addon, so NOTHING can be verified here." >&2
+  if [ -f .gitmodules ]; then
+    echo "  Addons declared in .gitmodules  [status] path  url:" >&2
+    while read -r _key path; do
+      name="$(printf '%s' "$_key" | sed 's/^submodule\.//;s/\.path$//')"
+      url="$(git config -f .gitmodules --get "submodule.$name.url" 2>/dev/null)"
+      if [ -f "$path/.git" ] || [ -d "$path/.git" ]; then st="present"; else st="MISSING"; fi
+      printf '    [%-7s] %s  %s\n' "$st" "$path" "${url:-?}" >&2
+    done < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null)
+    echo "  To obtain (if submodules): git submodule update --init --recursive" >&2
+    echo "  (or clone each url above into its path). submodule-vs-vendored is the" >&2
+    echo "  user's decision; do not edit .gitignore/.gitmodules to force it." >&2
+  fi
   exit 1
 fi
 
@@ -175,8 +186,12 @@ gate_uid_tracking() {
       continue
     fi
     checked=$((checked + 1))
-    grep -E '\.(gd|gdshader|gdshaderinc)$' "$headf" >"$scr"
-    grep -E '\.uid$' "$headf" >"$trk"
+    # Exclude HIDDEN paths (any component starting with '.'): Godot does not scan
+    # hidden dirs, so it NEVER generates a .uid for e.g. `.opencode/**/*.gd` — the
+    # invariant would be unsatisfiable there (verifier: 152 false positives at HEAD
+    # 31a5fcc). Content roots (src, scenes, the addon, resources, tools) are kept.
+    grep -E '\.(gd|gdshader|gdshaderinc)$' "$headf" | grep -vE '(^|/)\.' >"$scr"
+    grep -E '\.uid$' "$headf" | grep -vE '(^|/)\.' >"$trk"
     n=0
     while IFS= read -r f; do
       [ -z "$f" ] && continue
