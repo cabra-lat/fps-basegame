@@ -39,6 +39,22 @@ const SCRATCH = '/tmp/shooter';
 const SCAN_DIRS = ['addons/cabra.lat_shooters/src', 'src', 'scenes'];
 const REFERENCE_EXTS = ['.gd', '.tscn', '.tres', '.godot', '.cfg'];
 
+// Full vocabulary of rule names the tool can emit (scanner + manual findings).
+// The baseline stores this so `--check` can tell a real rule-set change from a
+// rule that merely stopped/started FIRING because its findings were fixed or
+// added. Comparing the currently-firing set instead made a reappearing rule
+// (e.g. `duplication` at 0) look like a taxonomy change and excuse its MAJOR rise.
+const RULE_VOCABULARY = [
+  'broken-ref', 'case-mismatch', 'competing-truth', 'connect-leak', 'dead-api',
+  'dead-branch', 'debug-print', 'deep-nesting', 'dev-comment', 'duplicate-logic',
+  'duplicate-mass', 'duplication', 'frame-not-delta', 'god-object', 'ignored-config',
+  'indent-mixed', 'invisible-debt', 'ip-name', 'ip-tarkov', 'lambda-leak',
+  'long-function', 'mag-alias', 'magic-number', 'node-churn', 'noop-call',
+  'not-docstring', 'null-guard', 'order-of-init', 'pending-consumer', 'reused-asset',
+  'rule5-held-sim', 'signal-decay', 'signal-spam', 'silent-zero-armor', 'stale-comment',
+  'unused-field', 'unused-func', 'unused-wrong', 'write-only',
+].sort();
+
 const GOD_OBJECT_LINES = 800;
 const LONG_FUNCTION_LINES = 60;
 const DEEP_NESTING = 5;
@@ -1122,7 +1138,7 @@ function main() {
     scope: SCAN_DIRS,
     counts,
     byRule,
-    rules: Object.keys(byRule).sort(),
+    rules: RULE_VOCABULARY.slice(),
     snapshot: { files: scans.length, lines: scans.reduce((s, f) => s + f.lines, 0) },
   };
 
@@ -1156,7 +1172,7 @@ function main() {
     // A taxonomy change (new rules / new tool version) explains a MAJOR jump;
     // do not fail on an explained reclassification, only on a real regression.
     const baselineRules = (baseline?.rules || []).slice().sort();
-    const currentRules = Object.keys(byRule).sort();
+    const currentRules = RULE_VOCABULARY.slice();
     const taxonomyChanged = !baseline ||
       baseline.toolVersion !== TOOL_VERSION ||
       JSON.stringify(baselineRules) !== JSON.stringify(currentRules);
