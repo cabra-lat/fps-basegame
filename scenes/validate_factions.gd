@@ -23,8 +23,16 @@
 extends SceneTree
 
 const PACK_DIR := "res://resources/meta/factions"
+## ExtractionPoint is loaded at RUNTIME on purpose. Referencing its global class
+## name at compile time pulls the addon's PlayerController, which calls the
+## `Debug` autoload — and in `--script` mode that identifier is not registered
+## yet, so this whole harness fails to compile at startup (it recompiles later,
+## but the gate's log carries a SCRIPT ERROR and a "Failed to load script").
+## Deferring the load keeps the gate's log honest and clean.
+const EXTRACTION_POINT_PATH := "res://scenes/extraction_point.gd"
 
 var v: ValidateUtil
+var _point_script: GDScript
 
 
 func _initialize() -> void:
@@ -36,6 +44,16 @@ func _initialize() -> void:
 	_scenario_extraction_gate()
 	_scenario_legacy_and_compliance()
 	quit(v.finish())
+
+
+## Builds a real ExtractionPoint through a runtime load (see EXTRACTION_POINT_PATH).
+func _make_point(profile: PlayerProfile, registry: FactionRegistry, allowed: Array[String]) -> Variant:
+	if _point_script == null:
+		_point_script = load(EXTRACTION_POINT_PATH) as GDScript
+	var ep = _point_script.new()
+	ep.allowed_factions = allowed
+	ep.bind(profile, null, registry)
+	return ep
 
 
 # ─── [1][2] THE SHIPPED PACK ────────────────────────
@@ -99,14 +117,12 @@ func _scenario_generalizes_to_n() -> void:
 
 	# A gate restricted to THREE ids, over a five-faction pack.
 	var profile := PlayerProfile.new()
-	var ep := ExtractionPoint.new()
 	var allowed: Array[String] = ["faction_1", "faction_3", "faction_4"]
-	ep.allowed_factions = allowed
-	ep.bind(profile, null, reg)
+	var ep = _make_point(profile, reg, allowed)
 	profile.faction = "faction_3"
 	v.check(ep.can_use().get("ok", false), "restricted gate accepts a faction inside its list")
 	profile.faction = "faction_0"
-	var res := ep.can_use()
+	var res: Dictionary = ep.can_use()
 	v.check(not res.get("ok", false), "restricted gate refuses a faction outside its list")
 	v.check(String(res.get("reason", "")) == "apenas Faction 1, Faction 3, Faction 4",
 		"refusal names exactly the allowed factions (got '%s')" % String(res.get("reason", "")))
@@ -149,8 +165,7 @@ func _scenario_extraction_gate() -> void:
 	var reg := FactionRegistry.default_registry()
 	var p := PlayerProfile.new()
 
-	var open := ExtractionPoint.new()
-	open.bind(p, null, reg)
+	var open = _make_point(p, reg, [] as Array[String])
 	v.check(open.allowed_factions.is_empty(), "a fresh point defaults to open (empty list)")
 	for f in reg.all():
 		p.faction = f.id
@@ -158,17 +173,15 @@ func _scenario_extraction_gate() -> void:
 	v.check(open.faction_gate_text() == "", "an open point renders no faction restriction")
 	open.free()
 
-	var restricted := ExtractionPoint.new()
 	var allowed: Array[String] = ["contractor"]
-	restricted.allowed_factions = allowed
-	restricted.bind(p, null, reg)
+	var restricted = _make_point(p, reg, allowed)
 	p.faction = "contractor"
 	v.check(restricted.can_use().get("ok", false), "point restricted to contractor accepts contractor")
 	v.check(restricted.faction_gate_text() == "apenas Contractor",
 		"gate text is mounted from the pack (got '%s')" % restricted.faction_gate_text())
 	for blocked in ["drifter", "raider"]:
 		p.faction = blocked
-		var res := restricted.can_use()
+		var res: Dictionary = restricted.can_use()
 		v.check(not res.get("ok", false), "point restricted to contractor REFUSES '%s'" % blocked)
 		v.check(String(res.get("reason", "")) == "apenas Contractor",
 			"refusal for '%s' names the allowed faction (got '%s')" % [blocked, String(res.get("reason", ""))])
