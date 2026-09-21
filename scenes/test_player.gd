@@ -1,8 +1,6 @@
 # res://test/scenes/test_player.gd
 extends Node
 
-var can_connect_signals: bool = false
-
 # DEV/DEBUG
 #@onready var ammo: Ammo = preload("res://resources/ammo/7_62_39mm_PS_GOST_BR4.tres")
 #@onready var weapon: Weapon = preload("res://resources/weapons/AK_47.tres")

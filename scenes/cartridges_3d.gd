@@ -6,7 +6,7 @@ class_name AmmunitionDemo
 const BULLET_SHADER = "res://addons/cabra.lat_shooters/src/shaders/cartridges/cartridge.gdshader"
 
 # Font atlas configuration
-const STAMP_FONT_PATH = "res://addons/cabra.lat_shooters/asset/cartridge-font.png"
+const STAMP_FONT_PATH = "res://assets/cartridge-font.png"
 const STAMP_CONFIG = {
   "cells_per_row": 16,
   "cells_per_col": 16,
@@ -427,7 +427,6 @@ var rotation_speed: float = 1.5
 var smooth_rotation: bool = true
 
 # Performance tracking
-var frame_count: int = 0
 var last_fps_update: float = 0.0
 var current_fps: int = 0
 
@@ -680,14 +679,12 @@ func _input(event):
 
 func _process(delta):
   # Optimized FPS counter - update less frequently
-  frame_count += 1
   last_fps_update += delta
   if last_fps_update >= 0.25:  # Update 4 times per second instead of every frame
     current_fps = Engine.get_frames_per_second()
     if fps_counter_enabled and fps_label:
       fps_label.text = "FPS: %d (Casings: %d)" % [current_fps, ejected_casings.size()]
     last_fps_update = 0.0
-    frame_count = 0
 
   # Handle continuous camera movement
   handle_camera_movement(delta)

@@ -1,0 +1,328 @@
+[gd_scene format=3 uid="uid://cd64citgl7svy"]
+
+[ext_resource type="Script" uid="uid://y05iod4jl4qd" path="res://scenes/arena_manager.gd" id="1_arena"]
+[ext_resource type="PackedScene" uid="uid://ly33hk8t667t" path="res://addons/cabra.lat_shooters/src/player/scenes/player.tscn" id="2_player"]
+[ext_resource type="Environment" path="res://scenes/shared_env.tres" id="3_env"]
+[ext_resource type="Material" path="res://scenes/shared_ground_material.tres" id="4_ground"]
+[ext_resource type="Script" uid="uid://1ac4doe80ak2" path="res://scenes/extraction_point.gd" id="5_extract"]
+[ext_resource type="Script" uid="uid://7l24ptguoyif" path="res://scenes/trader_point.gd" id="6_trader"]
+
+[sub_resource type="WorldBoundaryShape3D" id="GroundShape_arena"]
+
+[sub_resource type="PlaneMesh" id="GroundMesh_arena"]
+material = ExtResource("4_ground")
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="CoverShapeA_arena"]
+size = Vector3(4, 2, 1)
+
+[sub_resource type="StandardMaterial3D" id="CoverMat_arena"]
+albedo_color = Color(0.55, 0.5, 0.42, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="CoverMeshA_arena"]
+material = SubResource("CoverMat_arena")
+size = Vector3(4, 2, 1)
+
+[sub_resource type="BoxShape3D" id="CoverShapeWallNS_arena"]
+size = Vector3(6, 3, 1)
+
+[sub_resource type="BoxMesh" id="CoverMeshWallNS_arena"]
+material = SubResource("CoverMat_arena")
+size = Vector3(6, 3, 1)
+
+[sub_resource type="BoxShape3D" id="CoverShapeWallEW_arena"]
+size = Vector3(1, 3, 6)
+
+[sub_resource type="BoxMesh" id="CoverMeshWallEW_arena"]
+material = SubResource("CoverMat_arena")
+size = Vector3(1, 3, 6)
+
+[sub_resource type="BoxShape3D" id="CoverShapeCube_arena"]
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxMesh" id="CoverMeshCube_arena"]
+material = SubResource("CoverMat_arena")
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxShape3D" id="ExtractShape_arena"]
+size = Vector3(6, 3, 6)
+
+[sub_resource type="StandardMaterial3D" id="ExtractMatInstant_arena"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.25, 0.9, 0.4, 0.55)
+
+[sub_resource type="PlaneMesh" id="ExtractPad_arena"]
+size = Vector2(6, 6)
+
+[sub_resource type="StandardMaterial3D" id="ExtractMatPaid_arena"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.8, 0.25, 0.55)
+
+[sub_resource type="StandardMaterial3D" id="ExtractMatTimed_arena"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.3, 0.75, 1, 0.55)
+
+[sub_resource type="StandardMaterial3D" id="ExtractMatLever_arena"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.45, 0.15, 0.55)
+
+[sub_resource type="BoxShape3D" id="LeverShape_arena"]
+size = Vector3(0.22, 1.1, 0.22)
+
+[sub_resource type="StandardMaterial3D" id="LeverMat_arena"]
+albedo_color = Color(0.8, 0.8, 0.85, 1)
+metallic = 0.6
+roughness = 0.4
+
+[sub_resource type="BoxMesh" id="LeverMesh_arena"]
+size = Vector3(0.22, 1.1, 0.22)
+
+[sub_resource type="BoxShape3D" id="TraderArea_arena"]
+size = Vector3(3.2, 3.2, 3.2)
+
+[sub_resource type="BoxShape3D" id="TraderShape_arena"]
+size = Vector3(2, 2.4, 2)
+
+[sub_resource type="StandardMaterial3D" id="TraderMat_arena"]
+albedo_color = Color(0.25, 0.45, 0.3, 1)
+roughness = 0.75
+
+[sub_resource type="BoxMesh" id="TraderMesh_arena"]
+size = Vector3(2, 2.4, 2)
+
+[node name="ArenaBlockout" type="Node3D" unique_id=1823187960]
+script = ExtResource("1_arena")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2099088317]
+environment = ExtResource("3_env")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1394538024]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 20, 0)
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1350498280]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=395916267]
+shape = SubResource("GroundShape_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=580516243]
+mesh = SubResource("GroundMesh_arena")
+
+[node name="Cover01" type="StaticBody3D" parent="." unique_id=1673659650]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover01" unique_id=468763849]
+shape = SubResource("CoverShapeA_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover01" unique_id=884761242]
+mesh = SubResource("CoverMeshA_arena")
+
+[node name="Cover02" type="StaticBody3D" parent="." unique_id=1454304840]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover02" unique_id=1714393601]
+shape = SubResource("CoverShapeA_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover02" unique_id=1099668181]
+mesh = SubResource("CoverMeshA_arena")
+
+[node name="Cover03" type="StaticBody3D" parent="." unique_id=17438049]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, 10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover03" unique_id=1618819487]
+shape = SubResource("CoverShapeA_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover03" unique_id=352283605]
+mesh = SubResource("CoverMeshA_arena")
+
+[node name="Cover04" type="StaticBody3D" parent="." unique_id=2074280481]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, 10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover04" unique_id=857122429]
+shape = SubResource("CoverShapeA_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover04" unique_id=1025242993]
+mesh = SubResource("CoverMeshA_arena")
+
+[node name="Cover05" type="StaticBody3D" parent="." unique_id=1490273844]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -20)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover05" unique_id=363345746]
+shape = SubResource("CoverShapeWallNS_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover05" unique_id=1126764383]
+mesh = SubResource("CoverMeshWallNS_arena")
+
+[node name="Cover06" type="StaticBody3D" parent="." unique_id=469015408]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 20)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover06" unique_id=1163533913]
+shape = SubResource("CoverShapeWallNS_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover06" unique_id=374233009]
+mesh = SubResource("CoverMeshWallNS_arena")
+
+[node name="Cover07" type="StaticBody3D" parent="." unique_id=2035973969]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover07" unique_id=1024626201]
+shape = SubResource("CoverShapeWallEW_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover07" unique_id=1334834691]
+mesh = SubResource("CoverMeshWallEW_arena")
+
+[node name="Cover08" type="StaticBody3D" parent="." unique_id=1162735251]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover08" unique_id=1466207892]
+shape = SubResource("CoverShapeWallEW_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover08" unique_id=2065149749]
+mesh = SubResource("CoverMeshWallEW_arena")
+
+[node name="Cover09" type="StaticBody3D" parent="." unique_id=1803231227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25, 1, -25)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover09" unique_id=327390571]
+shape = SubResource("CoverShapeCube_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover09" unique_id=138253578]
+mesh = SubResource("CoverMeshCube_arena")
+
+[node name="Cover10" type="StaticBody3D" parent="." unique_id=812435141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1, -25)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover10" unique_id=514821035]
+shape = SubResource("CoverShapeCube_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover10" unique_id=1957573047]
+mesh = SubResource("CoverMeshCube_arena")
+
+[node name="Cover11" type="StaticBody3D" parent="." unique_id=1741499231]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25, 1, 25)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover11" unique_id=1954507069]
+shape = SubResource("CoverShapeCube_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover11" unique_id=596741537]
+mesh = SubResource("CoverMeshCube_arena")
+
+[node name="Cover12" type="StaticBody3D" parent="." unique_id=1500904741]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 1, 25)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Cover12" unique_id=684702306]
+shape = SubResource("CoverShapeCube_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cover12" unique_id=1156140716]
+mesh = SubResource("CoverMeshCube_arena")
+
+[node name="Spawn1" type="Marker3D" parent="." unique_id=1225712411]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 40)
+
+[node name="Spawn2" type="Marker3D" parent="." unique_id=1225273055]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -40)
+
+[node name="Spawn3" type="Marker3D" parent="." unique_id=2021150371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1, 0)
+
+[node name="Spawn4" type="Marker3D" parent="." unique_id=1724779477]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1, 0)
+
+[node name="Player" parent="." unique_id=1269882176 instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 40)
+
+[node name="ExtractInstant" type="Area3D" parent="." unique_id=610739526 groups=["extraction_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0, -42)
+script = ExtResource("5_extract")
+display_name = "Ponte"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExtractInstant" unique_id=471343684]
+shape = SubResource("ExtractShape_arena")
+
+[node name="Marker" type="MeshInstance3D" parent="ExtractInstant" unique_id=1430428464]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+material_override = SubResource("ExtractMatInstant_arena")
+mesh = SubResource("ExtractPad_arena")
+
+[node name="ExtractPaid" type="Area3D" parent="." unique_id=438603510 groups=["extraction_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0, 42)
+script = ExtResource("5_extract")
+display_name = "V-Ex"
+kind = 1
+extract_time = 2.0
+single_use = true
+paid_cost = 20000
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExtractPaid" unique_id=1652386502]
+shape = SubResource("ExtractShape_arena")
+
+[node name="Marker" type="MeshInstance3D" parent="ExtractPaid" unique_id=308162891]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+material_override = SubResource("ExtractMatPaid_arena")
+mesh = SubResource("ExtractPad_arena")
+
+[node name="ExtractTimed" type="Area3D" parent="." unique_id=1687192611 groups=["extraction_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -46)
+script = ExtResource("5_extract")
+display_name = "Trem"
+kind = 5
+extract_time = 4.0
+timed_open = 30.0
+timed_close = 420.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExtractTimed" unique_id=1064001702]
+shape = SubResource("ExtractShape_arena")
+
+[node name="Marker" type="MeshInstance3D" parent="ExtractTimed" unique_id=668425964]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+material_override = SubResource("ExtractMatTimed_arena")
+mesh = SubResource("ExtractPad_arena")
+
+[node name="ExtractLever" type="Area3D" parent="." unique_id=751696920 groups=["extraction_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, 0)
+script = ExtResource("5_extract")
+display_name = "ZB-013"
+kind = 3
+extract_time = 3.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExtractLever" unique_id=845994555]
+shape = SubResource("ExtractShape_arena")
+
+[node name="Marker" type="MeshInstance3D" parent="ExtractLever" unique_id=2061050266]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+material_override = SubResource("ExtractMatLever_arena")
+mesh = SubResource("ExtractPad_arena")
+
+[node name="LeverBody" type="StaticBody3D" parent="ExtractLever" unique_id=1988112631 groups=["extraction_levers"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExtractLever/LeverBody" unique_id=1686830717]
+shape = SubResource("LeverShape_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="ExtractLever/LeverBody" unique_id=2088229088]
+material_override = SubResource("LeverMat_arena")
+mesh = SubResource("LeverMesh_arena")
+
+[node name="TraderQuartermaster" type="Area3D" parent="." unique_id=2039156368 groups=["traders"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 42)
+script = ExtResource("6_trader")
+display_name = "Quartermaster"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TraderQuartermaster" unique_id=1785419866]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+shape = SubResource("TraderArea_arena")
+
+[node name="Booth" type="StaticBody3D" parent="TraderQuartermaster" unique_id=1676592896]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TraderQuartermaster/Booth" unique_id=647774444]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+shape = SubResource("TraderShape_arena")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TraderQuartermaster/Booth" unique_id=602583433]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+material_override = SubResource("TraderMat_arena")
+mesh = SubResource("TraderMesh_arena")

@@ -1,0 +1,327 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/main_menu.gd" id="1_menu"]
+
+[sub_resource type="StyleBoxFlat" id="BtnNormal"]
+bg_color = Color(0.16, 0.2, 0.25, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="BtnHover"]
+bg_color = Color(0.23, 0.29, 0.38, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.7, 0.9, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="BtnPressed"]
+bg_color = Color(0.11, 0.14, 0.18, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="PanelBg"]
+bg_color = Color(0.09, 0.11, 0.14, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.36, 0.45, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.08, 0.11, 1)
+
+[node name="Menu" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = -140.0
+offset_right = 170.0
+offset_bottom = 140.0
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Menu"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 34
+text = "FPS BASEGAME — ARENA"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Menu"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.68, 0.78, 1)
+theme_override_font_sizes/font_size = 16
+text = "Fase 1 do loop jogável"
+horizontal_alignment = 1
+
+[node name="BtnPlay" type="Button" parent="Menu"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("BtnNormal")
+theme_override_styles/hover = SubResource("BtnHover")
+theme_override_styles/pressed = SubResource("BtnPressed")
+theme_override_styles/focus = SubResource("BtnHover")
+theme_override_font_sizes/font_size = 20
+text = "Jogar"
+
+[node name="BtnSettings" type="Button" parent="Menu"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("BtnNormal")
+theme_override_styles/hover = SubResource("BtnHover")
+theme_override_styles/pressed = SubResource("BtnPressed")
+theme_override_styles/focus = SubResource("BtnHover")
+theme_override_font_sizes/font_size = 18
+text = "Configurações"
+
+[node name="BtnQuit" type="Button" parent="Menu"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("BtnNormal")
+theme_override_styles/hover = SubResource("BtnHover")
+theme_override_styles/pressed = SubResource("BtnPressed")
+theme_override_styles/focus = SubResource("BtnHover")
+theme_override_font_sizes/font_size = 18
+text = "Sair"
+
+[node name="SettingsPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -250.0
+offset_right = 220.0
+offset_bottom = 250.0
+theme_override_styles/panel = SubResource("PanelBg")
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Box" type="VBoxContainer" parent="SettingsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SetTitle" type="Label" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "CONFIGURAÇÕES"
+horizontal_alignment = 1
+
+[node name="RowSens" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblSens" type="Label" parent="SettingsPanel/Margin/Box/RowSens"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Sensibilidade"
+
+[node name="SliderSens" type="HSlider" parent="SettingsPanel/Margin/Box/RowSens"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 3.0
+step = 0.05
+value = 1.0
+
+[node name="ValSens" type="Label" parent="SettingsPanel/Margin/Box/RowSens"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "1.00"
+horizontal_alignment = 2
+
+[node name="RowMaster" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblMaster" type="Label" parent="SettingsPanel/Margin/Box/RowMaster"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Volume Master"
+
+[node name="SliderMaster" type="HSlider" parent="SettingsPanel/Margin/Box/RowMaster"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 0.0
+min_value = -40.0
+step = 1.0
+
+[node name="ValMaster" type="Label" parent="SettingsPanel/Margin/Box/RowMaster"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "0 dB"
+horizontal_alignment = 2
+
+[node name="RowSfx" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblSfx" type="Label" parent="SettingsPanel/Margin/Box/RowSfx"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Volume SFX"
+
+[node name="SliderSfx" type="HSlider" parent="SettingsPanel/Margin/Box/RowSfx"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 0.0
+min_value = -40.0
+step = 1.0
+
+[node name="ValSfx" type="Label" parent="SettingsPanel/Margin/Box/RowSfx"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "0 dB"
+horizontal_alignment = 2
+
+[node name="RowUi" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblUi" type="Label" parent="SettingsPanel/Margin/Box/RowUi"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Volume UI"
+
+[node name="SliderUi" type="HSlider" parent="SettingsPanel/Margin/Box/RowUi"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 0.0
+min_value = -40.0
+step = 1.0
+value = -3.0
+
+[node name="ValUi" type="Label" parent="SettingsPanel/Margin/Box/RowUi"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "-3 dB"
+horizontal_alignment = 2
+
+[node name="RowAmb" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblAmb" type="Label" parent="SettingsPanel/Margin/Box/RowAmb"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Volume Ambiente"
+
+[node name="SliderAmb" type="HSlider" parent="SettingsPanel/Margin/Box/RowAmb"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 0.0
+min_value = -40.0
+step = 1.0
+value = -16.0
+
+[node name="ValAmb" type="Label" parent="SettingsPanel/Margin/Box/RowAmb"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "-16 dB"
+horizontal_alignment = 2
+
+[node name="RowRes" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblRes" type="Label" parent="SettingsPanel/Margin/Box/RowRes"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Resolução"
+
+[node name="OptRes" type="OptionButton" parent="SettingsPanel/Margin/Box/RowRes"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RowFull" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblFull" type="Label" parent="SettingsPanel/Margin/Box/RowFull"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Tela cheia"
+
+[node name="CheckFull" type="CheckButton" parent="SettingsPanel/Margin/Box/RowFull"]
+layout_mode = 2
+text = "Fullscreen"
+
+[node name="RowPix" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblPix" type="Label" parent="SettingsPanel/Margin/Box/RowPix"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Pixelação (PS1)"
+
+[node name="SliderPix" type="HSlider" parent="SettingsPanel/Margin/Box/RowPix"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+min_value = 0.25
+step = 0.05
+value = 1.0
+
+[node name="ValPix" type="Label" parent="SettingsPanel/Margin/Box/RowPix"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="RowMode" type="HBoxContainer" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="LblMode" type="Label" parent="SettingsPanel/Margin/Box/RowMode"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Modo de jogo"
+
+[node name="OptMode" type="OptionButton" parent="SettingsPanel/Margin/Box/RowMode"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="SettingsPanel/Margin/Box"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("BtnNormal")
+theme_override_styles/hover = SubResource("BtnHover")
+theme_override_styles/pressed = SubResource("BtnPressed")
+theme_override_styles/focus = SubResource("BtnHover")
+theme_override_font_sizes/font_size = 18
+text = "Voltar (salva)"
