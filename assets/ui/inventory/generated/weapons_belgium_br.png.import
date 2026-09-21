@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bsj1d6bbdyryw"
-path="res://.godot/imported/placeholder_weapon_rifle.png-bfcf31b5885b7097e24fcb9b258c9d44.ctex"
+uid="uid://bke7li1rm71es"
+path="res://.godot/imported/weapons_belgium_br.png-0e33fe002de502a271fd3045a28084f5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/inventory/generated/placeholder_weapon_rifle.png"
-dest_files=["res://.godot/imported/placeholder_weapon_rifle.png-bfcf31b5885b7097e24fcb9b258c9d44.ctex"]
+source_file="res://assets/ui/inventory/generated/weapons_belgium_br.png"
+dest_files=["res://.godot/imported/weapons_belgium_br.png-0e33fe002de502a271fd3045a28084f5.ctex"]
 
 [params]
 
