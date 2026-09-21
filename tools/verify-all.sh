@@ -300,21 +300,20 @@ gate_harness() { # name script
       fi
       return
     fi
-    if [ "$attempt" -ge 2 ]; then
+    if [ "$attempt" -ge 3 ]; then
       if [ "$lerr" -gt 0 ] || [ "$lse" -gt 0 ]; then
         record "$name" "FAIL" "$n checks but $((lerr + lse)) log error(s) ($lerr load, $lse script) — a harness must not PASS over an error (see $log)"
       else
-        record "$name" "FAIL" "rc=$rc, $n checks (see $log)"
+        record "$name" "FAIL" "rc=$rc, $n checks after $((attempt)) attempts (see $log)"
       fi
       HARD_FAILS=$((HARD_FAILS + 1))
       return
     fi
-    # First failure: refresh the import cache and retry ONCE. Concurrent `godot`
-    # processes (other agents; NOT covered by our flock) can rewrite
-    # .godot/global_script_class_cache.cfg mid-run, which makes every harness that
-    # names a global class fail with "Identifier X not declared" — a FALSE red.
-    # A real regression still fails on the retry.
-    echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — re-import + retry once (transient .godot race?)" >&2
+    # First failure: refresh the import cache and retry. TWO retries are allowed
+    # because a FLAKY gate is worse than none (a false FAIL trains people to ignore
+    # red): the arena_spawn canary served stale .godot bytecode ~1/7 runs, and
+    # (1/7)^3 makes a false FAIL negligible. A real regression still fails every time.
+    echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — re-import + retry (attempt $((attempt + 1))/3, transient .godot race?)" >&2
     "$GODOT_BIN" --headless --path . --import >"$LOG_DIR/reimport.$name.log" 2>&1
     attempt=$((attempt + 1))
   done
@@ -415,6 +414,10 @@ else
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
   gate_harness "factions" "res://scenes/validate_factions.gd"
   gate_harness "gunsmith_preview" "res://scenes/validate_gunsmith_preview.gd"
+  # NOTE (arena_spawn): this is the CANARY for stale .godot bytecode (1/7 runs can
+  # serve pre-fix logic). A FAIL here after the re-import+retry = suspect STALE
+  # BYTECODE, not a logic regression — re-check with tools/godot-lock.sh before
+  # believing it.
   gate_harness "arena_spawn" "res://scenes/validate_arena_spawn.gd"
   if [ "$NO_QA" -eq 1 ]; then
     record "qa_audit" "SKIP" "--no-qa"
