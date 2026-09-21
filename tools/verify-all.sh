@@ -130,9 +130,30 @@ count_checks() { # logfile -> prints a check count or "?"
 #       "parse gate" that could never fail.
 CHECK_SCRIPTS_SCRIPT="res://addons/cabra.lat_shooters/test/check_scripts.gd"
 gate_import() {
-  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n
-  "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1
-  rc=$?
+  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1
+  # Contention guard: other lanes call `godot --import` DIRECTLY (our per-repo flock
+  # does NOT cover them), and concurrent imports on the shared .godot/ can hang
+  # forever on a locked/stale file (verifier: `reimport | pistol_9mm_albedo.png`
+  # loop, exit 124, plus 34 leftover 0-byte .godot/imported/*.tmp). Drop that
+  # residue and BOUND the import; a real timeout is reported, never an infinite hang.
+  find .godot/imported -name '*.tmp' -size 0 -delete 2>/dev/null || true
+  while :; do
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 300 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+    else
+      "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+    fi
+    [ "$rc" -ne 124 ] && break
+    if [ "$attempt" -ge 2 ]; then
+      record "import/parse" "FAIL" "import TIMED OUT (300s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
+    fi
+    echo "verify-all: import timed out (likely a concurrent 'godot --import'); waiting 15s + retry once" >&2
+    sleep 15
+    find .godot/imported -name '*.tmp' -size 0 -delete 2>/dev/null || true
+    attempt=$((attempt + 1))
+  done
   errs="$(grep -cE 'SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile' "$ilog")"
   "$GODOT_BIN" --headless --path . --script "$CHECK_SCRIPTS_SCRIPT" >"$clog" 2>&1
   crc=$?
