@@ -128,7 +128,8 @@ gate_import() {
 # addon the runner could not fetch) is skipped rather than faked green.
 UID_REPOS=("." "addons/cabra.lat_shooters")
 gate_uid_tracking() {
-  local repo f n total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log" tracked="$LOG_DIR/.uid_tracked"
+  local repo f n u total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log"
+  local headf="$LOG_DIR/.uid_head" scr="$LOG_DIR/.uid_scripts" trk="$LOG_DIR/.uid_tracked"
   : >"$list"
   for repo in "${UID_REPOS[@]}"; do
     # Must be its OWN repo TOPLEVEL, not a subdirectory of a parent repo. If the
@@ -145,16 +146,35 @@ gate_uid_tracking() {
       skipped+="$repo "
       continue
     fi
+    # HEAD, NOT the index. The invariant is "a CLEAN CLONE works", and a clone
+    # only has committed files. `git ls-files` (index) produced a false green
+    # while 36 .uid were staged-but-uncommitted: gate PASS, clean clone FAIL with
+    # 6 missing uid:// refs (verifier e2e). Check BOTH directions on HEAD:
+    #   forward: every committed script has its committed .uid
+    #   reverse: every committed .uid has its committed script (an orphan .uid
+    #            makes --import try to open a missing file, cf. dim_tmp.gd.uid)
+    if ! git -C "$repo" ls-tree -r --name-only HEAD >"$headf" 2>/dev/null; then
+      skipped+="$repo "
+      continue
+    fi
     checked=$((checked + 1))
-    git -C "$repo" ls-files -- '*.uid' >"$tracked"
+    grep -E '\.(gd|gdshader|gdshaderinc)$' "$headf" >"$scr"
+    grep -E '\.uid$' "$headf" >"$trk"
     n=0
     while IFS= read -r f; do
       [ -z "$f" ] && continue
-      if ! grep -qxF "$f.uid" "$tracked"; then
-        printf '%s/%s\n' "$repo" "$f" >>"$list"
+      if ! grep -qxF "$f.uid" "$trk"; then
+        printf '%s/%s (script without .uid)\n' "$repo" "$f" >>"$list"
         n=$((n + 1))
       fi
-    done < <(git -C "$repo" ls-files -- '*.gd' '*.gdshader' '*.gdshaderinc')
+    done <"$scr"
+    while IFS= read -r u; do
+      [ -z "$u" ] && continue
+      if ! grep -qxF "${u%.uid}" "$scr"; then
+        printf '%s/%s (uid without script)\n' "$repo" "$u" >>"$list"
+        n=$((n + 1))
+      fi
+    done <"$trk"
     if [ "$n" -gt 0 ]; then
       total=$((total + n))
       details+="$repo:$n "
