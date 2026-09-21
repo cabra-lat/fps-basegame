@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_underbarrel"]
+size = Vector3(0.04, 0.06, 0.12)
+
+[sub_resource type="StandardMaterial3D" id="Mat_placeholder"]
+albedo_color = Color(0.16, 0.16, 0.18, 1)
+roughness = 0.6
+metallic = 0.2
+
+[node name="attachment_placeholder_underbarrel" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_underbarrel")
+surface_material_override/0 = SubResource("Mat_placeholder")
