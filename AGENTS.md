@@ -47,6 +47,12 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
 ## Rules
 
 1. **Never commit/push** unless explicitly asked. Leave trees dirty, report status.
+   - **Always commit with an explicit pathspec:** `git commit -m "..." -- <your files>`.
+     The worktree is SHARED, so the INDEX carries whatever other lanes staged; a
+     pathless `git commit` sweeps their work (proven: board commit `a403a54` reverted
+     the NPC body swap that another lane had staged for an A/B test).
+   - **Never `git checkout <rev> -- <path>`, `git add -A` or `git stash` for testing** —
+     the first two write the INDEX. For A/B use `git worktree add` or copy the file to /tmp.
 2. **Scratch goes to `/tmp/shooter/`** (screenshots, strips, GIFs, logs).
    Nothing capture-related enters the repo. Temp runner scripts live under
    `addons/cabra.lat_shooters/test/*_tmp.gd` and MUST be deleted after the run —
