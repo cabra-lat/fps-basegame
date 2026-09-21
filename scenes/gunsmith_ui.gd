@@ -19,24 +19,11 @@ const MOUNT_NAMES := {
 	Weapon.AttachmentPoint.TOP_RAIL: "TOP RAIL",
 	Weapon.AttachmentPoint.UNDER: "UNDERBARREL",
 }
-## Mount point -> node name in the weapon view_model scene (where the visual goes).
-const MOUNT_MARKERS := {
-	Weapon.AttachmentPoint.MUZZLE: "MuzzlePoint",
-	Weapon.AttachmentPoint.TOP_RAIL: "Scope",
-	Weapon.AttachmentPoint.UNDER: "Handguard",
-	Weapon.AttachmentPoint.LEFT_RAIL: "Handguard",
-	Weapon.AttachmentPoint.RIGHT_RAIL: "Handguard",
-}
-## Best-effort 3D art: attachment resource name -> scene. Attachments without
-## art still show in the list (icon/name), just not on the model.
-const ATTACH_ART := {
-	"Aimpoint_T1": "res://src/attachments/attachment_scope_reddot.tscn",
-	"attachment_scope_guara": "res://src/attachments/scopes/attachment_scope_guara.tscn",
-	"Vortex_Razor_1_6x": "res://src/attachments/attachment_scope_sniper.tscn",
-	"ACOG_4x32": "res://src/attachments/attachment_scope_sniper.tscn",
-	"EOTech_EXPS3": "res://src/attachments/attachment_scope_reddot.tscn",
-	"attachment_pistol_silencer": "res://src/attachments/attachment_pistol_silencer.tscn",
-}
+# The 3D art is NOT mapped here any more: it comes from the resource itself
+# (`Attachment.model_scene` + `model_transform`), the same fields the in-hands
+# rigs use, and the marker names come from `Weapon3D.marker_names_for_point`.
+# A hardcoded name->scene map meant an attachment with a resource but no entry
+# silently showed no model (the "attachments have no model" report).
 
 var player: PlayerController
 var audio: GameAudio
@@ -317,6 +304,9 @@ func _physics_process(delta: float) -> void:
 		return
 	if preview_holder != null:
 		preview_holder.rotate_y(delta * 0.5)
+		# Re-assert "posed, not simulated": a scene's deferred _ready() (scope
+		# grab()) or its own physics timer can re-enable a body after mounting.
+		_neutralize_descendants(preview_holder)
 	if _active.is_empty():
 		if _pending.is_empty():
 			return
@@ -367,19 +357,67 @@ func _rebuild_preview() -> void:
 		(vm as CollisionObject3D).collision_layer = 0
 		(vm as CollisionObject3D).collision_mask = 0
 	preview_holder.add_child(vm)
-	# Mount the visuals we have art for.
+	# The view_model itself ships baked-in optics (authoring convention: the
+	# weapon's default sight is part of its scene), and their own _ready() calls
+	# grab() — which re-enables physics AFTER a deferred frame. Nothing inside the
+	# preview may simulate (AGENTS rule 5), so neutralize the whole subtree now and
+	# re-assert every physics frame (see _physics_process).
+	_neutralize_descendants(vm)
+	# Mount the art the RESOURCE declares — `Attachment.model_scene`, placed by
+	# `model_transform` on the marker `Weapon3D.marker_names_for_point` resolves:
+	# the exact convention the in-hands rigs use, so the preview shows what the
+	# player sees, and a new attachment needs no edit here.
 	for point in weapon.attachments:
-		var art: String = ATTACH_ART.get(String((weapon.attachments[point] as Attachment).name), "")
-		if art == "":
+		var att := weapon.attachments[point] as Attachment
+		if att == null or att.model_scene == null:
 			continue
-		var marker := vm.get_node_or_null(String(MOUNT_MARKERS.get(point, ""))) as Node3D
+		var marker := _preview_marker(vm, point)
 		if marker == null:
 			continue
-		var scene := load(art) as PackedScene
-		if scene == null:
+		var vis := att.model_scene.instantiate() as Node3D
+		if vis == null:
 			continue
-		var vis := scene.instantiate() as Node3D
-		if vis is CollisionObject3D:
-			(vis as CollisionObject3D).collision_layer = 0
-			(vis as CollisionObject3D).collision_mask = 0
 		marker.add_child(vis)
+		vis.transform = att.model_transform
+		_neutralize_descendants(vis)
+
+
+## Poses a body: frozen, out of the collision world and ungrabbed — the same
+## convention the in-hands rigs use (viewmodel_rig._freeze_body,
+## weapon_3d._mount_attachment). A body left "grabbed" keeps its grab spring
+## alive and re-enables its own physics.
+func _neutralize_body(rb: RigidBody3D) -> void:
+	rb.freeze = true
+	rb.contact_monitor = false
+	rb.collision_layer = 0
+	rb.collision_mask = 0
+	if rb.get("is_grabbed") != null:
+		rb.set("is_grabbed", false)
+
+
+## Every rigid body in the preview is posed, never simulated.
+func _neutralize_descendants(node: Node) -> void:
+	if node is RigidBody3D:
+		_neutralize_body(node as RigidBody3D)
+	elif node is CollisionObject3D:
+		(node as CollisionObject3D).collision_layer = 0
+		(node as CollisionObject3D).collision_mask = 0
+	for c in node.get_children():
+		_neutralize_descendants(c)
+
+
+## Marker for a mount point inside the previewed view_model: the addon's own
+## candidate list, most specific first, with the weapon root as the last resort
+## (same fallback the in-hands rigs use, so a mismatch is visible, not hidden).
+## `Weapon.MAGAZINE_POINT` resolves to the weapon's MagazinePoint marker, like
+## the in-hands path; a point the addon knows nothing about resolves to null
+## rather than dumping its art on the weapon root.
+func _preview_marker(vm: Node3D, point: int) -> Node3D:
+	var names := Weapon3D.marker_names_for_point(point)
+	if names.is_empty():
+		return null
+	for marker_name in names:
+		var n := vm.get_node_or_null(String(marker_name))
+		if n is Node3D:
+			return n
+	return vm
