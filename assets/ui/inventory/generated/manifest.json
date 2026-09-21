@@ -107,7 +107,6 @@
     "res://resources/weapons/Austria_P9.tres": "res://assets/ui/inventory/generated/placeholder_weapon_pistol.png",
     "res://resources/weapons/Belgium_BR.tres": "res://assets/ui/inventory/generated/placeholder_weapon_rifle.png",
     "res://resources/weapons/Brazil_556.tres": "res://assets/ui/inventory/generated/weapons_brazil_556.png",
-    "res://resources/weapons/Dragunov_SVD.tres": "res://assets/ui/inventory/generated/placeholder_weapon_sniper.png",
     "res://resources/weapons/Germany_SMG_5.tres": "res://assets/ui/inventory/generated/placeholder_weapon_pistol.png",
     "res://resources/weapons/Israel_SMG_9.tres": "res://assets/ui/inventory/generated/placeholder_weapon_pistol.png",
     "res://resources/weapons/M14.tres": "res://assets/ui/inventory/generated/placeholder_weapon_sniper.png",
@@ -118,6 +117,7 @@
     "res://resources/weapons/M82.tres": "res://assets/ui/inventory/generated/placeholder_weapon_sniper.png",
     "res://resources/weapons/PKM.tres": "res://assets/ui/inventory/generated/weapons_pkm.png",
     "res://resources/weapons/Russia_12.tres": "res://assets/ui/inventory/generated/placeholder_weapon_shotgun.png",
+    "res://resources/weapons/SVD.tres": "res://assets/ui/inventory/generated/placeholder_weapon_sniper.png",
     "res://resources/weapons/USA_P50.tres": "res://assets/ui/inventory/generated/placeholder_weapon_pistol.png",
     "res://resources/weapons/USA_Pump.tres": "res://assets/ui/inventory/generated/weapons_usa_pump.png"
   },
@@ -172,7 +172,6 @@
     "res://resources/medical/salewa_first_aid_kit.tres": "medical",
     "res://resources/weapons/Austria_P9.tres": "weapon",
     "res://resources/weapons/Belgium_BR.tres": "weapon",
-    "res://resources/weapons/Dragunov_SVD.tres": "weapon",
     "res://resources/weapons/Germany_SMG_5.tres": "weapon",
     "res://resources/weapons/Israel_SMG_9.tres": "weapon",
     "res://resources/weapons/M14.tres": "weapon",
@@ -180,6 +179,7 @@
     "res://resources/weapons/M24.tres": "weapon",
     "res://resources/weapons/M82.tres": "weapon",
     "res://resources/weapons/Russia_12.tres": "weapon",
+    "res://resources/weapons/SVD.tres": "weapon",
     "res://resources/weapons/USA_P50.tres": "weapon"
   },
   "real_model": [

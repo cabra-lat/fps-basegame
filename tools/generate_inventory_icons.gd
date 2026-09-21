@@ -559,7 +559,7 @@ func _weapon_category(path: String) -> String:
 		return "pistol"
 	if n.contains("russia_12") or n.contains("usa_pump") or n.contains("shotgun"):
 		return "shotgun"
-	if n.contains("dragunov") or n.contains("m14") or n.contains("m24") or n.contains("m82") or n.contains("sniper"):
+	if n.contains("dragunov") or n.contains("m14") or n.contains("m24") or n.contains("m82") or n.contains("svd") or n.contains("sniper"):
 		return "sniper"
 	return "rifle"
 
