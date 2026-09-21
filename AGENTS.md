@@ -88,7 +88,7 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
 
 ## Identity rule (this is a genre framework, NOT a clone)
 
-Tarkov is the **mechanical reference** (see `docs/tarkov-feature-survey.md`), never our
+Tarkov is the **mechanical reference** (see `docs/genre-feature-survey.md`), never our
 content. This project ships **no proper nouns or content from any commercial game**:
 
 - trader, map, item, quest, faction and boss names in `resources/`, `src/`, `scenes/` and

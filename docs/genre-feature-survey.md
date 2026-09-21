@@ -1,4 +1,4 @@
-# Tarkov feature survey × framework gap matrix
+# Genre feature survey × framework gap matrix
 
 Fonte: espelho local da wiki (`../tarkov-wiki`, 4902 páginas) + auditoria do código.
 Objetivo: framework para **immersive sim / extraction shooter** estilo Tarkov.

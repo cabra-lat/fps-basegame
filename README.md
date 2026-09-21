@@ -1,7 +1,7 @@
 # fps-basegame
 
 A **Godot 4.7 framework for building immersive-sim / extraction-shooter FPS games**
-(Tarkov-like). The combat, ballistics, survival and raid-loop systems are implemented
+(genre-typical). The combat, ballistics, survival and raid-loop systems are implemented
 as verified subsystems; game content sits on top of them.
 
 Not a demo — a basegame. Each system below was built with a written contract, a
@@ -109,7 +109,7 @@ Each gate can still be run individually:
 
 ```bash
 godot --headless --path . --script res://addons/cabra.lat_shooters/test/validate_assets.gd
-godot --headless --path . --script res://addons/cabra.lat_shooters/test/validate_tarkov_ballistics.gd
+godot --headless --path . --script res://addons/cabra.lat_shooters/test/validate_ballistics.gd
 godot --headless --path . --script res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd
 ```
 
@@ -165,8 +165,8 @@ scenes/                        main_menu, arena_blockout (+manager), debug_range
                                debug_movement, test terrain
 resources/                     weapons, ammo, armor, attachments, magazines, medical
 src/                           game-side weapon/attachment/NPC scenes
-tools/                         tarkov-wiki scraper, amq<->herdr bridge
-docs/                          tarkov-feature-survey, ai-local-models-survey,
+tools/                         reference-wiki scraper, amq<->herdr bridge
+docs/                          genre-feature-survey, ai-local-models-survey,
                                medical-items (provenance)
 .opencode/                     agent briefs, board, commands, skills
 flake.nix                      dev shell (godot, virtualgl, ffmpeg, local AI)
@@ -174,11 +174,11 @@ flake.nix                      dev shell (godot, virtualgl, ffmpeg, local AI)
 
 ## Roadmap
 
-Done: raid loop, extraction, ballistics to Tarkov depth, survival, perception, game modes.
+Done: raid loop, extraction, ballistics to genre depth, survival, perception, game modes.
 In flight: **persistence** (stash + profile save/load + raid outcome resolution),
 **AI depth** (cover, squads, looting, difficulty tiers), **weapon mechanics** (malfunctions,
 durability wear, ergonomics). Next: quests + skills on the raid event bus, traders/insurance,
 framework docs and export presets.
 
-See `docs/tarkov-feature-survey.md` for the full feature-by-feature gap analysis against the
+See `docs/genre-feature-survey.md` for the full feature-by-feature gap analysis against the
 genre.

@@ -9,7 +9,7 @@
 #   1. import/parse        godot --headless --path . --import + check_scripts.gd (hard)
 #   2. uid_tracking        every tracked script has its tracked .uid   (hard)
 #   3. assets              test/validate_assets.gd              (hard)
-#   4. ballistics          test/validate_tarkov_ballistics.gd   (hard)
+#   4. ballistics          test/validate_ballistics.gd          (hard)
 #   5. weapon_mechanics    test/validate_weapon_mechanics.gd    (hard)
 #   6. meta_persistence    src/meta/validate_meta_persistence.gd (hard)
 #   7. meta_progression    src/meta/validate_meta_progression.gd (hard)
@@ -327,7 +327,7 @@ if [ "$QUICK" -eq 1 ]; then
   echo "(quick mode: import + assets only)"
 else
   gate_harness "assets" "res://addons/cabra.lat_shooters/test/validate_assets.gd"
-  gate_harness "ballistics" "res://addons/cabra.lat_shooters/test/validate_tarkov_ballistics.gd"
+  gate_harness "ballistics" "res://addons/cabra.lat_shooters/test/validate_ballistics.gd"
   gate_harness "weapon_mechanics" "res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd"
   gate_harness "inventory_ux" "res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd"
   gate_harness "meta_persistence" "res://src/meta/validate_meta_persistence.gd"
