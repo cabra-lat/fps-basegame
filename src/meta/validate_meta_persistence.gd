@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_scenario_weapon_state()
 	_scenario_corrupt()
 	_scenario_missing_and_atomic()
+	_scenario_v1_migration()
 
 	quit(v.finish())
 
@@ -175,6 +176,70 @@ func _scenario_missing_and_atomic() -> void:
 	f.close()
 	var future := ProfileStore.load_profile(fpath)
 	_check(future.currency == PlayerProfile.new().currency, "future-version save ignored, starts clean")
+
+func _scenario_v1_migration() -> void:
+	print("\n[6] a real v1 save migrates to v2 (never quarantined)")
+	# Build a realistic CURRENT profile, then rewrite it as a v1 save: version 1 and
+	# the faction as the legacy numeric index (index 1 = the second legacy id).
+	var src := MetaProfile.new()
+	src.stash.deposit(ItemCodec.item_from_path(BANDAGE))
+	src.loadout = {"primary": [ItemCodec.encode_item(ItemCodec.item_from_path("res://resources/weapons/M4_Carbine.tres"))]}
+	src.currency = 4242
+	src.raids = 3
+	src.survived = 2
+	src.kia = 1
+	src.total_exp = 1500
+	var legacy_index := 1
+	var expected_id: String = PlayerProfile.LEGACY_FACTION_ORDER[legacy_index]
+
+	var v1 := src.to_dict()
+	v1["version"] = 1
+	v1["faction"] = legacy_index
+	var path := TEST_DIR + "/v1.save"
+	_write_json(path, v1)
+
+	var migrated := ProfileStore.load_profile(path)
+	_check(migrated != null, "v1 save loads")
+	_check(migrated.faction == expected_id, "numeric faction %d migrated to id \"%s\" (got \"%s\")" % [legacy_index, expected_id, migrated.faction])
+	_check(migrated.currency == 4242, "currency preserved (%d)" % migrated.currency)
+	_check(migrated.stash.count_items() == 1, "stash preserved (%d item)" % migrated.stash.count_items())
+	_check(migrated.stash.get_total_mass() > 0.0, "stash mass preserved (%.4f kg)" % migrated.stash.get_total_mass())
+	_check(migrated.loadout.size() == 1, "loadout preserved (%d slot)" % migrated.loadout.size())
+	_check(migrated.raids == 3 and migrated.survived == 2 and migrated.kia == 1, "counters preserved (raids=%d survived=%d kia=%d)" % [migrated.raids, migrated.survived, migrated.kia])
+	_check(migrated.total_exp == 1500, "EXP preserved (%d)" % migrated.total_exp)
+	_check(_no_corrupt_backup_for("v1.save"), "a migratable v1 save is NOT quarantined")
+
+	# The migrated profile is written back in the new shape.
+	ProfileStore.save(migrated, path)
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	_check(parsed is Dictionary and int(parsed.get("version", -1)) == MetaProfile.VERSION, "rewritten save carries version %d" % MetaProfile.VERSION)
+	if parsed is Dictionary:
+		_check(parsed.get("faction") is String, "faction written as a String id after migration (got %s)" % str(parsed.get("faction")))
+
+	# A legacy index outside the known range must be loud but still load: the
+	# migration never guesses silently, and never destroys the save over it.
+	var v1_bad := src.to_dict()
+	v1_bad["version"] = 1
+	v1_bad["faction"] = 99
+	var bad_path := TEST_DIR + "/v1_bad.save"
+	_write_json(bad_path, v1_bad)
+	var from_bad := ProfileStore.load_profile(bad_path)
+	_check(from_bad != null and from_bad.faction == PlayerProfile.DEFAULT_FACTION, "out-of-range legacy faction falls back to \"%s\" and still loads (got \"%s\")" % [PlayerProfile.DEFAULT_FACTION, from_bad.faction if from_bad != null else "nil"])
+	_check(_no_corrupt_backup_for("v1_bad.save"), "out-of-range legacy faction is not quarantined either")
+
+func _write_json(path: String, data: Dictionary) -> void:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(data, "\t"))
+	f.close()
+
+func _no_corrupt_backup_for(name: String) -> bool:
+	var d := DirAccess.open(TEST_DIR)
+	if d == null:
+		return true
+	for f in d.get_files():
+		if f.begins_with(name + ".corrupt-"):
+			return false
+	return true
 
 # ─── HELPERS ────────────────────────────────────────
 

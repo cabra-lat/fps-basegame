@@ -52,10 +52,22 @@ static func load_profile(path: String = PATH) -> MetaProfile:
 		return MetaProfile.new()
 	var data := parsed as Dictionary
 	var version := int(data.get("version", -1))
-	if version != MetaProfile.VERSION:
+	# A future format is never trusted (we cannot know what it means), and a save
+	# with no usable version cannot be reasoned about at all: quarantine both.
+	if version > MetaProfile.VERSION or version < 1:
 		_quarantine(path)
-		push_warning("ProfileStore: save version %d unsupported (want %d) — starting clean" % [version, MetaProfile.VERSION])
+		push_warning("ProfileStore: save version %d unsupported (accepts 1..%d) — starting clean" % [version, MetaProfile.VERSION])
 		return MetaProfile.new()
+	# An older format we CAN convert is migrated, never quarantined: quarantining a
+	# readable v1 save would be silent data loss for every live profile.
+	if version < MetaProfile.VERSION:
+		var migrated := MetaProfile.migrate(data)
+		if int(migrated.get("version", -1)) != MetaProfile.VERSION:
+			_quarantine(path)
+			push_warning("ProfileStore: could not migrate save v%d -> v%d — starting clean (kept as .corrupt backup)" % [version, MetaProfile.VERSION])
+			return MetaProfile.new()
+		data = migrated
+		push_warning("ProfileStore: migrated save v%d -> v%d" % [version, MetaProfile.VERSION])
 	return MetaProfile.from_dict(data)
 
 static func exists(path: String = PATH) -> bool:

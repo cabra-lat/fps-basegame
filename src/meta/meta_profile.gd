@@ -7,7 +7,11 @@ extends PlayerProfile
 ## the stash, the equipped loadout, progression placeholders, counters and the
 ## last raid report.
 
-const VERSION := 1
+## Save format version. v2 = `faction` is a String id into the faction pack; v1
+## stored the index of a two-value enum. Old saves are converted by `migrate()`,
+## so the bump is an explicit, tested conversion instead of a read-time guess.
+## `ProfileStore` never quarantines a save it can migrate.
+const VERSION := 2
 
 var version: int = VERSION
 var stash: Stash
@@ -140,3 +144,41 @@ static func _restore_stash(p: MetaProfile, sd) -> void:
 			continue
 		if not p.stash.add_item(item, item.position):
 			p.stash.add_item(item, Vector2i(-1, -1))
+
+# ─── MIGRATION ──────────────────────────────────────
+
+## Convert an older save dictionary up to VERSION, one explicit step at a time.
+## Each step is a pure function on the dict that bumps `version`; the chain runs
+## from the save's version to VERSION. A missing step is a HARD STOP — the caller
+## (`ProfileStore.load_profile`) quarantines rather than loading a half-converted
+## save. Returns the input unchanged if no step applies.
+static func migrate(data: Dictionary) -> Dictionary:
+	var out := data
+	var v := int(out.get("version", -1))
+	var steps := 0
+	while v < VERSION:
+		steps += 1
+		if steps > 64:
+			push_error("MetaProfile.migrate: loop guard tripped at v%d" % v)
+			return out
+		match v:
+			1:
+				out = _migrate_1_to_2(out)
+			_:
+				push_error("MetaProfile.migrate: no migration step from v%d" % v)
+				return out
+		var next_v := int(out.get("version", v))
+		if next_v <= v:
+			push_error("MetaProfile.migrate: step from v%d did not advance the version" % v)
+			return out
+		v = next_v
+	return out
+
+## v1 -> v2: `faction` stopped being an index into the old two-value enum and
+## became a String id into the faction pack. The index is translated explicitly
+## (never guessed) and the save is rewritten in the new shape on the next save.
+static func _migrate_1_to_2(data: Dictionary) -> Dictionary:
+	var out := data.duplicate(true)
+	out["faction"] = PlayerProfile.faction_from_saved(out.get("faction", PlayerProfile.DEFAULT_FACTION))
+	out["version"] = 2
+	return out
