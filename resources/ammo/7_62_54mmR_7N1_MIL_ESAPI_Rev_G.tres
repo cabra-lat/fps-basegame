@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://chad667c7vbrg"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://chad667c7vbrg"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_yn1ua"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_yn1ua")
+icon = ExtResource("icon")
 name = "762x54R_7N1_ESAPI"
 caliber = "7.62x54mmR 7N1"
 description = "7.62x54mmR 7N1 (MIL ESAPI Rev G)"

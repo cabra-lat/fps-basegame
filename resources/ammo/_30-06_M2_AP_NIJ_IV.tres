@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://dmqdbu0bsowaj"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://dmqdbu0bsowaj"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_8gbi1"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_8gbi1")
+icon = ExtResource("icon")
 name = "3006_M2_AP_NIJ_IV"
 caliber = ".30-06 M2 AP"
 description = ".30-06 M2 AP (NIJ IV)"

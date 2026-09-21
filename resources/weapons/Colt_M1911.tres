@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="Weapon" load_steps=4 format=3 uid="uid://dpg0a1m0r4vxp"]
+[gd_resource type="Resource" script_class="Weapon" load_steps=5 format=3 uid="uid://dpg0a1m0r4vxp"]
 
 [ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="1_ei1wv"]
 [ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_s4qyt"]
+[ext_resource type="Texture2D" uid="uid://brwng3nv0i2lr" path="res://assets/ui/inventory/generated/placeholder_weapon_pistol.png" id="icon"]
 
 [sub_resource type="Resource" id="Resource_rqd3s"]
 script = ExtResource("1_ei1wv")
@@ -17,6 +18,7 @@ max_capacity = 30
 
 [resource]
 script = ExtResource("1_s4qyt")
+icon = ExtResource("icon")
 name = "Colt_M1911"
 ammo_feed = SubResource("Resource_rqd3s")
 attach_points = 7

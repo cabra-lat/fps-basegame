@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://bd0pq7u5t7d6q"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://bd0pq7u5t7d6q"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_6nt0q"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_6nt0q")
+icon = ExtResource("icon")
 name = "44Mag_VPAM_PM4"
 caliber = ".44 Magnum"
 description = ".44 Magnum (VPAM PM4)"

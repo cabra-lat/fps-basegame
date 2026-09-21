@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://bcepu2shnpeii"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://bcepu2shnpeii"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_nle21"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_nle21")
+icon = ExtResource("icon")
 name = "556_M995_ESAPI"
 caliber = "5.56x45mm M995 AP"
 description = "5.56x45mm M995 AP (MIL ESAPI Rev G)"

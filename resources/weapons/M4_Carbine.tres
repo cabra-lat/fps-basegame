@@ -1,11 +1,11 @@
 [gd_resource type="Resource" script_class="Weapon" load_steps=8 format=3 uid="uid://dxcmgjmc5taby"]
 
 [ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="1_8usqk"]
-[ext_resource type="Texture2D" uid="uid://duglkvi55qps7" path="res://icon.svg" id="1_77mr4"]
 [ext_resource type="Script" uid="uid://174ja52pe154" path="res://addons/cabra.lat_shooters/src/core/item.gd" id="1_dk5mk"]
 [ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_oh2s6"]
 [ext_resource type="PackedScene" uid="uid://r6hi7sd3qmcu" path="res://src/weapons/weapon_ar15.tscn" id="3_o2pnn"]
 [ext_resource type="PackedScene" uid="uid://cgawylhvl3e86" path="res://src/weapons/magazine_ar15.tscn" id="4_7aqm8"]
+[ext_resource type="Texture2D" uid="uid://vssy8ryqylem" path="res://assets/ui/inventory/generated/weapons_m4_carbine.png" id="icon"]
 
 [sub_resource type="Resource" id="Resource_clyp3"]
 script = ExtResource("1_8usqk")
@@ -16,6 +16,7 @@ metadata/_custom_type_script = "uid://6ckswbqpufn8"
 
 [resource]
 script = ExtResource("1_oh2s6")
+icon = ExtResource("icon")
 ammo_feed = SubResource("Resource_clyp3")
 attach_points = 31
 firemodes = 14

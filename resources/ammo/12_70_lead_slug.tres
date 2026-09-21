@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_ammo"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_ammo")
+icon = ExtResource("icon")
 name = "12_70_lead_slug"
 caliber = "12 Gauge lead slug"
 description = "12/70 lead slug"

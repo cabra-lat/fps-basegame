@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://uobjlsalv5t6"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://uobjlsalv5t6"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_pr786"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_pr786")
+icon = ExtResource("icon")
 name = "762x54R_B32_VPAM_PM10"
 caliber = "7.62x54mmR B32 API"
 description = "7.62x54mmR B32 API (VPAM PM10)"

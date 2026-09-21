@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Ammo" load_steps=2 format=3 uid="uid://do234htl54q8"]
+[gd_resource type="Resource" script_class="Ammo" load_steps=3 format=3 uid="uid://do234htl54q8"]
 
 [ext_resource type="Script" uid="uid://dl2e4okyiotb2" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo.gd" id="1_wikdg"]
+[ext_resource type="Texture2D" uid="uid://dla3momlqlkto" path="res://assets/ui/inventory/generated/cartridge.png" id="icon"]
 
 [resource]
 script = ExtResource("1_wikdg")
+icon = ExtResource("icon")
 name = "FSP_4gr"
 caliber = "4gr FSP"
 description = "4gr FSP (MIL FSP)"

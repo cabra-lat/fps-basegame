@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=2 format=3 uid="uid://by4xoj8r850sc"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=3 format=3 uid="uid://by4xoj8r850sc"]
 
-[ext_resource type="Script" uid="uid://chtgefjsvykha" path="res://addons/cabra.lat_shooters/src/core/attachment.gd" id="1_hpb8j"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_hpb8j"]
+[ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
 
 [resource]
 script = ExtResource("1_hpb8j")
+icon = ExtResource("icon")
 name = "A2_Flash_Hider"
 description = "This Attachment is the default one."
 type = 1

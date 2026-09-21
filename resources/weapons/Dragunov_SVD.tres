@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="Weapon" load_steps=4 format=3 uid="uid://3k078e4vr7wp"]
+[gd_resource type="Resource" script_class="Weapon" load_steps=5 format=3 uid="uid://3k078e4vr7wp"]
 
 [ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="1_0fmy1"]
 [ext_resource type="Script" uid="uid://b32jdwlnmqn5a" path="res://addons/cabra.lat_shooters/src/core/weapon/weapon.gd" id="1_m28xj"]
+[ext_resource type="Texture2D" uid="uid://cs0hiwqmcgjh8" path="res://assets/ui/inventory/generated/placeholder_weapon_sniper.png" id="icon"]
 
 [sub_resource type="Resource" id="Resource_w5l5x"]
 script = ExtResource("1_0fmy1")
@@ -17,6 +18,7 @@ max_capacity = 30
 
 [resource]
 script = ExtResource("1_m28xj")
+icon = ExtResource("icon")
 name = "Dragunov_SVD"
 ammo_feed = SubResource("Resource_w5l5x")
 attach_points = 25

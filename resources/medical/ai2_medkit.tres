@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="MedicalItem" load_steps=2 format=3 uid="uid://cmedai200000001"]
+[gd_resource type="Resource" script_class="MedicalItem" load_steps=3 format=3 uid="uid://cmedai200000001"]
 
 [ext_resource type="Script" uid="uid://du1gbtym1dxnh" path="res://addons/cabra.lat_shooters/src/core/health/medical_item.gd" id="1_med"]
+[ext_resource type="Texture2D" uid="uid://b52milpe4i5n5" path="res://assets/ui/inventory/generated/placeholder_medical.png" id="icon"]
 
 [resource]
 script = ExtResource("1_med")
+icon = ExtResource("icon")
 name = "AI-2 medkit"
 description = "Small automatic injector. Heals up to 50 HP."
 kind = 0

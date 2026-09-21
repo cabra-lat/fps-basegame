@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="Attachment" load_steps=2 format=3 uid="uid://5sl1dn1l6bou"]
+[gd_resource type="Resource" script_class="Attachment" load_steps=3 format=3 uid="uid://5sl1dn1l6bou"]
 
-[ext_resource type="Script" uid="uid://chtgefjsvykha" path="res://addons/cabra.lat_shooters/src/core/attachment.gd" id="1_ov0oa"]
+[ext_resource type="Script" uid="uid://be4ojknbd6klo" path="res://addons/cabra.lat_shooters/src/core/attachment/attatchments.gd" id="1_ov0oa"]
+[ext_resource type="Texture2D" uid="uid://btvp0v5ja4jmr" path="res://assets/ui/inventory/generated/placeholder_attachment.png" id="icon"]
 
 [resource]
 script = ExtResource("1_ov0oa")
+icon = ExtResource("icon")
 name = "Magpul_PMAG_40"
 description = "This Attachment is the default one."
 type = 5
