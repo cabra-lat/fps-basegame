@@ -30,6 +30,10 @@ extends Resource
 ## contract's signature, but get_spawn() needs them.
 var spawn_points: Array[Vector3] = []
 
+## team -> next offset inside that team's slice (FFA shares one cursor). Reset by
+## setup(), so a round always starts from the same deterministic order.
+var _spawn_cursor: Dictionary = {}
+
 var _scores: Dictionary = {}
 var _elapsed: float = 0.0
 var _over: bool = false
@@ -37,6 +41,7 @@ var _over: bool = false
 ## Called by the level before the match starts. Resets scores/clock.
 func setup(points: Array[Vector3]) -> void:
 	spawn_points = points.duplicate()
+	_spawn_cursor.clear()
 	_scores.clear()
 	_over = false
 	_elapsed = 0.0
@@ -88,15 +93,25 @@ func get_score_of(participant_id: int) -> int:
 func reset() -> void:
 	setup(spawn_points)
 
-## Team-aware spawn pick: FFA uses any point, TDM splits points per team.
+## Team-aware spawn pick. DETERMINISTIC per round: a per-team cursor walks that
+## team's slice, so two participants never get the same point until the slice
+## wraps. This used to be `randi()`, which handed the same point to two bots
+## often enough to matter: two CharacterBody3D created on one point in one frame
+## are depenetrated UPWARDS and launched (npc-body measured 2/2 bots at y~100
+## after 120 frames). A cursor also makes spawns reproducible for tests.
 func _pick_spawn(team: int) -> Vector3:
 	if spawn_points.is_empty():
 		return Vector3.ZERO
-	if team_count <= 1:
-		return spawn_points[randi() % spawn_points.size()]
-	var teams: int = maxi(team_count, 1)
-	var per: int = maxi(1, spawn_points.size() / teams)
-	var t: int = clampi(team, 0, teams - 1)
-	var start: int = t * per
-	var count: int = maxi(1, mini(per, spawn_points.size() - start))
-	return spawn_points[start + randi() % count]
+	var start := 0
+	var count := spawn_points.size()
+	var key := 0 # FFA: one shared cursor over every point
+	if team_count > 1:
+		var teams: int = maxi(team_count, 1)
+		var per: int = maxi(1, spawn_points.size() / teams)
+		var t: int = clampi(team, 0, teams - 1)
+		start = t * per
+		count = maxi(1, mini(per, spawn_points.size() - start))
+		key = t # TDM: each team walks its own slice
+	var offset: int = int(_spawn_cursor.get(key, 0))
+	_spawn_cursor[key] = offset + 1
+	return spawn_points[start + (offset % count)]

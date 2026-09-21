@@ -57,6 +57,8 @@ var _weapon_kit := {} # Weapon -> [weapon_template, ammo_template, mag_n]
 
 var _pending_shots: Array = []
 var _bot_seq := 0
+## Points already handed out this round (see _free_spawn).
+var _round_spawns: Array[Vector3] = []
 
 var top_label: Label
 var feed_labels: Array[Label] = []
@@ -119,6 +121,7 @@ func _setup_game_mode() -> void:
 		var choice := String(SettingsStore.load_all().get("match_mode", "ffa"))
 		game_mode = TDMMode.new() if choice == "tdm" else FFAMode.new()
 	game_mode.setup(_spawn_points())
+	_round_spawns.clear()
 	_player_team = game_mode.assign_team(PLAYER_ID)
 
 ## World medical loot (Fase: medical items). Player-rig's kit covers the
@@ -463,6 +466,9 @@ func _activate_slot(slot: String) -> void:
 	player.equipment.equip(items[slot], slot)
 	_track_weapon(weapon, target)
 	active_slot = slot
+	# The controller owns `current_weapon`; tell it which slot is live, or it keeps
+	# resolving the OLD one and the gunsmith/HUD show the previous weapon.
+	player.set_active_weapon_slot(slot)
 	_switch_cd = SWITCH_S # lower/raise window
 	ShotRay.register(self)
 	if audio:
@@ -485,6 +491,9 @@ func _drop_active() -> void:
 	_track_weapon(w, null)
 	_spawn_loot(w)
 	active_slot = ""
+	# Nothing is drawn any more: the controller must not keep resolving the slot it
+	# just dropped (this is the "gunsmith opens with the gun I threw away" bug).
+	player.set_active_weapon_slot("")
 	ShotRay.register(self)
 	_push_feed("Largou %s (%d na mag)" % [w.name, rounds])
 	_refresh_top("")
@@ -681,7 +690,36 @@ func _spawn_bots() -> void:
 	for i in range(BOT_COUNT):
 		var index := _bot_seq + 1
 		var team: int = game_mode.assign_team(index)
-		_spawn_bot(game_mode.get_spawn(team) + Vector3(0, 0.5, 0), team)
+		_spawn_bot(_free_spawn(team), team)
+
+
+## Spawn position for a participant, nudged off any point already taken this
+## round. `game_mode.get_spawn()` is a deterministic per-team cursor (distinct
+## until a team's slice wraps), so this is the second line of defence: two
+## CharacterBody3D created on the SAME point in one frame get depenetrated
+## UPWARDS and launched (npc-body measured 2/2 bots at y~100 after 120 frames).
+## Golden-angle steps of 0.9 m, at most 8 tries, no randomness (testable).
+func _free_spawn(team: int) -> Vector3:
+	var at := game_mode.get_spawn(team)
+	var step := 0
+	while step < 8 and _spawn_taken(at):
+		step += 1
+		at += Vector3(cos(step * 2.399), 0.0, sin(step * 2.399)) * 0.9
+	_round_spawns.append(at)
+	return at + Vector3(0, 0.5, 0)
+
+
+## Taken = handed out earlier this round, or a live bot/player already stands there.
+func _spawn_taken(at: Vector3) -> bool:
+	for u in _round_spawns:
+		if u.distance_to(at) < 0.7:
+			return true
+	if player != null and player.global_position.distance_to(at) < 0.7:
+		return true
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b is Node3D and (b as Node3D).global_position.distance_to(at) < 0.7:
+			return true
+	return false
 
 func _spawn_bot(at: Vector3, team: int) -> void:
 	_bot_seq += 1
@@ -785,7 +823,7 @@ func _respawn_bot_later() -> void:
 		return
 	var index := _bot_seq + 1
 	var team: int = game_mode.assign_team(index)
-	_spawn_bot(game_mode.get_spawn(team) + Vector3(0, 0.5, 0), team)
+	_spawn_bot(_free_spawn(team), team)
 	_push_feed("Wave: novo %s" % game_mode.team_name(team))
 
 # ─── player death + respawn ───
@@ -829,7 +867,7 @@ func _on_player_died(cause: String) -> void:
 	_respawn_player()
 
 func _respawn_player() -> void:
-	player.global_position = game_mode.get_spawn(_player_team) + Vector3(0, 0.5, 0)
+	player.global_position = _free_spawn(_player_team)
 	player.velocity = Vector3.ZERO
 	player.health = Health.new()
 	_connect_player_health()
