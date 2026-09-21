@@ -71,9 +71,9 @@ func to_dict() -> Dictionary:
 	return {
 		"version": VERSION,
 		# [range 2026-09-21] faction became a String id (faction pack, "faction is
-		# content, not an enum"). VERSION stays 1 on purpose: the read path below is
-		# backwards-compatible, so bumping it here would only quarantine live saves.
-		# A hard v1->v2 boundary + ProfileStore migration is the meta lane's call.
+		# content, not an enum"). The save-format side is the meta lane's: v2 stores
+		# the id, and ProfileStore migrates a v1 save through MetaProfile.migrate()
+		# instead of quarantining it (see the VERSION docs at the top of this file).
 		"faction": faction,
 		"team": team,
 		"currency": currency,
