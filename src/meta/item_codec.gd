@@ -27,6 +27,10 @@ static func encode_item(item: InventoryItem) -> Dictionary:
 		"mass": item.get_mass(),
 	}
 	var content: Resource = item.extra
+	if item.has_meta("no_transfer") or (content != null and content.has_meta("no_transfer")):
+		# Starter gear is marked non-transferable so it cannot be laundered into the
+		# shared bank through a trader or the flea (it can still be equipped and used).
+		d["no_transfer"] = true
 	if content is Weapon:
 		_encode_weapon(d, content as Weapon)
 	elif content is AmmoFeed:
@@ -150,6 +154,8 @@ static func decode_item(d: Dictionary) -> InventoryItem:
 	var pos = d.get("pos", null)
 	if pos is Array and pos.size() == 2:
 		item.position = Vector2i(int(pos[0]), int(pos[1]))
+	if bool(d.get("no_transfer", false)):
+		item.set_meta("no_transfer", true)
 	return item
 
 static func decode_into_equipment(eq: Equipment, data: Dictionary) -> int:

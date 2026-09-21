@@ -98,12 +98,14 @@ func seed_from_market(market: Market, markup: float = SELLER_MARKUP) -> int:
 func list_from_stash(path: String, price: int) -> Dictionary:
 	if price <= 0:
 		return _no("preco invalido")
-	if TradeOps.count_in_stash(profile, path) <= 0:
+	if TradeOps.count_transferable_in_stash(profile, path) <= 0:
+		if TradeOps.count_in_stash(profile, path) > 0:
+			return _no("item nao-transferivel (starter)")
 		return _no("item nao encontrado no stash")
 	var fee := listing_fee(price)
 	if not TradeOps.can_afford(profile, fee):
 		return _no("saldo insuficiente para a taxa (%d cr)" % fee)
-	var item := TradeOps.find_stash_item(profile, path)
+	var item := TradeOps.find_transferable_stash_item(profile, path)
 	if item == null:
 		return _no("item nao encontrado no stash")
 	var encoded := ItemCodec.encode_item(item)

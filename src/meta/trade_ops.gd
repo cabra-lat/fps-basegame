@@ -14,6 +14,24 @@ static func count_in_stash(profile: MetaProfile, path: String) -> int:
 			total += maxi(item.stack_count, 1)
 	return total
 
+## True when the item may leave the profile through a trade (trader sale, barter or
+## flea listing). Starter gear is flagged `no_transfer` — it can be equipped and
+## used, but it must not be laundered into the shared bank (see the roles design).
+static func is_transferable(item: InventoryItem) -> bool:
+	return item != null and not item.has_meta("no_transfer")
+
+## Like `count_in_stash`, but only counts units the player is allowed to trade.
+## Every trade path must use this one, otherwise a sell attempt succeeds on paper
+## and then fails on the take (or, worse, takes the wrong copy).
+static func count_transferable_in_stash(profile: MetaProfile, path: String) -> int:
+	if profile == null or path == "":
+		return 0
+	var total := 0
+	for item in profile.stash.items:
+		if ItemCodec.content_path(item) == path and is_transferable(item):
+			total += maxi(item.stack_count, 1)
+	return total
+
 static func find_stash_item(profile: MetaProfile, path: String) -> InventoryItem:
 	if profile == null or path == "":
 		return null
@@ -22,16 +40,27 @@ static func find_stash_item(profile: MetaProfile, path: String) -> InventoryItem
 			return item
 	return null
 
+## The item a trade may actually take: the first TRANSFERABLE copy of `path`.
+static func find_transferable_stash_item(profile: MetaProfile, path: String) -> InventoryItem:
+	if profile == null or path == "":
+		return null
+	for item in profile.stash.items:
+		if ItemCodec.content_path(item) == path and is_transferable(item):
+			return item
+	return null
+
 ## Remove `count` units of `path` from the stash. All-or-nothing.
 static func take_from_stash(profile: MetaProfile, path: String, count: int) -> bool:
 	if count <= 0:
 		return true
-	if count_in_stash(profile, path) < count:
+	if count_transferable_in_stash(profile, path) < count:
 		return false
 	var remaining := count
 	for item in profile.stash.items.duplicate():
 		if ItemCodec.content_path(item) != path:
 			continue
+		if not is_transferable(item):
+			continue # never take a non-transferable copy when a transferable one exists
 		var take := mini(item.stack_count, remaining)
 		if take >= item.stack_count:
 			profile.stash.remove_item(item)

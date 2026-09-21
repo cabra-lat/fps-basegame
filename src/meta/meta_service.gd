@@ -286,6 +286,10 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 			var item := ItemCodec.item_from_path(String(path))
 			if item == null:
 				continue
+			# Starter gear is non-transferable: it can be equipped and used, but it must
+			# not be laundered into the shared bank (sold to a trader, bartered or listed
+			# on the flea) — otherwise the once-per-faction grant is an infinite faucet.
+			item.set_meta("no_transfer", true)
 			arr.append(ItemCodec.encode_item(item))
 			added += 1
 		if not arr.is_empty():

@@ -50,6 +50,7 @@ func _initialize() -> void:
 	_scenario_barter()
 	_scenario_stock_reset()
 	_scenario_insurance()
+	_scenario_no_transfer_starter()
 	_scenario_persistence()
 
 	quit(v.finish())
@@ -160,6 +161,49 @@ func _scenario_insurance() -> void:
 	var r4 := service.resolve_raid(Raid.Outcome.KIA, 0)
 	_check(r4.insured == 0, "killer-looted item not insured (got %d)" % r4.insured)
 	service.enemy_looted_paths = []
+
+## Starter gear must not be launderable into the shared bank (the once-per-faction
+## grant would otherwise be an infinite faucet). It can still be equipped/used.
+func _scenario_no_transfer_starter() -> void:
+	v.section("[H] starter gear is non-transferable (no faucet)")
+	var p := MetaProfile.new()
+	p.market.load_dir()
+	p.flea.seed_from_market(p.market)
+	var service := MetaService.new()
+	service.save_path = SAVE
+	service.use_profile(p, SAVE)
+	var sl := load("res://resources/meta/starter_loadout.tres") as StarterLoadout
+	var granted := service.grant_starter_loadout(sl)
+	_check(granted > 0, "starter granted (%d)" % granted)
+
+	# Put the starter kit in the stash (as it is after a raid) and flag it. Bandage is
+	# quartermaster offer 1 (LL1) so the loyalty gate does not mask the transfer rule.
+	var starter_path := BANDAGE
+	var starter := ItemCodec.item_from_path(starter_path)
+	starter.set_meta("no_transfer", true)
+	p.stash.deposit(starter)
+	_check(p.market.count_in_stash(starter_path) == 1, "starter item is in the stash")
+	_check(p.market.count_transferable_in_stash(starter_path) == 0, "but it is NOT transferable")
+
+	# Selling it must be refused with a clear reason (not 'not found').
+	var sell := p.market.can_sell("quartermaster", 1)
+	_check(not sell.get("ok", false) and String(sell.get("reason", "")).contains("nao-transferivel"), "selling the starter gear is refused: %s" % sell.get("reason", ""))
+	# ...and listing it on the flea too.
+	var listed := p.flea.list_from_stash(starter_path, 1000)
+	_check(not listed.get("ok", false) and String(listed.get("reason", "")).contains("nao-transferivel"), "listing the starter gear is refused: %s" % listed.get("reason", ""))
+
+	# The flag survives a save/reload round-trip.
+	ProfileStore.save(p, SAVE)
+	var loaded := ProfileStore.load_profile(SAVE)
+	var reloaded := TradeOps.find_stash_item(loaded, starter_path)
+	_check(reloaded != null and not TradeOps.is_transferable(reloaded), "the flag survives a save/reload")
+
+	# A NORMAL copy of the same item stays sellable: the rule is about the flag, not the path.
+	p.stash.deposit(ItemCodec.item_from_path(starter_path))
+	_check(p.market.count_transferable_in_stash(starter_path) == 1, "a normal copy of the same path IS transferable")
+	p.currency = 100000
+	var sell_ok := p.market.sell("quartermaster", 1)
+	_check(sell_ok.get("ok", false), "selling the normal copy works (%s)" % sell_ok.get("reason", ""))
 
 func _scenario_persistence() -> void:
 	print("\n[G] market state + pending insurance survive close/reopen")

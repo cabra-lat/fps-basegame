@@ -137,7 +137,7 @@ func can_buy(id: String, index: int) -> Dictionary:
 		return _no("sem estoque")
 	if offer.is_barter():
 		for path in offer.barter_required:
-			if count_in_stash(String(path)) < int(offer.barter_required[path]):
+			if count_transferable_in_stash(String(path)) < int(offer.barter_required[path]):
 				return _no("barter insuficiente (%s)" % _short_name(String(path)))
 	if offer.buy_price > 0 and profile != null and profile.currency < offer.buy_price:
 		return _no("saldo insuficiente (%d cr)" % offer.buy_price)
@@ -178,7 +178,9 @@ func can_sell(id: String, index: int) -> Dictionary:
 		return _no("trader nao compra este item")
 	if loyalty_level(id) < offer.min_loyalty:
 		return _no("loyalty insuficiente (precisa LL%d)" % offer.min_loyalty)
-	if count_in_stash(offer.item_path) <= 0:
+	if count_transferable_in_stash(offer.item_path) <= 0:
+		if count_in_stash(offer.item_path) > 0:
+			return _no("item nao-transferivel (starter)")
 		return _no("item nao encontrado no stash")
 	return {"ok": true, "reason": ""}
 
@@ -207,6 +209,10 @@ func add_reputation(id: String, amount: int) -> void:
 
 func count_in_stash(path: String) -> int:
 	return TradeOps.count_in_stash(profile, path)
+
+## Units the player may actually trade (excludes non-transferable starter gear).
+func count_transferable_in_stash(path: String) -> int:
+	return TradeOps.count_transferable_in_stash(profile, path)
 
 func _take_from_stash(path: String, count: int) -> bool:
 	return TradeOps.take_from_stash(profile, path, count)
