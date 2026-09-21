@@ -79,6 +79,12 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
    - One agent per file-set; claim before editing. Never touch `.agent-mail/`
      files directly — `amq` CLI only. Long bodies use `--body @file` (backticks
      are eaten by the shell and corrupt the message).
+   - **Never verify a diff with the repo's external diff driver on.** This repo sets
+     one (`sem`, the boxed output): bare `git diff` emits **no** `+`/`-` lines, so a
+     check like "the diff only touches icons" can pass *vacuously* instead of failing.
+     Always disable it: `git -c diff.external= diff --no-ext-diff --unified=0
+     <from> <to> -- <paths>`. (Reproduced by `meta`+`testkit`: a "0 changed lines"
+     check where the real diff had 30 — it had falsified an "icon-only" claim.)
 
 ## Identity rule (this is a genre framework, NOT a clone)
 
