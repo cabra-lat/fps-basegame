@@ -93,6 +93,12 @@ content. This project ships **no proper nouns or content from any commercial gam
 - No ripped assets, icons or logos; placeholders only.
 - `docs/` may cite sources and use their names (research material). Shipped code may not.
 
+**Content is data, mechanics may be enums.** A game framework cannot hardcode things the game
+decides. Factions, maps, items, quests, traders and modes are **data** (`.tres` + a registry),
+so a game can ship 3, 5 or 10 of them. Finite, universal simulation categories may stay enums
+(`Ammo.Type`, `BodyPart.Type`, `BallisticMaterial.Type`, `Certification.Standard`). Hardcoding a
+faction list is the same mistake as hardcoding the weapon list.
+
 ## AMQ ↔ herdr bridge (delivery)
 
 AMQ queues reliably but has no doorbell; herdr knows who is idle/blocked but has no
