@@ -251,7 +251,7 @@ mesh = SubResource("ExtractPad_arena")
 [node name="ExtractPaid" type="Area3D" parent="." unique_id=438603510 groups=["extraction_points"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0, 42)
 script = ExtResource("5_extract")
-display_name = "V-Ex"
+display_name = "Express"
 kind = 1
 extract_time = 2.0
 single_use = true

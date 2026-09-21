@@ -1,7 +1,7 @@
 class_name PlayerProfile
 extends Resource
 ## Minimal raid profile: faction id + currency + a tiny inventory for key items.
-## Deliberately NOT a full economy (Fase 2) — just enough for V-Ex charging
+## Deliberately NOT a full economy (Fase 2) — just enough for paid-extraction charging
 ## and required-item gates.
 ##
 ## `faction` is a String id into the faction pack (`FactionRegistry`), never an
@@ -16,7 +16,7 @@ const LEGACY_FACTION_ORDER: Array[String] = ["contractor", "drifter"]
 
 @export var faction: String = DEFAULT_FACTION
 @export var team: int = 0 ## used by COOP gates / GameMode integration
-@export var currency: int = 25000 # credits; V-Ex is ~20k
+@export var currency: int = 25000 # credits; a paid extraction is ~20k
 @export var inventory: Dictionary = {} # item_id -> count
 
 
