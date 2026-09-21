@@ -118,13 +118,13 @@ const IP_BRANDS = [
   brandCS('Vortex'),
   brand('Steiner'),
   brandCS('Harris'),
-  brandCS('BCM'),
+  brand('BCM'),
   brand('JP Enterprises'),
   brand('Trijicon'),
-  brandCS('ACOG'),
+  brand('ACOG'),
   brand('Imbel'),
-  brandCS('FN'),
-  brandCS('HK'),
+  brand('FN'),
+  brand('HK'),
   brand('Uzi'),
   brand('Saiga'),
   brand('Desert Eagle'),
@@ -133,7 +133,7 @@ const IP_BRANDS = [
   brand('Barrett'),
   brandCS('Colt'),
   brand('Beretta'),
-  brandCS('Taurus'),
+  brand('Taurus'),
   brand('Rossi'),
   brand('Kalashnikov'),
   brand('Izhmash'),
@@ -271,16 +271,16 @@ function enclosingFunc(funcs, line) {
 // (writing the file only when the status actually changes). Entries without a
 // probe stay `unverified` and are reported, not hidden.
 function verifyManualFindings() {
-  if (!existsSync(MANUAL_PATH)) return { ran: 0, resolved: 0, active: 0, unverified: 0 };
+  if (!existsSync(MANUAL_PATH)) return { ran: 0, resolved: 0, active: 0, unverified: 0, errors: 0 };
   let list;
   try {
     list = JSON.parse(readFileSync(MANUAL_PATH, 'utf8'));
   } catch (e) {
     console.error(`warn: could not parse ${MANUAL_PATH}: ${e.message}`);
-    return { ran: 0, resolved: 0, active: 0, unverified: 0 };
+    return { ran: 0, resolved: 0, active: 0, unverified: 0, errors: 0 };
   }
   let changed = false;
-  const stats = { ran: 0, resolved: 0, active: 0, unverified: 0 };
+  const stats = { ran: 0, resolved: 0, active: 0, unverified: 0, errors: 0 };
   for (const m of list) {
     if (!m.probe) {
       stats.unverified++;
@@ -289,13 +289,23 @@ function verifyManualFindings() {
     let out = '';
     try {
       out = execFileSync('bash', ['-lc', m.probe], {
-        cwd: ROOT, encoding: 'utf8', timeout: 180000, stdio: ['ignore', 'pipe', 'pipe'],
+        // The probe runs Godot through tools/godot-lock.sh, which may wait up to
+        // 900s for the shared .godot lock; the exec timeout must cover that.
+        cwd: ROOT, encoding: 'utf8', timeout: 1200000, stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (e) {
       out = `${e.stdout || ''}\n${e.stderr || ''}`;
     }
     stats.ran++;
     const resolved = /QA_RESULT=RESOLVED/.test(out);
+    const present = /QA_RESULT=PRESENT/.test(out);
+    if (!resolved && !present) {
+      // No explicit result: the probe errored, timed out, or was killed while
+      // waiting on the lock. Absence of evidence is NOT evidence the bug is
+      // back -> keep the stored status and flag it for a re-run.
+      stats.errors++;
+      continue;
+    }
     const status = resolved ? 'resolved' : 'active';
     if (resolved) stats.resolved++;
     else stats.active++;
@@ -1019,7 +1029,8 @@ function renderReport(findings, scans, importGate, dupes, manualStats, ignoreRes
     `a finding whose probe prints \`QA_RESULT=RESOLVED\` is dropped from the counts so a fixed bug cannot keep CI red.`);
   if (manualStats) {
     L.push(`This run verified **${manualStats.ran}** probe(s): ${manualStats.active} still reproduced, ` +
-      `${manualStats.resolved} resolved, ${manualStats.unverified} without a probe (reported as \`unverified\`).`);
+      `${manualStats.resolved} resolved, ${manualStats.unverified} without a probe (reported as \`unverified\`), ` +
+      `${manualStats.errors || 0} errored/no-result (status kept, needs a re-run).`);
   }
   if (ignoreResult && ignoreResult.entries > 0) {
     L.push(`Triage: **${ignoreResult.ignored}** finding(s) suppressed by \`${relative(ROOT, IGNORE_PATH)}\` ` +

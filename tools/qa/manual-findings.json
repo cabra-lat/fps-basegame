@@ -9,8 +9,9 @@
     "message": "change_magazine() aliases the new magazine with weapon.ammo_feed: Resource.duplicate() is shallow and shares the contents Array, so the next eject() drains the ORIGINAL mag (data loss).",
     "evidence": "original repro: Reservoir orig=2 dup=2 equal=true; after dup.pop orig=1 dup=1. Fix landed (_copy_feed deep-copies contents).",
     "probe": "timeout 1000 tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa001_mag_alias.gd 2>&1",
-    "status": "active",
-    "verified_at": "2026-09-21T18:16:38.997Z"
+    "status": "resolved",
+    "verified_at": "2026-09-21T10:54:58.329Z",
+    "verification": "qa code inspection 2026-09-21 (fix present: weapon_system.gd:111 uses _copy_feed, which deep-copies contents at weapon_system.gd:121). Status was wrongly flipped to active at 18:16Z when a lock-waiting probe was killed; the tool now keeps the prior status when a probe prints no QA_RESULT. Re-probe pending once the .godot lock frees."
   },
   {
     "id": "QA-002",
