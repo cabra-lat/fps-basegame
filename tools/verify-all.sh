@@ -150,7 +150,7 @@ gate_import() {
   find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
   while :; do
     if command -v timeout >/dev/null 2>&1; then
-      timeout 300 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+      timeout 600 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
     else
       "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
     fi
@@ -166,7 +166,7 @@ gate_import() {
       return
     fi
     if [ "$attempt" -ge 2 ]; then
-      record "import/parse" "FAIL" "import TIMED OUT (300s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
+      record "import/parse" "FAIL" "import TIMED OUT (600s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
       HARD_FAILS=$((HARD_FAILS + 1))
       return
     fi
