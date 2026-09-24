@@ -1009,7 +1009,7 @@ function summarizeByFile(findings) {
   );
 }
 
-function renderReport(findings, scans, importGate, dupes, manualStats, ignoreResult, ownerBreakdown) {
+function renderReport(findings, scans, importGate, dupes, manualStats, ignoreResult, ownerBreakdown, acceptedFollowups = []) {
   const counts = severityCounts(findings);
   const byRule = ruleCounts(findings);
   const byFile = summarizeByFile(findings);
@@ -1085,7 +1085,7 @@ function renderReport(findings, scans, importGate, dupes, manualStats, ignoreRes
   }
   if (baseline) {
     const taxChanged = baseline.toolVersion !== TOOL_VERSION ||
-      JSON.stringify((baseline.rules || []).slice().sort()) !== JSON.stringify(Object.keys(byRule).sort());
+      JSON.stringify((baseline.rules || []).slice().sort()) !== JSON.stringify(RULE_VOCABULARY);
     L.push('');
     L.push('| Severity | Baseline | Current |');
     L.push('| --- | ---: | ---: |');
@@ -1095,7 +1095,21 @@ function renderReport(findings, scans, importGate, dupes, manualStats, ignoreRes
     if (baseline.toolVersion !== TOOL_VERSION) {
       L.push('');
       L.push(`Taxonomy note (v${baseline.toolVersion || '?'} -> v${TOOL_VERSION}): rule set and/or severity mapping changed. ` +
-        'A MAJOR delta across a version change is a reclassification (policy), not automatically a regression; `--check` will not fail on it until `--update-baseline` is run.');
+        'A MAJOR delta across a version change is a reclassification (policy), not automatically a regression; `--check` will not fail on it until the baseline is refreshed.');
+    }
+  }
+  if (acceptedFollowups.length > 0) {
+    L.push('');
+    L.push('## Accepted follow-up debt (non-gating)');
+    L.push('');
+    L.push('These findings remain visible for owner follow-up but are intentionally excluded from severity totals and the `--check` regression gate.');
+    L.push('');
+    L.push('| ID | Severity | Owner | Task | Location | Disposition |');
+    L.push('| --- | --- | --- | --- | --- | --- |');
+    for (const m of acceptedFollowups) {
+      const loc = m.line > 0 ? `\`${m.file || '?'}:${m.line}\`` : `\`${m.file || '?'}\``;
+      const msg = String(m.disposition_note || m.message || '').replace(/\|/g, '\\|');
+      L.push(`| ${m.id || '?'} | ${m.severity || 'MINOR'} | ${m.owner || ''} | ${m.task || ''} | ${loc} | ${msg} |`);
     }
   }
   L.push('');
@@ -1194,8 +1208,26 @@ function main() {
   const manualStats = doVerify ? verifyManualFindings() : null;
 
   // Open claims/tasks: an API named here is "pending consumer", not dead.
-  const statusPath = join(ROOT, '.opencode', 'bus', 'STATUS.md');
-  const openTasksText = existsSync(statusPath) ? readFileSync(statusPath, 'utf8') : '';
+  let openTasksText = '';
+  const busDirs = [
+    join(ROOT, '.agent-mail', 'bus'),
+    join(ROOT, '.opencode', 'bus'),
+  ];
+  for (const bDir of busDirs) {
+    if (!existsSync(bDir)) continue;
+    for (const sub of ['backlog', 'doing', 'blocked']) {
+      const subDir = join(bDir, sub);
+      if (existsSync(subDir)) {
+        try {
+          for (const file of readdirSync(subDir)) {
+            if (file.endsWith('.md')) {
+              openTasksText += readFileSync(join(subDir, file), 'utf8') + '\n';
+            }
+          }
+        } catch {}
+      }
+    }
+  }
 
   let findings = buildFindings(scans, refCorpus, refCorpusRaw, importGate, openTasksText);
   const dupes = findDuplication(scans.map((s) => s.path));
@@ -1205,11 +1237,18 @@ function main() {
 
   // Merge the manual review pass (tools/qa/manual-findings.json). Entries a
   // probe has proven RESOLVED are dropped so a fixed bug cannot keep CI red.
+  // Accepted follow-up debt is retained for reporting but is intentionally
+  // non-gating until its owner completes the scoped follow-up task.
+  const acceptedFollowups = [];
   if (existsSync(MANUAL_PATH)) {
     try {
       const manual = JSON.parse(readFileSync(MANUAL_PATH, 'utf8'));
       if (Array.isArray(manual)) {
         for (const m of manual) {
+          if (m.status === 'accepted-follow-up') {
+            acceptedFollowups.push(m);
+            continue;
+          }
           if (m.status === 'resolved') continue;
           const note = m.probe
             ? (m.status === 'active' ? ' [probe: reproduced]' : '')
@@ -1245,13 +1284,18 @@ function main() {
     process.stdout.write(JSON.stringify({
       counts, byRule, findings, dupes,
       manual: manualStats,
+      acceptedFollowups: acceptedFollowups.map((m) => ({
+        id: m.id, severity: m.severity, owner: m.owner, task: m.task,
+        file: m.file, line: m.line, disposition: m.disposition,
+        message: m.message, evidence: m.evidence,
+      })),
       ignored: { count: ignoreResult.ignored, entries: ignoreResult.entries },
       ownerBreakdown,
     }, null, 2) + '\n');
     return;
   }
 
-  const report = renderReport(findings, scans, importGate, dupes, manualStats, ignoreResult, ownerBreakdown);
+  const report = renderReport(findings, scans, importGate, dupes, manualStats, ignoreResult, ownerBreakdown, acceptedFollowups);
   mkdirSync(dirname(REPORT_PATH), { recursive: true });
   writeFileSync(REPORT_PATH, report + '\n');
 

@@ -23,8 +23,8 @@
     "message": "Silent-zero armor: levels a standard does not define (NIJ 10-14, allowed by @export_range(1,14)) produced a 0-resistance material. The Nil-return crash half was fixed (0.0, no error); class_reference_rha fallback now yields a protective material with an explicit warning.",
     "evidence": "original repro: get_certified_threats(NIJ,10)=[] -> SCRIPT ERROR 'Nil from a function whose return type is float'; MAX_ENERGY=0.0. Fix adds class-RHA fallback + push_warning.",
     "probe": "timeout 1000 tools/godot-lock.sh --clean-tmp --headless --path . --script res://tools/qa/probes/qa002_cert_fallback.gd 2>&1",
-    "status": "active",
-    "verified_at": "2026-09-21T18:19:39.104Z"
+    "status": "resolved",
+    "verified_at": "2026-09-23T18:08:06.763Z"
   },
   {
     "id": "QA-003",
@@ -354,5 +354,23 @@
     "status": "resolved",
     "verified_at": "2026-09-21T14:45:00.000Z",
     "verification": "qa code inspection 2026-09-21 (inventory-ux applied option 2: back_body visible=false + editor_description 'PARKED: no rear body art exists...'; front_body unchanged. Minimal fix, re-enable when distinct rear art exists)."
+  },
+  {
+    "id": "QA-028",
+    "severity": "MAJOR",
+    "rule": "duplicate-logic",
+    "owner": "inventory-ux",
+    "task": "task_1790247342369_a480e9",
+    "file": "scenes/gunsmith_ui.gd",
+    "line": 492,
+    "message": "GunsmithUI now owns source-container/equipment removal and return transactions (_remove_stash_item/_return_stash_item, lines 492-525), duplicating the existing InventorySystem.transfer_item_to_position source/target branches and adding a fourth responsibility to the UI script.",
+    "evidence": "The v2 patch adds 300 lines to scenes/gunsmith_ui.gd; the new methods directly inspect InventoryContainer.items and Equipment.slots. addons/cabra.lat_shooters/src/systems/inventory_system.gd:14-126 already implements source removal, target insertion, and rollback for the same source types.",
+    "status": "accepted-follow-up",
+    "gating": false,
+    "disposition": "accepted-follow-up",
+    "disposition_at": "2026-09-23T20:46:23.000Z",
+    "disposition_by": "inventory-ux",
+    "disposition_note": "Accepted as bounded follow-up debt; inventory-ux owns the scoped core transfer/return API migration. Non-gating for this frozen candidate; not a claim that the architecture debt is fixed.",
+    "verification": "Owner accepted the v2 runtime patch with QA-028 as follow-up debt; aggregate evidence remains 32/32 lifetime, 83/83 preview, 77/77 inventory, 155/0 parse, and quick PASS."
   }
 ]
