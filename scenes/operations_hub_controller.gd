@@ -15,6 +15,8 @@ signal hub_return_requested
 
 const HUB_SCENE := "res://scenes/operations_hub.tscn"
 const DEFAULT_ARENA_SCENE := "res://scenes/arena_blockout.tscn"
+const ACTIVE_LOADOUT_ID := "active"
+const ACTIVE_LOADOUT_LABEL := "Loadout ativo"
 
 @export var arena_scene_path := DEFAULT_ARENA_SCENE
 @export var auto_route := true
@@ -57,6 +59,12 @@ func set_meta_service(value: Node) -> void:
 ## MetaService.validate_deploy(): {primary: [ItemCodec dict], secondary: [...]}.
 func set_selection_registry(value: Dictionary) -> void:
 	selection_registry = value.duplicate(true)
+	if hub != null:
+		_project_registry()
+
+
+func refresh_from_meta() -> void:
+	_apply_meta_snapshot()
 
 
 func get_selection(loadout_id: String) -> Variant:
@@ -145,8 +153,71 @@ func _apply_meta_snapshot() -> void:
 	var profile_value = meta_service.get("profile")
 	if profile_value is PlayerProfile:
 		hub.set_profile(profile_value as PlayerProfile)
-		if profile_value is MetaProfile:
-			hub.set_last_report((profile_value as MetaProfile).last_report)
+	if profile_value is MetaProfile:
+		hub.set_last_report((profile_value as MetaProfile).last_report)
+	_project_meta_options(profile_value)
+
+
+func _project_meta_options(profile_value: Variant) -> void:
+	# MetaService.deploy_options() is the read-only projection authority. Keep
+	# the call dynamic so the hub can be imported before Meta's API lands.
+	if meta_service != null and meta_service.has_method("deploy_options"):
+		var projected = meta_service.call("deploy_options")
+		if projected is Dictionary and projected.has("id") and projected.has("selection"):
+			var projected_id := String((projected as Dictionary).get("id", ""))
+			var projected_selection = (projected as Dictionary).get("selection", {})
+			if projected_id != "" and projected_selection is Dictionary:
+				selection_registry = {projected_id: (projected_selection as Dictionary).duplicate(true)}
+				var projected_valid := bool((projected as Dictionary).get("valid", false))
+				if not (projected as Dictionary).has("valid"):
+					projected_valid = _selection_is_valid(projected_selection as Dictionary)
+				hub.set_loadouts([{
+					"id": projected_id,
+					"label": String((projected as Dictionary).get("label", "Loadout %s" % projected_id)),
+					"valid": projected_valid,
+					"summary": String((projected as Dictionary).get("summary", "Loadout selecionado")),
+				}])
+				return
+		# An empty projection is the empty state. If Meta still has a non-empty
+		# active kit, it was rejected as malformed; expose that as INVALID rather
+		# than silently presenting an empty hub. Meta remains the validator.
+		if profile_value is MetaProfile and not (profile_value as MetaProfile).loadout.is_empty():
+			var invalid_selection: Dictionary = (profile_value as MetaProfile).loadout.duplicate(true)
+			selection_registry = {ACTIVE_LOADOUT_ID: invalid_selection}
+			hub.set_loadouts([{
+				"id": ACTIVE_LOADOUT_ID,
+				"label": ACTIVE_LOADOUT_LABEL,
+				"valid": _selection_is_valid(invalid_selection),
+				"summary": "Loadout requer revisão",
+			}])
+			return
+		selection_registry.clear()
+		hub.set_loadouts([])
+		return
+	_project_registry()
+
+
+func _project_registry() -> void:
+	var options: Array[Dictionary] = []
+	for loadout_id in selection_registry:
+		var selection = selection_registry[loadout_id]
+		if not selection is Dictionary:
+			continue
+		var option: Dictionary = {
+			"id": String(loadout_id),
+			"label": ACTIVE_LOADOUT_LABEL if String(loadout_id) == ACTIVE_LOADOUT_ID else "Loadout %s" % String(loadout_id),
+			"valid": _selection_is_valid(selection as Dictionary),
+			"summary": "Loadout selecionado",
+		}
+		options.append(option)
+	hub.set_loadouts(options)
+
+
+func _selection_is_valid(selection: Dictionary) -> bool:
+	if meta_service == null or not meta_service.has_method("validate_deploy"):
+		return false
+	var validation = meta_service.call("validate_deploy", selection)
+	return validation is Dictionary and bool((validation as Dictionary).get("ok", false))
 
 
 func _on_hub_return_requested() -> void:
