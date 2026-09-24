@@ -24,9 +24,13 @@
 #  14. invariants          test/validate_invariants.gd          (hard; cross-system
 #                                                                regression probes
 #                                                                promoted from *_tmp.gd)
-#  15. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
+#  15. locomotion_orientation test/validate_locomotion_orientation.gd (hard;
+#                                                                procedural facing
+#                                                                and nested-transform
+#                                                                regression)
+#  16. qa_audit            tools/qa/audit.mjs --check           (graded: BLOCKER hard,
 #                                                                     MAJOR regression = WARN)
-#  16. export              optional, --with-export only (SKIP if no templates)
+#  17. export              optional, --with-export only (SKIP if no templates)
 #
 # Why run ALL gates instead of stopping at the first hard failure? Each harness is
 # independent and cheap; a full matrix shows every regression in one pass instead
@@ -433,6 +437,7 @@ else
   gate_harness "meta_market" "res://src/meta/validate_meta_market.gd"
   gate_harness "meta_flea" "res://src/meta/validate_meta_flea.gd"
   gate_harness "invariants" "res://addons/cabra.lat_shooters/test/validate_invariants.gd"
+  gate_harness "locomotion_orientation" "res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd"
   gate_harness "factions" "res://scenes/validate_factions.gd"
   gate_harness "gunsmith_preview" "res://scenes/validate_gunsmith_preview.gd"
   # NOTE (arena_spawn): this is the CANARY for stale .godot bytecode (1/7 runs can
