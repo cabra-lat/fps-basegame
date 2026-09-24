@@ -23,6 +23,11 @@ signal report_ready(summary: String)
 signal insurance_claim_available(lost: Array)
 
 const SURVIVAL_REWARD := 5000 # credits for getting out alive
+## Numeric mirror of Raid.Outcome.SCENARIO_CLEARED. Kept here so MetaService can
+## integrate the range outcome before the shared Raid enum is present in every
+## meta-only worktree; the value is the finite enum slot, not a new outcome.
+const SCENARIO_CLEARED_OUTCOME := 6
+const RAID1_MARKED_INTEL_PATH := "res://resources/raid1/marked_intel.tres"
 ## HUB-1's deliberately small deploy contract. The hub owns selection UI, but
 ## MetaService remains the only authority for what may be deployed and persisted.
 const DEPLOY_SLOTS: Array[String] = ["primary", "secondary"]
@@ -198,7 +203,9 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	var report := RaidReport.new()
 	report.outcome = outcome
 	report.outcome_name = _outcome_name(outcome)
-	report.survived = outcome == Raid.Outcome.SURVIVED or outcome == Raid.Outcome.RUN_THROUGH
+	report.survived = outcome == Raid.Outcome.SURVIVED \
+		or outcome == Raid.Outcome.RUN_THROUGH \
+		or outcome == SCENARIO_CLEARED_OUTCOME
 	report.exp = maxi(exp, 0)
 
 	var carried_loadout := ItemCodec.encode_equipment(_equipment)
@@ -213,16 +220,34 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 func _resolve_survival(report: RaidReport, carried_loadout: Dictionary, carried_loot: Array) -> void:
 	profile.survived += 1
 	var value := 0
-	for data in carried_loot:
-		var item := ItemCodec.decode_item(data)
-		if item == null:
-			continue
-		var value_of := _item_value(item)
-		if profile.stash.deposit(item, item.position):
-			report.gained.append(_brief(data))
-			value += value_of
-		else:
-			push_warning("MetaService: stash full — %s lost" % item.name)
+	if report.outcome == SCENARIO_CLEARED_OUTCOME:
+		# The scenario's backpack filter is authoritative. Settlement banks only
+		# the marked intel; ordinary medical/world loot is deliberately discarded.
+		for data in carried_loot:
+			if not _is_marked_intel(data):
+				report.loot_discarded += 1
+				continue
+			var item := ItemCodec.decode_item(data)
+			if item == null:
+				continue
+			var value_of := _item_value(item)
+			if profile.stash.deposit(item, item.position):
+				report.gained.append(_brief(data))
+				value += value_of
+			else:
+				report.loot_discarded += 1
+				push_warning("MetaService: scenario objective could not be stashed — %s lost" % item.name)
+	else:
+		for data in carried_loot:
+			var item := ItemCodec.decode_item(data)
+			if item == null:
+				continue
+			var value_of := _item_value(item)
+			if profile.stash.deposit(item, item.position):
+				report.gained.append(_brief(data))
+				value += value_of
+			else:
+				push_warning("MetaService: stash full — %s lost" % item.name)
 	# The equipped kit stays available for the next raid. Only entries that did
 	# not equip are merged; the durable manifest is replaced, never duplicated.
 	profile.loadout = _merge_loadout(carried_loadout, _deploy_leftovers) if _prepared else carried_loadout
@@ -461,6 +486,13 @@ func _rollback_deploy(old_loadout: Dictionary, returned: Array[InventoryItem], s
 	profile.loadout = old_loadout
 
 
+func _is_marked_intel(data: Dictionary) -> bool:
+	if String(data.get("path", "")) == RAID1_MARKED_INTEL_PATH:
+		return true
+	var item := ItemCodec.decode_item(data)
+	return item != null and ItemCodec.content_path(item) == RAID1_MARKED_INTEL_PATH
+
+
 func _selection_key(data: Dictionary) -> String:
 	var item := ItemCodec.decode_item(data)
 	return JSON.stringify(ItemCodec.encode_item(item)) if item != null else JSON.stringify(data)
@@ -530,6 +562,7 @@ func _outcome_name(outcome: int) -> String:
 	match outcome:
 		Raid.Outcome.SURVIVED: return "SURVIVED"
 		Raid.Outcome.RUN_THROUGH: return "RUN THROUGH"
+		SCENARIO_CLEARED_OUTCOME: return "SCENARIO CLEARED"
 		Raid.Outcome.MIA: return "MIA"
 		Raid.Outcome.KIA: return "KIA"
 		Raid.Outcome.LEFT_BEHIND: return "LEFT BEHIND"

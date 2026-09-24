@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_cleanup()
 
 	_scenario_survive_roundtrip()
+	_scenario_scenario_clear_settlement()
 	_scenario_death_preserves_stash()
 	_scenario_weapon_state()
 	_scenario_corrupt()
@@ -80,6 +81,66 @@ func _scenario_survive_roundtrip() -> void:
 	_check(loaded.raids == 1 and loaded.survived == 1, "raid counters persisted (raids=%d survived=%d)" % [loaded.raids, loaded.survived])
 	_check(loaded.stash.get_total_mass() > 0.0, "stash mass accounted (%.4f kg)" % loaded.stash.get_total_mass())
 	_check(loaded.last_report.get("survived", false) == true, "last raid report persisted")
+
+func _scenario_scenario_clear_settlement() -> void:
+	print("\n[1b] RAID-1 scenario clear settlement")
+	var path := TEST_DIR + "/scenario_clear.save"
+	ProfileStore.delete(path)
+	var service := MetaService.new()
+	service.save_path = path
+	var profile := MetaProfile.new()
+	service.use_profile(profile, path)
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	_add_loot(bag, BANDAGE, 1)
+	var before_currency := profile.currency
+	var report := service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 250)
+	_check(report != null and report.survived, "SCENARIO_CLEARED is a successful raid")
+	_check(report.outcome_name == "SCENARIO CLEARED", "scenario report keeps the exact outcome name")
+	_check(report.gained.is_empty() and report.loot_discarded == 1, "scenario settlement discards non-marked loot")
+	_check(profile.stash.count_items() == 0, "scenario settlement did not bank non-marked loot")
+	_check(profile.currency == before_currency + MetaService.SURVIVAL_REWARD, "scenario clear uses the normal survival reward")
+	_check(profile.raids == 1 and profile.survived == 1, "scenario clear advances successful raid counters")
+	_check(int(profile.role_state()["survived"]) == 1, "scenario clear records successful role progression")
+	_check(service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 250) == null, "scenario clear resolves only once")
+	_check(profile.raids == 1 and profile.currency == before_currency + MetaService.SURVIVAL_REWARD, "duplicate scenario report has no second settlement")
+	_check(service._is_marked_intel({"path": MetaService.RAID1_MARKED_INTEL_PATH}), "marked intel path is recognized")
+
+	# Generic extraction outcomes remain distinct and retain their old settlement.
+	var run_path := TEST_DIR + "/ordinary_run_through.save"
+	var run_service := MetaService.new()
+	run_service.save_path = run_path
+	var run_profile := MetaProfile.new()
+	run_service.use_profile(run_profile, run_path)
+	run_service.bind_carrier(Equipment.new(), Backpack.new())
+	var run_report := run_service.resolve_raid(Raid.Outcome.RUN_THROUGH, 0)
+	_check(run_report != null and run_report.outcome_name == "RUN THROUGH" and run_report.survived, "ordinary RUN_THROUGH remains successful")
+	var survive_path := TEST_DIR + "/ordinary_survived.save"
+	var survive_service := MetaService.new()
+	survive_service.save_path = survive_path
+	var survive_profile := MetaProfile.new()
+	survive_service.use_profile(survive_profile, survive_path)
+	survive_service.bind_carrier(Equipment.new(), Backpack.new())
+	var survive_report := survive_service.resolve_raid(Raid.Outcome.SURVIVED, 250)
+	_check(survive_report != null and survive_report.outcome_name == "SURVIVED" and survive_report.survived, "ordinary SURVIVED remains successful")
+
+	# The marked-intel resource is supplied by RAID-1. When that sibling change is
+	# present, prove the positive banking path too; the base-only meta worktree
+	# still verifies the filter and ordinary outcomes above.
+	if ResourceLoader.exists(MetaService.RAID1_MARKED_INTEL_PATH):
+		var marked_service := MetaService.new()
+		marked_service.save_path = TEST_DIR + "/scenario_marked.save"
+		var marked_profile := MetaProfile.new()
+		marked_service.use_profile(marked_profile, marked_service.save_path)
+		marked_service.bind_carrier(Equipment.new(), Backpack.new())
+		_add_loot(marked_service._backpack, MetaService.RAID1_MARKED_INTEL_PATH, 1)
+		var marked_report := marked_service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 0)
+		_check(marked_report != null and marked_report.gained.size() == 1, "scenario settlement banks marked intel exactly once")
+		_check(marked_profile.stash.count_items() == 1, "scenario settlement keeps only marked intel")
+	else:
+		print("SKIP: marked-intel positive banking awaits the RAID-1 resource sibling")
+
 
 func _scenario_death_preserves_stash() -> void:
 	print("\n[2] die in a raid with 1 item -> stash untouched")
