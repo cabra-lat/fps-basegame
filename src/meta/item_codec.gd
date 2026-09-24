@@ -200,10 +200,29 @@ static func _decode_weapon(d: Dictionary) -> InventoryItem:
 		if not (a is Dictionary):
 			continue
 		var ap := String(a.get("path", ""))
-		var att := load(ap) as Attachment if ap != "" else null
-		if att is Attachment:
+		var att := _independent_attachment(ap)
+		if att != null:
 			w.attach_attachment(int(a.get("point", 0)), att)
 	return InventorySystem.create_inventory_item(w)
+
+## Attachment resources are cached and carry single-owner runtime state. A decoded
+## weapon must receive its own clean instance, never the shared resource that may
+## still be mounted on the source weapon.
+static func _independent_attachment(path: String) -> Attachment:
+	if path == "":
+		return null
+	var source := load(path) as Attachment
+	if source == null:
+		return null
+	var copy := source.duplicate(true) as Attachment
+	if copy == null:
+		return null
+	# Resource.duplicate() copies the exported data, but it can also copy the
+	# transient owner fields. Reset them before handing the instance to Weapon.
+	copy.is_attached = false
+	copy.current_weapon = null
+	copy.set_meta("base_path", path)
+	return copy
 
 static func _decode_feed_item(d: Dictionary) -> InventoryItem:
 	var fd = d.get("feed", {})
