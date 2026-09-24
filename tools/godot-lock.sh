@@ -33,14 +33,95 @@ for a in "$@"; do
 done
 
 mkdir -p /tmp/shooter
-if command -v flock >/dev/null 2>&1; then
-  LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
+LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
+
+# A Node/timeout intermediary can sit between verify-all.sh and this wrapper,
+# so argv-based ancestor detection alone is not sufficient.  If any ancestor
+# still has the gate lock file open, the gate already owns serialization; do
+# not open a second descriptor and wait on our own parent.  The inode/device
+# check is intentionally independent of process names and works through Node.
+_lock_held_by_ancestor() {
+  local target="$1"
+  local target_dev target_inode pid fd fd_dev fd_inode depth=0
+  target_dev="$(stat -Lc '%d' "$target" 2>/dev/null || true)"
+  target_inode="$(stat -Lc '%i' "$target" 2>/dev/null || true)"
+  [ -n "$target_dev" ] && [ -n "$target_inode" ] || return 1
+  pid="${PPID:-1}"
+  while [ "$depth" -lt 64 ]; do
+    case "$pid" in ''|*[!0-9]*|0|1) break ;; esac
+    for fd in "/proc/$pid/fd/"*; do
+      [ -e "$fd" ] || continue
+      fd_dev="$(stat -Lc '%d' "$fd" 2>/dev/null || true)"
+      fd_inode="$(stat -Lc '%i' "$fd" 2>/dev/null || true)"
+      if [ "$fd_dev" = "$target_dev" ] && [ "$fd_inode" = "$target_inode" ]; then
+        return 0
+      fi
+    done
+    pid="$(awk '/^PPid:/ {print $2; exit}' "/proc/$pid/status" 2>/dev/null || true)"
+    depth=$((depth + 1))
+  done
+  return 1
+}
+
+# The lock file is intentionally persistent. Never unlink it after a holder
+# exits: flock releases kernel ownership automatically, while unlinking a held
+# inode lets a new process create a different inode and bypass serialization.
+#
+# NESTED-GATE fast path (testkit 2026-09-22): verify-all.sh holds this same lock
+# for its WHOLE run (FD 9, released only on exit). Anything the gate itself
+# spawns that comes back through this wrapper (gate_qa -> audit.mjs -> QA-001
+# probe) opens the lockfile on a NEW file description, so `flock -n` fails
+# against the inherited lock and `flock -w 900` burns 900s waiting on its own
+# parent (measured: FULL round where qa_audit hit `timeout 900` -> rc=124 ->
+# WARN, with zero external contention). The gate already serializes us against
+# the outside world, so re-locking is both unnecessary and self-deadlocking.
+#
+# Detection is deliberately STRICT: an ancestor counts only if it is actually
+# EXECUTING this repo's verify-all.sh — i.e. argv = [<shell>, <script>] with
+# <script> canonicalizing to $ROOT/tools/verify-all.sh. A mere substring match
+# on the full command line is WRONG: `bash -c` payloads carry their script text
+# in argv (a lane running `bash -c '...verify-all.sh...'` would false-positive).
+# The FD/inode ancestor check above is the fallback for Node/timeout chains;
+# uncertain external ancestry falls through to the legacy wait below.
+_in_gate=0
+_gate_script="$(readlink -m "$ROOT/tools/verify-all.sh" 2>/dev/null || true)"
+if [ -n "$_gate_script" ] && [ -d /proc/self ]; then
+  _p="${PPID:-1}" _n=0
+  while [ "$_n" -lt 64 ]; do
+    case "$_p" in ''|*[!0-9]*|1|0) break ;; esac
+    _a0="$(tr '\0' '\n' < "/proc/$_p/cmdline" 2>/dev/null | sed -n '1p')"
+    _a1="$(tr '\0' '\n' < "/proc/$_p/cmdline" 2>/dev/null | sed -n '2p')"
+    case "${_a0##*/}" in
+      bash|sh|dash|zsh)
+        case "$_a1" in ""|-*) ;; *)
+          _acwd="$(readlink "/proc/$_p/cwd" 2>/dev/null || true)"
+          case "$_a1" in
+            /*) _ascript="$(readlink -m "$_a1" 2>/dev/null || true)" ;;
+            *)  _ascript="$(readlink -m "$_acwd/$_a1" 2>/dev/null || true)" ;;
+          esac
+          if [ -n "$_ascript" ] && [ "$_ascript" = "$_gate_script" ]; then
+            _in_gate=1
+            break
+          fi
+          ;;
+        esac
+        ;;
+    esac
+    _p="$(awk '{print $4}' "/proc/$_p/stat" 2>/dev/null || echo 1)"
+    _n=$((_n + 1))
+  done
+fi
+if [ "$_in_gate" -eq 1 ] || _lock_held_by_ancestor "$LOCK_FILE"; then
+  echo "godot-lock: nested inside verify-all ($ROOT) — gate already holds the lock, skipping re-lock" >&2
+elif command -v flock >/dev/null 2>&1; then
   exec 9>"$LOCK_FILE"
   if flock -n 9; then
     # Lock was FREE -> any `godot` already running is NOT holding it (bypass).
     if command -v pgrep >/dev/null 2>&1; then
-      others="$(pgrep -c -x godot 2>/dev/null || echo 0)"
-      [ "${others:-0}" -gt 0 ] && echo "godot-lock: WARNING: ${others} 'godot' process(es) running WITHOUT the lock — .godot may still race (use this wrapper everywhere)" >&2
+      # NOTE: `pgrep -c` prints 0 AND exits 1 on no match, so `|| echo 0`
+      # would append a second line ("0\n0") and break the integer test.
+      others="$(pgrep -c -x godot 2>/dev/null || true)"
+      [ "${others:-0}" -gt 0 ] 2>/dev/null && echo "godot-lock: WARNING: ${others} 'godot' process(es) running WITHOUT the lock — .godot may still race (use this wrapper everywhere)" >&2
     fi
   else
     # Say so BEFORE blocking: a caller that wraps us in a short `timeout` then sees
