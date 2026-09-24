@@ -21,12 +21,18 @@ extends CharacterBody3D
 ##    items or corpses and marks them consumed (signal `loot_consumed`).
 ##  - Tiers: RECRUIT/REGULAR/VETERAN (NpcTier) change reaction time, shot
 ##    dispersion, aggression, cover use and weapon cadence.
+##  - Loadout: each bot owns a data-backed Weapon and an InventoryContainer. A
+##    dead bot keeps that container and exposes it through `interact(player)`;
+##    the small corpse hit surface is only enabled after death so a scene-owned
+##    corpse ray can reach it without making corpses bullet targets.
 ##  - Debug: `debug_perception` draws cone, hearing circle, chosen cover and the
 ##    squad-shared target.
 ##
 ## Combat contract kept intact: GameMode teams, friendly-fire, died(bot) +
 ## died_with_team(bot, team), range_hit(impact, ammo, killer_id), death corpse
-## 10 s + fade + white hit flash.
+## 10 s + fade + white hit flash. Weapon fire is a deliberately small, cadence-
+## limited synthetic impact (not a physics-simulated held prop); the visual
+## proxy is posed on the rig hand and follows the shared body.
 ##
 ## Body (shared rig): the visual body is the player-rig `humanoid_rig.tscn`,
 ## instanced in `bot.tscn` as a child NAMED "Skeleton3D" at
@@ -42,8 +48,18 @@ extends CharacterBody3D
 signal died(bot: NpcBot)
 signal died_with_team(bot: NpcBot, team: int)
 signal loot_consumed(loot: Node)
+signal weapon_fired(weapon: Weapon, target: Node3D)
+signal loot_requested(corpse: NpcBot, container: InventoryContainer)
 
 enum AlertState { IDLE, SUSPICIOUS, ENGAGED, SEARCH }
+
+## Fallback loadout data. The path is deliberately a neutral, data-owned
+## resource; a level/spawner can replace `weapon_template` without changing
+## this script. The visual is a tiny proxy so NPC bodies stay low-fidelity.
+const DEFAULT_WEAPON_PATH := "res://resources/weapons/M4_Carbine.tres"
+const DEFAULT_AMMO_PATH := "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
+const WEAPON_HAND_BONE := "hand.R_034"
+const CORPSE_COLLISION_LAYER := 8 ## scenery bit (layer 4), ray-pickable only when dead.
 
 @export_group("Movement")
 @export var waypoints: Array = [] ## Array[Vector3] patrol points (world space).
@@ -62,9 +78,24 @@ enum AlertState { IDLE, SUSPICIOUS, ENGAGED, SEARCH }
 @export var noise_boost_time: float = 1.5 ## Noise keeps attention hot (s).
 
 @export_group("Combat")
-@export var attack_range: float = 2.2
-@export var attack_cooldown: float = 1.5
-@export var attack_energy: float = 25.0 ## Joules of the synthetic impact.
+@export var attack_range: float = 2.2 ## Unarmed/legacy close-range fallback.
+@export var weapon_range: float = 18.0 ## Ranged weapon reach; keeps the AI from hugging.
+@export var attack_cooldown: float = 1.5 ## Fallback cadence when no weapon is equipped.
+@export var weapon_fire_interval: float = 0.35 ## Minimum seconds between weapon shots.
+@export var weapon_damage_scale: float = 0.20 ## Safety scale for the synthetic NPC impact.
+@export var attack_energy: float = 25.0 ## Joules before weapon_damage_scale.
+@export var weapon_enabled: bool = true
+@export var weapon_template: Weapon = null ## Optional data override; default is a neutral carbine.
+@export var weapon_magazine_rounds: int = 6 ## Rounds represented by the synthetic magazine.
+@export var weapon_spare_magazines: int = 1 ## Corpse loot beyond the equipped weapon.
+
+@export_group("Inventory")
+@export var inventory_width: int = 6
+@export var inventory_height: int = 4
+@export var inventory_max_weight: float = 30.0
+@export var corpse_inventory_enabled: bool = true
+@export var corpse_interaction_enabled: bool = true
+@export var display_name: String = "NPC corpse"
 
 @export_group("Teams")
 @export var team: int = -1 ## From GameMode.assign_team(); -1 = unassigned.
@@ -101,6 +132,11 @@ enum AlertState { IDLE, SUSPICIOUS, ENGAGED, SEARCH }
 @export var debug_hearing_loudness: float = 1.0 ## Reference loudness for circle.
 
 var health: Health
+## Live loadout state. These are intentionally public so a level, spawner, or
+## verification probe can inspect/replace them without knowing the internals.
+var inventory: InventoryContainer = null
+var weapon: Weapon = null
+var weapon_item: InventoryItem = null
 ## Participant id of the last attacker (set by range_hit/other bots); -1 unknown.
 var last_attacker_id: int = -1
 ## Current alert state (AlertState enum); read-only for HUD/debug consumers.
@@ -173,11 +209,18 @@ var _moving: bool = false
 var _debug_mi: MeshInstance3D = null
 var _debug_mesh: ImmediateMesh = null
 var _debug_t: float = 0.0
+var _corpse_hitbox: CollisionObject3D = null
+var _weapon_visual: MeshInstance3D = null
+var _weapon_rounds_remaining: int = 0
+var _weapon_mag_size: int = 0
+var _weapon_installed: bool = false
+var _weapon_spares_added: bool = false
 
 
 func _ready() -> void:
 	add_to_group("bots")
 	_rig = get_node_or_null("Skeleton3D") as HumanoidRig
+	_ensure_inventory()
 	if _rig != null:
 		_rig.set_tint(_tint)
 		_rig.play(ANIM_IDLE)
@@ -187,6 +230,10 @@ func _ready() -> void:
 	_apply_team_tint()
 	_apply_tier()
 	_base_basis = global_transform.basis
+	# Add the proxy after HumanoidRig has cached its body materials. The proxy
+	# owns a separate StandardMaterial3D and is faded explicitly below.
+	_ensure_weapon()
+	_ensure_corpse_hitbox()
 	if health == null:
 		health = Health.new()
 	if not health.player_died.is_connected(_die):
@@ -201,6 +248,54 @@ func _ready() -> void:
 func setup(p_waypoints: Array) -> void:
 	waypoints = p_waypoints.duplicate()
 	_wp_index = 0
+
+
+## Public loadout API for a level/spawner. Calling this before add_child() is
+## supported; the visual is created in _ready() once the shared rig exists.
+func set_weapon_template(template: Weapon) -> void:
+	weapon_template = template
+	_install_weapon(template)
+
+
+func has_weapon() -> bool:
+	return weapon_enabled and weapon != null
+
+
+func get_weapon() -> Weapon:
+	return weapon if has_weapon() else null
+
+
+func get_inventory() -> InventoryContainer:
+	_ensure_inventory()
+	return inventory
+
+
+## Scene-owned loot adapters should use this guarded accessor rather than
+## reaching into `inventory` and accidentally opening a live bot's loadout.
+func get_corpse_inventory() -> InventoryContainer:
+	return inventory if can_loot() else null
+
+
+func can_loot() -> bool:
+	return _dead and corpse_inventory_enabled and corpse_interaction_enabled \
+		and inventory != null and not inventory.items.is_empty() \
+		and not bool(get_meta("looted", false))
+
+
+func mark_looted() -> void:
+	set_meta("looted", true)
+
+
+## Existing scene interaction handlers call interact(player) on a raycast
+## ancestor. This is deliberately only a signal bridge: the player-rig UI is
+## typed for PlayerController, so the range/inventory owner owns the actual
+## corpse panel and listens for `loot_requested`.
+func interact(_who: Node) -> bool:
+	var corpse_inventory := get_corpse_inventory()
+	if corpse_inventory == null:
+		return false
+	loot_requested.emit(self, corpse_inventory)
+	return true
 
 
 func is_alive() -> bool:
@@ -222,6 +317,10 @@ func tier_name() -> String:
 
 func is_reloading() -> bool:
 	return _reloading
+
+
+func weapon_rounds_remaining() -> int:
+	return _weapon_rounds_remaining
 
 
 ## Debug/HUD hook (no in-repo caller yet; kept as API).
@@ -379,6 +478,8 @@ func _physics_process(delta: float) -> void:
 		_reload_t -= delta
 		if _reload_t <= 0.0:
 			_reloading = false
+			if has_weapon():
+				_prepare_weapon_rounds(weapon)
 	_perceive(delta)
 	_update_cover(delta)
 	_tick_debug(delta)
@@ -399,7 +500,8 @@ func _physics_process(delta: float) -> void:
 		var to_target := _target.global_position - global_position
 		to_target.y = 0.0
 		var dist := to_target.length()
-		if dist <= attack_range:
+		var reach := weapon_range if has_weapon() else attack_range
+		if dist <= maxf(reach, 0.1):
 			_face(to_target.normalized(), delta)
 			_try_attack()
 		else:
@@ -660,6 +762,198 @@ func _consume_loot(node: Node) -> void:
 	loot_consumed.emit(node)
 
 
+# ─── LOADOUT / CORPSE CONTAINER ───
+
+func _ensure_inventory() -> void:
+	if inventory == null:
+		inventory = InventoryContainer.new()
+		inventory.name = "NPC inventory"
+		inventory.grid_width = maxi(1, inventory_width)
+		inventory.grid_height = maxi(1, inventory_height)
+		inventory.max_weight = maxf(1.0, inventory_max_weight)
+	inventory.is_open = true
+	if not inventory.container_changed.is_connected(_on_inventory_changed):
+		inventory.container_changed.connect(_on_inventory_changed)
+	set_meta("npc_inventory", inventory)
+
+
+func _on_inventory_changed() -> void:
+	if _dead and inventory != null and inventory.items.is_empty():
+		mark_looted()
+
+
+func _ensure_weapon() -> void:
+	if not weapon_enabled:
+		weapon = null
+		_weapon_installed = false
+		return
+	if weapon != null and _weapon_installed:
+		_add_weapon_to_inventory()
+		if not _weapon_spares_added:
+			_add_spare_magazines()
+			_weapon_spares_added = true
+		if _rig != null:
+			_ensure_weapon_visual()
+		return
+	var source := weapon_template
+	if source == null:
+		source = load(DEFAULT_WEAPON_PATH) as Weapon
+	if source != null:
+		_install_weapon(source)
+
+
+func _install_weapon(source: Weapon) -> void:
+	if source == null:
+		return
+	if weapon_item != null and inventory != null and weapon_item in inventory.items:
+		inventory.remove_item(weapon_item)
+	var duplicate := source.duplicate(true) as Weapon
+	if duplicate == null:
+		return
+	weapon = duplicate
+	weapon.name = source.name
+	_weapon_installed = true
+	_weapon_spares_added = false
+	_prepare_weapon_rounds(weapon)
+	_add_weapon_to_inventory()
+	_add_spare_magazines()
+	if inventory != null:
+		_weapon_spares_added = true
+	if _rig != null:
+		_ensure_weapon_visual()
+
+
+func _add_weapon_to_inventory() -> void:
+	if inventory == null or weapon == null or weapon_item != null:
+		return
+	for item in inventory.items:
+		if item != null and item.extra == weapon:
+			weapon_item = item
+			return
+	weapon_item = InventoryItem.slurp(weapon)
+	weapon_item.max_stack = 1
+	weapon_item.stack_count = 1
+	weapon_item.dimensions = Vector2i(3, 2)
+	weapon_item.set_meta("npc_weapon", true)
+	if not inventory.add_item(weapon_item, Vector2i(-1, -1)):
+		weapon_item = null
+
+
+func _add_spare_magazines() -> void:
+	if inventory == null or weapon == null or weapon.ammo_feed == null:
+		return
+	for i in maxi(weapon_spare_magazines, 0):
+		var feed := weapon.ammo_feed.duplicate(true) as AmmoFeed
+		if feed == null:
+			continue
+		var item := InventoryItem.slurp(feed)
+		item.max_stack = 1
+		item.stack_count = 1
+		item.dimensions = Vector2i(1, 2)
+		item.set_meta("npc_spare_magazine", true)
+		inventory.add_item(item, Vector2i(-1, -1))
+
+
+func _prepare_weapon_rounds(w: Weapon) -> void:
+	if w == null:
+		_weapon_mag_size = 0
+		_weapon_rounds_remaining = 0
+		return
+	var capacity := 30
+	if w.ammo_feed != null:
+		capacity = maxi(1, w.ammo_feed.max_capacity)
+	_weapon_mag_size = clampi(weapon_magazine_rounds, 1, capacity)
+	_weapon_rounds_remaining = _weapon_mag_size
+	if w.ammo_feed == null:
+		return
+	# The resource is a private NPC copy. Refill it from the neutral default
+	# ammunition only when the feed accepts it; custom weapons may carry their
+	# own feed and remain valid with the synthetic round counter.
+	var ammo := load(DEFAULT_AMMO_PATH) as Ammo
+	if ammo == null or not w.ammo_feed.is_compatible(ammo):
+		var available := w.ammo_feed.capacity
+		_weapon_rounds_remaining = _weapon_mag_size if available == 0 \
+			else mini(_weapon_mag_size, available)
+		return
+	w.ammo_feed.contents.clear()
+	for i in _weapon_mag_size:
+		if not w.ammo_feed.insert(ammo.duplicate(true)):
+			break
+
+
+func _consume_weapon_round() -> bool:
+	if weapon == null:
+		return true
+	if _weapon_rounds_remaining <= 0:
+		start_reload()
+		return false
+	_weapon_rounds_remaining -= 1
+	if weapon.ammo_feed != null and not weapon.ammo_feed.is_empty():
+		weapon.ammo_feed.eject()
+	return true
+
+
+func _ensure_weapon_visual() -> void:
+	if not has_weapon() or is_instance_valid(_weapon_visual):
+		return
+	var host: Node3D = self
+	if _rig != null:
+		if _rig.find_bone(WEAPON_HAND_BONE) >= 0:
+			var mount := BoneAttachment3D.new()
+			mount.name = "NpcWeaponMount"
+			mount.bone_name = WEAPON_HAND_BONE
+			_rig.add_child(mount)
+			host = mount
+		else:
+			host = _rig
+	var mesh := MeshInstance3D.new()
+	mesh.name = "NpcWeaponProxy"
+	var box := BoxMesh.new()
+	box.size = Vector3(0.12, 0.12, 0.62)
+	mesh.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.16, 0.18, 0.20, 1.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.metallic = 0.25
+	mat.roughness = 0.78
+	mesh.material_override = mat
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mesh.position = Vector3(0.0, -0.04, -0.22) if host != self \
+		else Vector3(0.22, 1.12, -0.28)
+	mesh.set_meta("npc_weapon_proxy", true)
+	host.add_child(mesh)
+	_weapon_visual = mesh
+
+
+func _ensure_corpse_hitbox() -> void:
+	var hitbox := get_node_or_null("CorpseHitbox") as CollisionObject3D
+	if hitbox == null:
+		var area := Area3D.new()
+		area.name = "CorpseHitbox"
+		var shape_node := CollisionShape3D.new()
+		shape_node.name = "CollisionShape3D"
+		var source_shape := get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if source_shape != null and source_shape.shape != null:
+			shape_node.shape = source_shape.shape.duplicate()
+		else:
+			var capsule := CapsuleShape3D.new()
+			capsule.radius = 0.35
+			capsule.height = 1.7
+			shape_node.shape = capsule
+		shape_node.position = Vector3(0.0, 0.85, 0.0)
+		area.add_child(shape_node)
+		add_child(area)
+		hitbox = area
+	_corpse_hitbox = hitbox
+	_corpse_hitbox.collision_layer = 0
+	_corpse_hitbox.collision_mask = 0
+	if _corpse_hitbox is Area3D:
+		(_corpse_hitbox as Area3D).monitoring = false
+		(_corpse_hitbox as Area3D).monitorable = true
+	if "input_ray_pickable" in _corpse_hitbox:
+		_corpse_hitbox.set("input_ray_pickable", true)
+
+
 # ─── COMBAT ───
 
 func _try_attack() -> void:
@@ -668,12 +962,22 @@ func _try_attack() -> void:
 	if not _is_valid_target(_target):
 		return
 	var h: Health = _target.get("health") as Health
-	if h == null:
+	if h == null or not h.is_alive:
 		return
-	_attack_t = attack_cooldown
-	# Tier dispersion: rotate the shot direction by a random error.
+	var armed := has_weapon()
 	var to_target := _target.global_position - global_position
 	to_target.y = 0.0
+	var reach := weapon_range if armed else attack_range
+	if to_target.length() > maxf(reach, 0.1):
+		return
+	# Perception normally establishes LOS, but re-check at the attack point so
+	# a bot cannot damage through a wall that moved into the shot this frame.
+	if not _has_los():
+		return
+	if armed and not _consume_weapon_round():
+		return
+	_attack_t = _attack_interval(armed)
+	# Tier dispersion: rotate the shot direction by a random error.
 	if to_target.length_squared() > 0.0001:
 		var dir := to_target.normalized()
 		last_shot_error_deg = 0.0
@@ -686,17 +990,32 @@ func _try_attack() -> void:
 		(_target as NpcBot).set_attacker(npc_id)
 		(_target as NpcBot).report_threat(global_position)
 	var impact := BallisticsImpact.new()
-	impact.hit_energy = attack_energy
+	impact.hit_energy = _attack_energy(armed)
 	impact.thickness = 0.0
 	impact.angle = 0.0
 	h.take_ballistic_damage(impact, BodyPart.Type.UPPER_CHEST, null)
 	_shots_in_burst += 1
+	if armed:
+		weapon_fired.emit(weapon, _target)
 	if _rig != null and _rig.play(ANIM_FIRE):
 		_playing = ANIM_FIRE
 		_anim_lock_t = FIRE_ANIM_TIME
 	if burst_shots > 0 and _shots_in_burst >= burst_shots:
 		_shots_in_burst = 0
 		start_reload()
+
+
+func _attack_interval(armed: bool) -> float:
+	if not armed or weapon == null:
+		return maxf(0.05, attack_cooldown)
+	var cadence := 60.0 / maxf(1.0, weapon.firerate)
+	return maxf(weapon_fire_interval, cadence * 0.35)
+
+
+func _attack_energy(armed: bool) -> float:
+	if not armed:
+		return maxf(0.0, attack_energy)
+	return maxf(0.0, attack_energy * maxf(0.0, weapon_damage_scale))
 
 
 func _die(_cause: String = "") -> void:
@@ -711,6 +1030,11 @@ func _die(_cause: String = "") -> void:
 	# found no floor and sank through the arena (measured y 0 -> -3.475 in
 	# ~0.4 s by the spotter's strip).
 	set_collision_layer(0)
+	if corpse_interaction_enabled and corpse_inventory_enabled and _corpse_hitbox != null:
+		_corpse_hitbox.collision_layer = CORPSE_COLLISION_LAYER
+	set_meta("npc_corpse", true)
+	set_meta("npc_inventory", inventory)
+	add_to_group("npc_corpse")
 	# Corpse keeps its last pose: freeze the clip instead of letting it keep
 	# playing while the body is dragged down by the fall tilt.
 	if _rig != null:
@@ -730,6 +1054,7 @@ func _tick_death(delta: float) -> void:
 	if corpse_fade_time > 0.0 and _despawn_t <= corpse_fade_time:
 		var a := clampf(_despawn_t / corpse_fade_time, 0.0, 1.0)
 		NpcVisuals.corpse_alpha(_rig, _tint, a)
+		_set_weapon_visual_alpha(a)
 	if _despawn_t <= 0.0:
 		queue_free()
 
@@ -789,6 +1114,18 @@ func _state_debug_color() -> Color:
 
 
 # ─── visuals: team tint, hit flash, corpse fade (all on the shared rig) ───
+
+
+func _set_weapon_visual_alpha(alpha: float) -> void:
+	if not is_instance_valid(_weapon_visual):
+		return
+	var mat := _weapon_visual.material_override as StandardMaterial3D
+	if mat == null:
+		return
+	var c := mat.albedo_color
+	c.a = clampf(alpha, 0.0, 1.0)
+	mat.albedo_color = c
+
 
 ## Per-bot identity: body scale + a near-white tint jitter. Runs before
 ## _base_basis capture so the corpse keeps its scale.

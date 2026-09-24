@@ -22,18 +22,11 @@ const LOOT_EXP := 50
 const RAID_DURATION := 2100.0 # 35 min, genre-typical long raid
 
 const SLOT_ORDER: Array[String] = ["primary", "secondary"]
-## Spawn separation used by _free_spawn(): a candidate must clear this of every
-## point already handed out (and of live bodies) to be accepted. This is the
-## PHYSICAL minimum (2 x capsule radius ~ 0.7 m), i.e. "not overlapping". It is
-## deliberately NOT the same number as `NpcWaveSpawner.spawn_separation` (0.9 m),
-## which is a per-wave safety margin on top of it — two constants, two jobs: this
-## one keeps bodies from starting inside each other, that one spreads a wave out.
-const SPAWN_SEPARATION := 0.7
-## Candidate space for the last-resort ring search: rings x angles per ring.
-const SPAWN_RINGS := 3
-const SPAWN_RING_ANGLES := 8
-
+const INVENTORY_PANEL_CHROME := 64.0
 const BotScene: PackedScene = preload("res://src/npcs/bot/bot.tscn")
+
+const ArenaSpawnSolverScript = preload("./arena_spawn_solver.gd")
+const ArenaResultAdapterScript = preload("./arena_result_adapter.gd")
 
 @onready var ammo_template: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
 @onready var weapon_template: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
@@ -61,14 +54,16 @@ var _player_team := 0
 var _match_over := false
 var _raid_over := false
 var _footsteps := Footsteps.new()
+var _spawn_solver := ArenaSpawnSolverScript.new()
+var _result_adapter := ArenaResultAdapterScript.new()
+var _loot_corpse: NpcBot = null
+var _inventory_hidden_chrome: Array[Node] = []
 var _switch_cd := 0.0
 var _intents: Array = [] # [kind, arg] consumed in _physics_process
 var _weapon_kit := {} # Weapon -> [weapon_template, ammo_template, mag_n]
 
 var _pending_shots: Array = []
 var _bot_seq := 0
-## Points already handed out this round (see _free_spawn).
-var _round_spawns: Array[Vector3] = []
 
 var top_label: Label
 var feed_labels: Array[Label] = []
@@ -111,9 +106,13 @@ func _ready() -> void:
 	add_child(gunsmith)
 	gunsmith.bind(audio)
 	# Primary entry (player-rig hook): inventory -> click weapon -> Modificar.
-	# Defensive: connected only once the addon exposes the signal.
-	if player.has_signal("weapon_modify_requested"):
-		player.connect("weapon_modify_requested", _on_weapon_modify_requested)
+	if not player.weapon_modify_requested.is_connected(_on_weapon_modify_requested):
+		player.weapon_modify_requested.connect(_on_weapon_modify_requested)
+	if player.inventory_ui != null:
+		if not player.inventory_ui.inventory_closed.is_connected(_on_inventory_closed):
+			player.inventory_ui.inventory_closed.connect(_on_inventory_closed)
+		if not player.inventory_ui.visibility_changed.is_connected(_on_inventory_visibility_changed):
+			player.inventory_ui.visibility_changed.connect(_on_inventory_visibility_changed)
 	_apply_settings()
 	_setup_game_mode()
 	_build_hud()
@@ -131,7 +130,7 @@ func _setup_game_mode() -> void:
 		var choice := String(SettingsStore.load_all().get("match_mode", "ffa"))
 		game_mode = TDMMode.new() if choice == "tdm" else FFAMode.new()
 	game_mode.setup(_spawn_points())
-	_round_spawns.clear()
+	_spawn_solver.begin_round()
 	_player_team = game_mode.assign_team(PLAYER_ID)
 
 ## World medical loot (Fase: medical items). Player-rig's kit covers the
@@ -312,9 +311,11 @@ func point_list_text() -> String:
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
-	# While the gunsmith is open the player is busy working: drop combat input
-	# (the raid keeps running — you are vulnerable), then keep the sim ticking.
-	if gunsmith != null and gunsmith.is_open():
+	_tick_corpse_loot()
+	# While the gunsmith or inventory is open the player is busy working: drop
+	# combat input (the raid keeps running — you are vulnerable), then keep the
+	# sim ticking.
+	if (gunsmith != null and gunsmith.is_open()) or _inventory_open():
 		_pending_shots.clear()
 		_intents.clear()
 	# Skill rule: physics queries live in _physics_process, never _process.
@@ -336,10 +337,24 @@ func _physics_process(delta: float) -> void:
 		_refresh_top("")
 		_refresh_raid_hud()
 
+func _input(event: InputEvent) -> void:
+	# PlayerController closes its inventory from _unhandled_input. The arena is
+	# the parent and may receive the same Esc afterwards, so close here and mark
+	# it handled BEFORE child unhandled handlers can turn it into a pause toggle.
+	if _inventory_open() and event.is_action_pressed("ui_cancel"):
+		_close_inventory()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if gunsmith != null and gunsmith.is_open():
 		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("mod_weapon"):
 			gunsmith.close()
+		return
+	if _inventory_open():
+		if event.is_action_pressed("ui_cancel"):
+			_close_inventory()
+			get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_cancel"):
 		if _market_open:
@@ -543,12 +558,21 @@ func _try_pickup() -> void:
 	var end := origin + cam.project_ray_normal(get_viewport().get_visible_rect().size / 2.0) * LOOT_RANGE
 	var query := PhysicsRayQueryParameters3D.create(origin, end)
 	query.exclude = _shot_excludes() # viewmodel would block pickup too
+	# CorpseHitbox is an Area3D enabled only after death. This flag belongs to
+	# the pickup ray alone; ShotResolver intentionally keeps areas off so a
+	# looted body never blocks bullets.
+	query.collide_with_areas = true
 	var result := space.intersect_ray(query)
 	if result.is_empty():
 		return
-	# Traders / extraction levers take priority over loot pickup.
+	# Traders / extraction levers / corpses take priority over world loot.
 	var interactable := _interact_ancestor(result.collider)
 	if interactable != null:
+		if interactable is NpcBot:
+			var corpse := interactable as NpcBot
+			if not corpse.interact(player):
+				_set_center("Cadáver sem itens")
+			return
 		if interactable is TraderPoint:
 			interactable.interact(player) # emits -> _open_market
 			return
@@ -703,57 +727,28 @@ func _spawn_bots() -> void:
 		_spawn_bot(_free_spawn(team), team)
 
 
-## Spawn position for a participant, never on a point already taken this round.
-## `game_mode.get_spawn()` is a deterministic per-team cursor (distinct until a
-## team's slice wraps), so this is the second line of defence: two
-## CharacterBody3D on the SAME point overlap and the depenetration LAUNCHES them
-## (npc-body: 2/2 bots at y~100 after 120 frames).
-## Order of preference: (1) the cursor's point; (2) another AUTHORED spawn point
-## that is free; (3) a deterministic ring of offsets around the cursor position,
-## taking the first candidate that clears SPAWN_SEPARATION of everything used.
-## The ring candidates are computed from the BASE, never cumulatively: cumulative
-## golden-angle steps can cancel each other out and land back near another spawn
-## (the gate caught exactly that: 0.16 m between two spawns).
+## Thin scene adapter for the pure allocator. GameMode keeps the frozen team
+## cursor; ArenaSpawnSolver owns the second-line dedup ledger and deterministic
+## fallback rings. Scene-tree occupancy is sampled here.
 func _free_spawn(team: int) -> Vector3:
-	var base := game_mode.get_spawn(team)
-	var at := base
-	if _spawn_taken(at):
-		for p in _spawn_points():
-			if not _spawn_taken(p):
-				at = p
-				break
-	var attempt := 0
-	while _spawn_taken(at) and attempt < SPAWN_RINGS * SPAWN_RING_ANGLES:
-		at = _spawn_candidate(base, attempt)
-		attempt += 1
-	_round_spawns.append(at)
-	return at + Vector3(0, 0.5, 0)
+	return _spawn_solver.allocate(team, game_mode, _spawn_points(), _spawn_occupants())
 
 
-## The n-th deterministic candidate around `base`: rings of growing radius, each
-## with SPAWN_RING_ANGLES angles. Always measured from `base` (see _free_spawn).
-func _spawn_candidate(base: Vector3, attempt: int) -> Vector3:
-	var ring := 1 + attempt / SPAWN_RING_ANGLES
-	var angle := float(attempt % SPAWN_RING_ANGLES) * TAU / float(SPAWN_RING_ANGLES)
-	return base + Vector3(cos(angle), 0.0, sin(angle)) * (SPAWN_SEPARATION * float(ring))
-
-
-## Taken = handed out earlier this round, or a live bot/player already stands there.
-func _spawn_taken(at: Vector3) -> bool:
-	for u in _round_spawns:
-		if u.distance_to(at) < SPAWN_SEPARATION:
-			return true
-	if player != null and player.global_position.distance_to(at) < SPAWN_SEPARATION:
-		return true
-	for b in get_tree().get_nodes_in_group("bots"):
-		if b is Node3D and (b as Node3D).global_position.distance_to(at) < SPAWN_SEPARATION:
-			return true
-	return false
+func _spawn_occupants() -> Array[Vector3]:
+	var occupied: Array[Vector3] = []
+	if player != null:
+		occupied.append(player.global_position)
+	# Deliberately include dead bots while their corpses remain in the group.
+	for bot in get_tree().get_nodes_in_group("bots"):
+		if bot is Node3D:
+			occupied.append((bot as Node3D).global_position)
+	return occupied
 
 func _spawn_bot(at: Vector3, team: int) -> void:
 	_bot_seq += 1
 	var bot := BotScene.instantiate() as NpcBot
 	bot.name = "Bot%d" % _bot_seq
+	bot.display_name = "Cadáver — %s" % bot.name
 	# Position BEFORE add_child (npc-body's fix, applied to the arena too): adding
 	# the bot first leaves it at the arena origin for the rest of the frame, and a
 	# body that exists at the origin can be thrown up by the floor's depenetration
@@ -777,23 +772,25 @@ func _spawn_bot(at: Vector3, team: int) -> void:
 	bot.set_team(team)
 	bot.npc_id = _bot_seq
 	bot.friendly_fire = game_mode.friendly_fire
+	# Explicit learning-target contract: armed npc-body combat is opt-IN here.
+	# 12 J is the pre-scale input; npc-body's 0.20 safety scale makes each
+	# synthetic shot 2.4 J at an 18 m reach.
+	bot.weapon_enabled = true
+	bot.weapon_range = 18.0
+	bot.attack_energy = 12.0
 	add_child(bot)
 	bot.set_meta("id", _bot_seq) # COOP extraction gates read this meta
 	bot.set_meta("team", team)
-	# Fase 1 tuning: melee dummies, gentle enough to learn the loop.
-	bot.attack_energy = 12.0
 	# Patrol the full arena; chase/attack logic lives in the bot.
 	var pts := _spawn_points()
 	bot.setup([pts[1], pts[2], pts[3], pts[0]])
 	_connect_bot(bot)
 
-func _bot_id(bot: Node) -> int:
-	return int(bot.get_meta("id", 0))
-
-func _bot_team(bot: Node) -> int:
-	return int(bot.get_meta("team", 0))
-
 func _connect_bot(bot: Node) -> void:
+	if bot is NpcBot:
+		var npc := bot as NpcBot
+		if not npc.loot_requested.is_connected(_on_corpse_loot_requested):
+			npc.loot_requested.connect(_on_corpse_loot_requested)
 	# 1) player-rig API: signal died(bot)
 	if bot.has_signal("died"):
 		var died_sig := (bot as NpcBot).died as Signal
@@ -807,8 +804,10 @@ func _connect_bot(bot: Node) -> void:
 			(h as Health).player_died.connect(_on_bot_health_died.bind(bot))
 		return
 	# 3) RangeTarget-style: signal target_down
-	if bot.has_signal("target_down"):
-		bot.connect("target_down", _on_bot_target_down.bind(bot))
+	if bot is RangeTarget:
+		var target := bot as RangeTarget
+		if not target.target_down.is_connected(_on_bot_target_down.bind(bot)):
+			target.target_down.connect(_on_bot_target_down.bind(bot))
 
 func _on_bot_died(bot: NpcBot) -> void:
 	_register_bot_death(bot, true)
@@ -819,36 +818,178 @@ func _on_bot_health_died(_cause: String, bot: Node) -> void:
 func _on_bot_target_down(bot: Node) -> void:
 	_register_bot_death(bot, false)
 
-## Credits the kill to whoever actually did it. A bot records the attacker that
-## hit it (another bot's melee sets its `npc_id`; the range resolver leaves it at
-## -1 for the player), so hardcoding PLAYER_ID credited the PLAYER for every
-## bot-vs-bot kill as soon as the arena's bots became hostile to each other.
-## An unknown killer (environment, nothing recorded) still credits the player,
-## which is what the arena did before this.
+
+## npc-body owns the corpse data and guard; the arena owns the UI bridge. The
+## live InventoryContainer is opened beside the player's backpack/equipment so
+## the existing transfer, quick-equip and world-drop paths stay authoritative.
+func _on_corpse_loot_requested(corpse: NpcBot, container: InventoryContainer) -> void:
+	if not is_instance_valid(corpse) or container == null:
+		return
+	if corpse.get_corpse_inventory() != container:
+		_set_center("Cadáver sem itens")
+		return
+	if player == null or player.inventory_ui == null:
+		push_warning("ARENA: corpse loot requested without player inventory UI")
+		return
+	if _inventory_open():
+		player.inventory_ui.close_inventory()
+	var label: String = corpse.display_name.strip_edges()
+	if label.is_empty():
+		label = corpse.name
+	container.name = label
+	_loot_corpse = corpse
+	_set_inventory_chrome_hidden(true)
+	player.inventory_ui.open_inventory(player, container)
+	call_deferred("_focus_corpse_inventory", container)
+	_set_center("Saqueando %s" % label)
+
+
+func _inventory_open() -> bool:
+	return player != null and player.inventory_ui != null and player.inventory_ui.is_open()
+
+
+func _close_inventory() -> void:
+	_loot_corpse = null
+	if _inventory_open():
+		player.inventory_ui.close_inventory()
+	else:
+		_set_inventory_chrome_hidden(false)
+
+
+func _on_inventory_closed() -> void:
+	_loot_corpse = null
+	_set_inventory_chrome_hidden(false)
+
+
+func _on_inventory_visibility_changed() -> void:
+	_set_inventory_chrome_hidden(_inventory_open())
+
+
+## InventoryContainerUI's grid is a plain Control, so its row height does not
+## become the panel's container minimum. Without an explicit height, two open
+## panels receive shallow VBox space and their grids paint over each other.
+## Size each live panel from its actual grid and scroll the corpse section into
+## view; all transfer/drop behavior remains in the shared inventory UI.
+func _focus_corpse_inventory(container: InventoryContainer) -> void:
+	if not _inventory_open() or player.inventory_ui == null:
+		return
+	var corpse_ui: InventoryContainerUI = null
+	for ui in player.inventory_ui.open_containers:
+		_fit_inventory_panel(ui)
+		if ui.current_inventory_source == container:
+			corpse_ui = ui
+	if corpse_ui == null:
+		return
+	await get_tree().process_frame
+	if not _inventory_open() or not is_instance_valid(corpse_ui):
+		return
+	var column := corpse_ui.get_parent()
+	var scroll: ScrollContainer = null
+	if column != null:
+		scroll = column.get_parent() as ScrollContainer
+	if scroll != null:
+		scroll.scroll_vertical = int(maxf(0.0, corpse_ui.position.y))
+
+
+func _fit_inventory_panel(ui: InventoryContainerUI) -> void:
+	var container := ui.current_inventory_source as InventoryContainer
+	if container == null:
+		return
+	var grid_height := float(container.grid_height * ui.slot_size)
+	ui.custom_minimum_size = Vector2(0.0, grid_height + INVENTORY_PANEL_CHROME)
+	ui.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
+
+## Hide only persistent chrome that competes with the centered inventory. The
+## damage flash remains visible because the raid keeps running while looting.
+func _set_inventory_chrome_hidden(hidden: bool) -> void:
+	if hidden:
+		if not _inventory_hidden_chrome.is_empty():
+			return
+		var candidates: Array[Node] = []
+		if top_label != null:
+			candidates.append(top_label.get_parent())
+		if raid_label != null:
+			candidates.append(raid_label.get_parent())
+		if not feed_labels.is_empty():
+			var feed_box := feed_labels[0].get_parent()
+			if feed_box != null:
+				candidates.append(feed_box.get_parent())
+		candidates.append(center_label)
+		candidates.append(death_label)
+		candidates.append(extract_label)
+		candidates.append(dir_marker)
+		if player != null:
+			candidates.append(player.get_node_or_null("PlayerStatusHud"))
+			for child in player.get_children():
+				if child is SubViewportContainer:
+					candidates.append(child)
+		for item in candidates:
+			if item != null and is_instance_valid(item) and _node_visible(item):
+				_inventory_hidden_chrome.append(item)
+				_set_node_visible(item, false)
+		return
+	for item in _inventory_hidden_chrome:
+		if is_instance_valid(item):
+			_set_node_visible(item, true)
+	_inventory_hidden_chrome.clear()
+
+
+func _node_visible(node: Node) -> bool:
+	if node is CanvasLayer:
+		return (node as CanvasLayer).visible
+	if node is CanvasItem:
+		return (node as CanvasItem).visible
+	return false
+
+
+func _set_node_visible(node: Node, value: bool) -> void:
+	if node is CanvasLayer:
+		(node as CanvasLayer).visible = value
+	elif node is CanvasItem:
+		(node as CanvasItem).visible = value
+
+
+func _tick_corpse_loot() -> void:
+	if _loot_corpse == null:
+		return
+	if not is_instance_valid(_loot_corpse):
+		_close_inventory()
+		_set_center("Cadáver removido")
+		return
+	if _loot_corpse.get_corpse_inventory() == null:
+		_close_inventory()
+		_set_center("Cadáver saqueado")
+
+## The adapter owns attribution/result interpretation; this method retains the
+## scene lifecycle around it. Respawn scheduling stays here because it depends on
+## arena timers and the frozen match/raid lifecycle.
 func _register_bot_death(bot: Node, respawn: bool) -> void:
-	var attacker = bot.get("last_attacker_id")
-	var killer: int = int(attacker) if attacker is int and int(attacker) >= 0 else PLAYER_ID
-	_register_kill(killer, _bot_id(bot), _bot_team(bot), bot.name)
+	if not _match_over and not _raid_over:
+		_apply_kill_result(_result_adapter.record_bot_death(game_mode, bot, PLAYER_ID))
 	if respawn:
 		_respawn_bot_later()
 
-## Single kill entry: the mode owns scoring + friendly-fire + win condition.
+
+## Single kill entry: the adapter calls GameMode exactly once, then this scene
+## publishes raid/EXP/feed/match-over side effects in their historical order.
 func _register_kill(killer_id: int, victim_id: int, victim_team: int, victim_name: String) -> void:
 	if _match_over or _raid_over:
 		return
-	var killer_team: int = game_mode.assign_team(killer_id) if killer_id >= 0 else -1
-	game_mode.on_kill(killer_id, victim_id, victim_team)
+	_apply_kill_result(_result_adapter.record_kill(
+		game_mode, PLAYER_ID, killer_id, victim_id, victim_team, victim_name))
+
+
+func _apply_kill_result(result: Dictionary) -> void:
+	var killer_id := int(result.get("killer_id", NO_KILLER))
+	var victim_id := int(result.get("victim_id", 0))
 	# Raid event bus: consumer-less for now (quests/skills arrive later).
 	if raid != null:
 		raid.register_kill(killer_id, victim_id, _current_weapon_name())
 		if killer_id == PLAYER_ID:
 			raid.add_exp(KILL_EXP)
-	if killer_id == PLAYER_ID:
-		_push_feed("Você eliminou %s [%s]" % [victim_name, game_mode.team_name(killer_team)])
-	elif game_mode.team_count > 1 and killer_team == victim_team:
-		_push_feed("Fogo amigo: %s" % victim_name)
-	else:
-		_push_feed("%s abateu %s" % [game_mode.team_name(killer_team), victim_name])
+	_push_feed(String(result.get("feed_text", "")))
 	_check_match_over()
 
 func _current_weapon_name() -> String:
@@ -866,17 +1007,7 @@ func _check_match_over() -> void:
 	if OS.is_debug_build(): print("MATCH OVER: mode=%s winner=%s scores=%s" % [game_mode.mode_name, winner, game_mode.get_scores()])
 
 func _winner_text() -> String:
-	if game_mode is TDMMode:
-		var wt: int = (game_mode as TDMMode).winning_team()
-		return "empate" if wt < 0 else "%s vence" % game_mode.team_name(wt)
-	var best_id := -1
-	var best := -1
-	var scores := game_mode.get_scores()
-	for key in scores:
-		if int(scores[key]) > best:
-			best = int(scores[key])
-			best_id = int(key)
-	return "Você vence" if best_id == PLAYER_ID else "Bot %d vence" % best_id
+	return _result_adapter.winner_text(game_mode, PLAYER_ID)
 
 func _respawn_bot_later() -> void:
 	# NpcBot despawns itself; spawn a wave replacement after respawn_delay.

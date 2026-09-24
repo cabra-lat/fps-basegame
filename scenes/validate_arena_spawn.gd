@@ -17,6 +17,7 @@
 #   - a fresh `setup()` reproduces the same sequence: the spawn is DETERMINISTIC
 #     (no `randi()`), which is what makes a spawn bug reproducible at all
 #   - the arena spawns BOT_COUNT bots on distinct points
+#   - the arena explicitly opts into armed NPC combat: 18 m, 12 J input -> 2.4 J
 #   - after ~130 physics frames nobody is in the air: max y stays at floor level
 #     and every bot reports is_on_floor()
 #   - `_activate_slot(slot)` -> `player.current_weapon` is that slot's weapon
@@ -166,6 +167,24 @@ func _check_bot_spawns() -> void:
 			min_d = minf(min_d, positions[i].distance_to(positions[j]))
 	v.check(bots.size() < 2 or min_d >= MIN_SEPARATION,
 		"no two bots spawn inside %.1f m (min distance %.2f m)" % [MIN_SEPARATION, min_d])
+	_check_armed_contract(bots)
+
+
+## The arena deliberately opts into npc-body's armed learning-target contract.
+## Pin the consumer values, not just NpcBot defaults, so a future default change
+## cannot silently alter arena range/damage.
+func _check_armed_contract(bots: Array) -> void:
+	v.section("[arena: explicit armed learning-target contract]")
+	for b in bots:
+		var bot := b as NpcBot
+		v.check(bot.weapon_enabled and bot.has_weapon(),
+			"%s explicitly opts into armed NPC combat" % bot.name)
+		v.check(is_equal_approx(bot.weapon_range, 18.0),
+			"%s weapon reach is 18.0 m" % bot.name)
+		var actual_energy: float = bot._attack_energy(true)
+		v.check(is_equal_approx(bot.attack_energy, 12.0)
+				and is_equal_approx(actual_energy, 2.4),
+			"%s scales 12.0 J input to 2.4 J actual damage" % bot.name)
 
 
 func _check_nobody_launched() -> void:

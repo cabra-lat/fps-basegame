@@ -33,6 +33,10 @@ const DEFAULT_BOT_SCENE: PackedScene = preload("res://src/npcs/bot/bot.tscn")
 @export var participant_index_start: int = 1 ## 0 usually belongs to the player.
 @export var auto_start: bool = true
 @export var start_delay: float = 1.0
+## Optional data-driven loadout. Empty uses NpcBot's neutral default weapon;
+## otherwise each wave cycles the supplied resources without hardcoding a
+## weapon list in the spawner.
+@export var bot_weapon_templates: Array[Weapon] = []
 
 @export_group("Difficulty")
 @export var base_count: int = 2
@@ -133,6 +137,9 @@ func _spawn_one() -> void:
 		return
 	_group_seq += 1
 	bot.name = "Wave%dBot%d" % [wave, _group_seq]
+	if not bot_weapon_templates.is_empty() and bot.has_method("set_weapon_template"):
+		var weapon_index := (_group_seq - 1) % bot_weapon_templates.size()
+		bot.call("set_weapon_template", bot_weapon_templates[weapon_index])
 	bot.set_team(t)
 	bot.npc_id = idx
 	bot.friendly_fire = _friendly_fire()

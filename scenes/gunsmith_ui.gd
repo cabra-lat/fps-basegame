@@ -10,6 +10,15 @@ extends CanvasLayer
 ## ("Modificar" on a weapon item -> player-rig hook -> the arena). There is
 ## deliberately no "open whatever is equipped" path and no pause-menu screen:
 ## opening without an item showed a weapon the player had not picked.
+##
+## GUIDE-LINES UX (PARKED DESIGN):
+## The proposal to draw visual leader lines from locked 2D slot rows to 3D marker
+## positions is PARKED. Rationale: rows live in a 2D CanvasLayer column while markers
+## live in a rotating SubViewport 3D world; projecting 3D positions to 2D screen coords
+## per frame, tracking camera rotation, drawing Line2D overlays, and handling hover/drag
+## raycasts adds substantial per-frame complexity and performance overhead. If prioritized
+## in the future, recommended implementation is a Line2D overlay node atop the preview,
+## sampling preview_view.get_camera_3d().unproject_position(marker.global_position).
 
 signal closed
 
@@ -42,8 +51,10 @@ var preview_holder: Node3D
 var preview_view: SubViewport
 var close_btn: Button
 
-var _pending: Array = [] # [{kind:"attach"/"detach", point:int, att:Attachment}]
+var _pending: Array = [] # [{kind:"attach"/"detach", point:int, att:Attachment, origin:Dictionary}]
 var _active: Dictionary = {}
+var _mounted_origins: Dictionary = {} # current weapon point:int -> {"stash_item": InventoryItem, "source": Variant, "position": Vector2i}
+var _mounted_origins_by_weapon: Dictionary = {} # weapon instance id -> {"weapon_ref": WeakRef, "origins": Dictionary}
 var _t := 0.0
 
 func bind(p_audio: GameAudio) -> void:
@@ -63,6 +74,8 @@ func open_for_weapon(w: Weapon) -> void:
 	if w == null:
 		return
 	weapon = w
+	_activate_origin_map(w)
+	_prune_origin_map()
 	visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_refresh()
@@ -195,15 +208,20 @@ func _mounted_summary() -> String:
 	return "%d montado(s)" % n
 
 func _row_for(point: int) -> Control:
-	var row := HBoxContainer.new()
+	var row := MountRow.new()
+	row.ui = self
+	row.point = point
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	row.add_theme_constant_override("separation", 8)
 	var name_lbl := Label.new()
+	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_lbl.custom_minimum_size = Vector2(110, 0)
 	name_lbl.text = String(MOUNT_NAMES.get(point, str(point)))
 	name_lbl.add_theme_font_size_override("font_size", HudStyle.FONT_HINT)
 	row.add_child(name_lbl)
 	var att := weapon.get_attachment(point)
 	var info := Label.new()
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_font_size_override("font_size", HudStyle.FONT_HINT)
 	info.text = _att_line(att)
@@ -280,20 +298,125 @@ func _on_picker_option(picker: AcceptDialog, point: int, att: Attachment) -> voi
 		picker.hide()
 	_queue_attach(point, att)
 
+func _activate_origin_map(w: Weapon) -> void:
+	_prune_origin_weapon_entries()
+	var weapon_id := w.get_instance_id()
+	var entry = _mounted_origins_by_weapon.get(weapon_id, null)
+	if entry is Dictionary:
+		var ref = entry.get("weapon_ref", null)
+		var origins = entry.get("origins", null)
+		if ref is WeakRef and ref.get_ref() is Weapon and origins is Dictionary and not origins.is_empty():
+			_mounted_origins = origins
+			return
+	# Do not retain an entry for a weapon until it actually owns a source
+	# origin. This keeps opening arbitrary weapons bounded.
+	_mounted_origins = {}
+
+func _ensure_current_origin_entry() -> void:
+	if weapon == null:
+		return
+	var weapon_id := weapon.get_instance_id()
+	var entry = _mounted_origins_by_weapon.get(weapon_id, null)
+	if entry is Dictionary:
+		var ref = entry.get("weapon_ref", null)
+		var origins = entry.get("origins", null)
+		if ref is WeakRef and ref.get_ref() is Weapon and origins is Dictionary:
+			_mounted_origins = origins
+			return
+	_mounted_origins_by_weapon[weapon_id] = {
+		"weapon_ref": weakref(weapon),
+		"origins": _mounted_origins,
+	}
+
+func _prune_origin_weapon_entries() -> void:
+	for weapon_id in _mounted_origins_by_weapon.keys():
+		var entry = _mounted_origins_by_weapon[weapon_id]
+		if not (entry is Dictionary):
+			_mounted_origins_by_weapon.erase(weapon_id)
+			continue
+		var ref = entry.get("weapon_ref", null)
+		var live_weapon = ref.get_ref() if ref is WeakRef else null
+		var origins = entry.get("origins", null)
+		var has_origins = origins is Dictionary and not origins.is_empty()
+		if not (live_weapon is Weapon) or not has_origins:
+			_mounted_origins_by_weapon.erase(weapon_id)
+
+func _prune_origin_map() -> void:
+	if weapon == null:
+		return
+	for point in _mounted_origins.keys():
+		if weapon.get_attachment(int(point)) == null:
+			_mounted_origins.erase(point)
+	_erase_current_weapon_entry_if_empty()
+
+func _erase_current_weapon_entry_if_empty() -> void:
+	if weapon == null or not _mounted_origins.is_empty():
+		return
+	_mounted_origins_by_weapon.erase(weapon.get_instance_id())
+
+func _erase_origin(point: int) -> void:
+	_mounted_origins.erase(point)
+	_erase_current_weapon_entry_if_empty()
+
+func _can_drop_on_row(point: int, data: Variant) -> bool:
+	if not (data is Dictionary and data.has("item")):
+		return false
+	var item = data.get("item")
+	if item == null:
+		return false
+	var att = item.get("extra") as Attachment
+	if att == null:
+		return false
+	if att.attachment_point != point:
+		return false
+	if weapon == null or not (weapon.attach_points & point):
+		return false
+	if not att.compatible_weapons.is_empty() and not (weapon.name in att.compatible_weapons):
+		return false
+	if weapon.get_attachment(point) != null:
+		return false
+	if _is_point_busy(point):
+		return false
+	return true
+
+func _is_point_busy(point: int) -> bool:
+	if not _active.is_empty() and _active.get("point") == point:
+		return true
+	for p in _pending:
+		if p.get("point") == point:
+			return true
+	return false
+
+func _drop_on_row(point: int, data: Variant) -> void:
+	if not _can_drop_on_row(point, data):
+		return
+	var item = data.get("item")
+	var att: Attachment = item.extra as Attachment
+	var source = data.get("source")
+	var pos: Vector2i = item.position if item != null and "position" in item else Vector2i(-1, -1)
+	var origin: Dictionary = {
+		"stash_item": item,
+		"source": source,
+		"position": pos,
+	}
+	_queue_attach(point, att, origin)
+
 func _request_detach(point: int) -> void:
 	_queue_detach(point)
 
-func _queue_attach(point: int, att: Attachment) -> void:
-	_pending.append({"kind": "attach", "point": point, "att": att})
+func _queue_attach(point: int, att: Attachment, origin: Dictionary = {}) -> void:
+	_pending.append({"kind": "attach", "point": point, "att": att, "origin": origin})
 	message.text = "Na fila: montar %s" % att.name
 	_refresh()
 
 func _queue_detach(point: int) -> void:
-	_pending.append({"kind": "detach", "point": point, "att": weapon.get_attachment(point)})
+	var origin: Dictionary = _mounted_origins.get(point, {})
+	_pending.append({"kind": "detach", "point": point, "att": weapon.get_attachment(point), "origin": origin})
 	message.text = "Na fila: remover"
 	_refresh()
 
 func _physics_process(delta: float) -> void:
+	_prune_origin_weapon_entries()
 	if not visible:
 		return
 	if preview_holder != null:
@@ -323,18 +446,83 @@ func _physics_process(delta: float) -> void:
 		_rebuild_preview()
 
 func _apply(a: Dictionary) -> void:
+	if weapon == null:
+		return
 	var point: int = a.get("point", 0)
+	var origin: Dictionary = a.get("origin", {})
 	if a.get("kind") == "attach":
 		var att: Attachment = a.get("att")
-		if att != null and weapon.attach_attachment(point, att):
-			message.text = "Montado: %s" % att.name
-		else:
+		if att == null or not weapon.attach_attachment(point, att):
 			message.text = "Falhou ao montar"
-	else:
-		if weapon.detach_attachment(point):
-			message.text = "Removido"
+			return
+		# Mount first, then take ownership from the source. If the source moved
+		# while the timed action was running, roll the mount back instead of
+		# leaving a duplicated attachment behind.
+		if not origin.is_empty():
+			var stash_item = origin.get("stash_item")
+			var source = origin.get("source")
+			if not _remove_stash_item(source, stash_item):
+				weapon.detach_attachment(point)
+				message.text = "Falhou ao retirar da origem"
+				return
+			_ensure_current_origin_entry()
+			_mounted_origins[point] = origin
 		else:
+			_erase_origin(point)
+		message.text = "Montado: %s" % att.name
+	else:
+		var mounted_att: Attachment = weapon.get_attachment(point)
+		if not weapon.detach_attachment(point):
 			message.text = "Nada para remover"
+			return
+		if not origin.is_empty():
+			var stash_item = origin.get("stash_item")
+			var source = origin.get("source")
+			var pos: Vector2i = origin.get("position", Vector2i(-1, -1))
+			if not _return_stash_item(source, stash_item, pos):
+				# A detach is transactional too: if the source cannot take the
+				# wrapper back, keep it mounted so the player can retry after
+				# freeing space rather than silently losing the item.
+				var restored := mounted_att != null and weapon.attach_attachment(point, mounted_att)
+				message.text = "Falhou ao devolver; %s" % ("montagem mantida" if restored else "montagem nao restaurada")
+				return
+		_erase_origin(point)
+		message.text = "Removido"
+
+func _remove_stash_item(source: Variant, item: Variant) -> bool:
+	if source == null or item == null:
+		return false
+	if source is InventoryContainer:
+		var c := source as InventoryContainer
+		if item in c.items:
+			return c.remove_item(item)
+	elif source is Equipment:
+		var eq := source as Equipment
+		for slot_name in eq.slots:
+			var slot = eq.slots[slot_name]
+			if item in slot.items:
+				return slot.remove_item(item)
+	elif source.has_method("remove_item"):
+		return source.remove_item(item)
+	return false
+
+func _return_stash_item(source: Variant, item: Variant, preferred_pos: Vector2i = Vector2i(-1, -1)) -> bool:
+	if source == null or item == null:
+		return false
+	if source is InventoryContainer:
+		var c := source as InventoryContainer
+		if preferred_pos != Vector2i(-1, -1) and c.grid != null and c.grid.is_area_free(preferred_pos, item.dimensions):
+			return c.add_item(item, preferred_pos)
+		return c.add_item(item, Vector2i(-1, -1))
+	elif source is Equipment:
+		var eq := source as Equipment
+		for slot_name in eq.slots:
+			var slot = eq.slots[slot_name]
+			if slot.can_add_item(item):
+				return slot.add_item(item)
+	elif source.has_method("add_item"):
+		return source.add_item(item)
+	return false
 
 # ─── 3D PREVIEW ───
 
@@ -432,3 +620,17 @@ func _preview_marker(vm: Node3D, point: int) -> Node3D:
 		if n is Node3D:
 			return n
 	return vm
+
+
+## Mount row control: receives dragged inventory attachment items and routes
+## them through GunsmithUI drop validation and action queuing.
+class MountRow extends HBoxContainer:
+	var ui: GunsmithUI
+	var point: int
+
+	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+		return ui != null and ui._can_drop_on_row(point, data)
+
+	func _drop_data(_at_position: Vector2, data: Variant) -> void:
+		if ui != null:
+			ui._drop_on_row(point, data)
