@@ -471,6 +471,22 @@ func _scenario_hub_deploy_contract() -> void:
 	_check(not failed_eq.is_equipped("primary") and not failed_eq.is_equipped("secondary"), "failed prepare rolls back equipped items")
 	_check(failed_profile.loadout.size() == 2, "failed prepare leaves the recovery manifest intact")
 
+	# Checked preparation uses the same atomic transaction and clears a stale
+	# insurance manifest when the real profile save fails.
+	var checked_service := MetaService.new()
+	checked_service.save_path = TEST_DIR + "/checked_missing_parent/profile.save"
+	var checked_profile := MetaProfile.new()
+	checked_service.use_profile(checked_profile, checked_service.save_path)
+	checked_service.grant_starter_loadout(starter)
+	var checked_eq := Equipment.new()
+	checked_service.bind_carrier(checked_eq, Backpack.new())
+	checked_service._insured_manifest = {"stale": true}
+	var checked := checked_service.prepare_raid_checked()
+	_check(not checked.get("ok", false) and int(checked.get("error", OK)) != OK, "checked prepare reports save failure")
+	_check(not checked_eq.is_equipped("primary") and not checked_eq.is_equipped("secondary"), "checked prepare rolls back equipment")
+	_check(checked_service._insured_manifest.is_empty(), "checked prepare clears stale insurance manifest")
+	_check(checked_profile.loadout.size() == 2, "checked prepare preserves the loadout manifest")
+
 	# Force the second selected stash removal to fail. The deploy transaction
 	# must restore every selected item, including the one removed by the signal.
 	var rollback_profile := MetaProfile.new()

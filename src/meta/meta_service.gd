@@ -154,12 +154,24 @@ func flea_report_lines(only_active: bool = true) -> Array[String]:
 
 ## Move the persisted loadout onto the player. Runs before the raid starts.
 ## Un-decodable entries stay in the profile instead of being silently lost.
+## Legacy count API: returns the number equipped, or 0 when preparation fails.
 func prepare_raid() -> int:
+	var result := _prepare_raid_transaction()
+	return int(result.get("items_equipped", 0)) if bool(result.get("ok", false)) else 0
+
+
+## Fail-closed preparation for callers that must not begin a raid after a
+## persistence error. The same transaction is used by legacy prepare_raid().
+func prepare_raid_checked() -> Dictionary:
+	return _prepare_raid_transaction()
+
+
+func _prepare_raid_transaction() -> Dictionary:
 	_prepared = false
 	_resolved = false
 	_deploy_leftovers = {}
 	if profile == null or _equipment == null:
-		return 0
+		return {"ok": false, "error": ERR_UNCONFIGURED, "reason": "profile or equipment unavailable", "items_equipped": 0}
 	var moved := 0
 	var equipped_this_call: Array = []
 	for slot_name in profile.loadout:
@@ -174,19 +186,21 @@ func prepare_raid() -> int:
 		if not pending.is_empty():
 			_deploy_leftovers[slot_name] = pending
 	_prepared = true
-	# Deployment is a persistence boundary, not just an in-memory transfer. The
-	# profile still owns the recovery manifest if the process stops mid-raid.
+	# One persistence boundary for the whole preparation. If it fails, undo
+	# every carrier mutation and clear all raid-entry state, including a stale
+	# insurance manifest from an earlier attempt.
 	var err := _save()
 	if err != OK:
 		for entry in equipped_this_call:
 			_equipment.unequip(entry[0] as InventoryItem, String(entry[1]))
 		_prepared = false
 		_deploy_leftovers = {}
-		return 0
+		_insured_manifest = {}
+		return {"ok": false, "error": err, "reason": "profile save failed", "items_equipped": 0}
 	if auto_insure and _equipment != null:
 		insure_manifest()
 	raid_prepared.emit(moved)
-	return moved
+	return {"ok": true, "error": OK, "reason": "", "items_equipped": moved}
 
 ## Snapshot the currently-equipped gear as the insured manifest for this raid.
 func insure_manifest() -> Dictionary:
