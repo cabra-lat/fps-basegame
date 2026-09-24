@@ -336,6 +336,13 @@ func _scenario_hub_deploy_contract() -> void:
 	var starter := load(STARTER) as StarterLoadout
 	_check(service.grant_starter_loadout(starter) == 2, "starter granted once")
 	_check(service.grant_starter_loadout(starter) == 0, "starter grant is idempotent (no duplicate starter)")
+	var empty_options := MetaService.new()
+	var empty_profile := MetaProfile.new()
+	empty_options.use_profile(empty_profile, TEST_DIR + "/empty_projection.save")
+	_check(empty_options.deploy_options().is_empty(), "empty profile has no hub deployment option")
+	var projection := service.deploy_options()
+	_check(String(projection.get("id", "")) == "active", "populated kit exposes the active hub option")
+	_check(projection.get("selection", {}) is Dictionary and service.validate_deploy(projection.selection).get("ok", false), "hub projection is canonical and legal")
 
 	var selected := profile.loadout.duplicate(true)
 	var selected_sig := _loadout_signature(selected)
@@ -343,6 +350,8 @@ func _scenario_hub_deploy_contract() -> void:
 	_check(valid.get("ok", false), "selected two-site loadout validates")
 	var bad := service.validate_deploy({"primary": [{"kind": "container", "path": ""}]})
 	_check(not bad.get("ok", false), "unknown item is rejected safely")
+	var empty_primary := service.validate_deploy({"primary": []})
+	_check(not empty_primary.get("ok", false), "empty primary selection is rejected")
 	_check(profile.loadout == selected, "rejected selection does not mutate profile")
 
 	var deployed := service.deploy_loadout(selected)
@@ -386,6 +395,50 @@ func _scenario_hub_deploy_contract() -> void:
 	var second_after := ProfileStore.load_profile(second_path)
 	_check(second_after.loadout.is_empty(), "failed second deployment leaves no active loadout")
 	_check(second_after.stash.count_items() == 1, "failed second deployment preserves the unselected stash weapon")
+
+	# A persistence failure must not leave the carrier equipped or the service
+	# claiming that preparation completed.
+	var failed_path := TEST_DIR + "/missing_parent/profile.save"
+	var failed_service := MetaService.new()
+	failed_service.save_path = failed_path
+	var failed_profile := MetaProfile.new()
+	failed_service.use_profile(failed_profile, failed_path)
+	failed_service.grant_starter_loadout(starter)
+	var failed_eq := Equipment.new()
+	failed_service.bind_carrier(failed_eq, Backpack.new())
+	_check(failed_service.prepare_raid() == 0, "prepare fails closed when persistence fails")
+	_check(not failed_eq.is_equipped("primary") and not failed_eq.is_equipped("secondary"), "failed prepare rolls back equipped items")
+	_check(failed_profile.loadout.size() == 2, "failed prepare leaves the recovery manifest intact")
+
+	# Force the second selected stash removal to fail. The deploy transaction
+	# must restore every selected item, including the one removed by the signal.
+	var rollback_profile := MetaProfile.new()
+	var rollback_service := MetaService.new()
+	var rollback_path := TEST_DIR + "/deploy_rollback.save"
+	ProfileStore.delete(rollback_path)
+	rollback_service.save_path = rollback_path
+	rollback_service.use_profile(rollback_profile, rollback_path)
+	var primary_item := ItemCodec.item_from_path("res://resources/weapons/M4_Carbine.tres")
+	var secondary_item := ItemCodec.item_from_path("res://resources/weapons/AK_47.tres")
+	rollback_profile.stash.deposit(primary_item)
+	rollback_profile.stash.deposit(secondary_item)
+	primary_item = rollback_profile.stash.items[0]
+	secondary_item = rollback_profile.stash.items[1]
+	var primary_data := ItemCodec.encode_item(primary_item)
+	var secondary_data := ItemCodec.encode_item(secondary_item)
+	var callback_state := {"ran": false}
+	rollback_profile.stash.item_removed.connect(func(removed_item: InventoryItem) -> void:
+		if not callback_state.ran:
+			callback_state.ran = true
+			if removed_item == primary_item:
+				rollback_profile.stash.remove_item(secondary_item)
+			else:
+				rollback_profile.stash.remove_item(primary_item)
+	)
+	var rollback := rollback_service.deploy_loadout({"primary": [primary_data], "secondary": [secondary_data]})
+	_check(not rollback.get("ok", false), "deploy reports a failed stash removal (reason=%s)" % String(rollback.get("reason", "")))
+	_check(callback_state.ran and rollback_profile.stash.count_items() == 2, "failed stash removal restores every selected item (callback=%s count=%d)" % [callback_state.ran, rollback_profile.stash.count_items()])
+	_check(rollback_profile.loadout.is_empty(), "failed stash removal restores the old loadout")
 
 
 func _loadout_signature(kit: Dictionary) -> String:

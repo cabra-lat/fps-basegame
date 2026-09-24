@@ -156,11 +156,13 @@ func prepare_raid() -> int:
 	if profile == null or _equipment == null:
 		return 0
 	var moved := 0
+	var equipped_this_call: Array = []
 	for slot_name in profile.loadout:
 		var pending: Array = []
 		for item_data in profile.loadout[slot_name]:
 			var item := ItemCodec.decode_item(item_data)
 			if item != null and _equipment.equip(item, slot_name):
+				equipped_this_call.append([item, slot_name])
 				moved += 1
 			else:
 				pending.append(item_data)
@@ -169,7 +171,13 @@ func prepare_raid() -> int:
 	_prepared = true
 	# Deployment is a persistence boundary, not just an in-memory transfer. The
 	# profile still owns the recovery manifest if the process stops mid-raid.
-	_save()
+	var err := _save()
+	if err != OK:
+		for entry in equipped_this_call:
+			_equipment.unequip(entry[0] as InventoryItem, String(entry[1]))
+		_prepared = false
+		_deploy_leftovers = {}
+		return 0
 	if auto_insure and _equipment != null:
 		insure_manifest()
 	raid_prepared.emit(moved)
@@ -343,6 +351,8 @@ func validate_deploy(selection: Dictionary) -> Dictionary:
 		if entries.size() > 1:
 			return {"ok": false, "reason": "%s aceita no maximo uma arma" % slot_name}
 		if entries.is_empty():
+			if slot_name == REQUIRED_DEPLOY_SLOT:
+				return {"ok": false, "reason": "primary obrigatorio"}
 			continue
 		if not (entries[0] is Dictionary):
 			return {"ok": false, "reason": "%s contem dado invalido" % slot_name}
@@ -357,6 +367,26 @@ func validate_deploy(selection: Dictionary) -> Dictionary:
 		if not _find_owned_item(data).has("item"):
 			return {"ok": false, "reason": "arma nao pertence ao perfil: %s" % String(data.get("name", "?"))}
 	return {"ok": true, "reason": "", "slots": selection.keys()}
+
+## Read-only hub projection of the current legal kit. The opaque id is stable
+## for the UI; `selection` contains the canonical ItemCodec data that must be
+## passed back to validate_deploy()/deploy_loadout(). No starter is granted here.
+func deploy_options() -> Dictionary:
+	if profile == null:
+		return {}
+	var selection: Dictionary = {}
+	for slot_name in DEPLOY_SLOTS:
+		var raw: Variant = profile.loadout.get(slot_name, [])
+		if raw is Array and not (raw as Array).is_empty():
+			selection[slot_name] = (raw as Array).duplicate(true)
+	if not validate_deploy(selection).get("ok", false):
+		return {}
+	return {
+		"id": "active",
+		"label": "Active kit",
+		"selection": selection,
+	}
+
 
 ## Stage the selected kit as the profile's active loadout. Items selected from the
 ## stash are removed exactly once; unselected items from the old kit are returned
@@ -390,34 +420,45 @@ func deploy_loadout(selection: Dictionary) -> Dictionary:
 		var old_entries: Array = old_loadout[slot_name]
 		for old_data in old_entries:
 			if not (old_data is Dictionary):
+				_rollback_deploy(old_loadout, returned, [])
 				return {"ok": false, "reason": "loadout salvo contem dado invalido"}
 			var old_key := _selection_key(old_data as Dictionary)
 			if selected_keys.has(old_key):
 				continue
 			var old_item := ItemCodec.decode_item(old_data as Dictionary)
 			if old_item == null:
+				_rollback_deploy(old_loadout, returned, [])
 				return {"ok": false, "reason": "loadout salvo contem item invalido"}
 			if not profile.stash.deposit(old_item):
-				for added in returned:
-					profile.stash.remove_item(added)
+				_rollback_deploy(old_loadout, returned, [])
 				return {"ok": false, "reason": "stash sem espaco para trocar o kit"}
 
+	var removed_from_stash: Array[InventoryItem] = []
 	for item in from_stash:
 		if not profile.stash.remove_item(item):
+			_rollback_deploy(old_loadout, returned, from_stash)
 			return {"ok": false, "reason": "item selecionado nao pode ser retirado do stash"}
+		removed_from_stash.append(item)
 	profile.loadout = staged
 	_resolved = false
 	var err := _save()
 	if err != OK:
 		# Best-effort rollback keeps the same ownership contract if persistence is
 		# unavailable; the caller receives the error and can retry or leave the hub.
-		for item in from_stash:
-			profile.stash.deposit(item)
-		for item in returned:
-			profile.stash.remove_item(item)
-		profile.loadout = old_loadout
+		_rollback_deploy(old_loadout, returned, from_stash)
 		return {"ok": false, "reason": "falha ao salvar kit: %d" % err}
 	return {"ok": true, "reason": "", "loadout": staged.duplicate(true)}
+
+
+func _rollback_deploy(old_loadout: Dictionary, returned: Array[InventoryItem], selected_from_stash: Array[InventoryItem]) -> void:
+	for item in selected_from_stash:
+		if profile.stash.items.has(item):
+			continue
+		if not profile.stash.deposit(item):
+			push_error("MetaService: rollback could not restore selected stash item %s" % item.name)
+	for item in returned:
+		profile.stash.remove_item(item)
+	profile.loadout = old_loadout
 
 
 func _selection_key(data: Dictionary) -> String:
