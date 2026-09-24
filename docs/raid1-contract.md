@@ -12,11 +12,27 @@ pickup, and two visible destinations.
   the existing MetaService resolution discards raid loot and forfeitures the
   deployed kit.
 
-## Product decision: Option A selected
+## Product decision: Option A — TARGET / UNIMPLEMENTED IN e9883e6
 
 The coordinator selected Option A: preserve the 600-second / 8–12 minute
 RAID-1 scenario and add a distinct scenario-clear outcome. The ordinary
 `RUN_THROUGH` rule remains unchanged for non-RAID-1 raids.
+
+This is the acceptance target that was missing from `e9883e6`; it is not a
+claim that the first candidate commit implemented the behavior. The historical
+`e9883e6` gaps were:
+
+- `Raid.Outcome.SCENARIO_CLEARED` did not exist.
+- RAID-1 still used generic `Raid.extract()`, so a 600-second clear was
+  classified by the ordinary `RUN_THROUGH`/`SURVIVED` thresholds.
+- The fallback could terminate through generic extraction while the scenario
+  remained ACTIVE when Marked Intel was missing.
+- MetaService settlement, progression, and result HUD had no distinct
+  scenario-clear outcome handling.
+
+The scoped follow-up `a9c6031` is the implementation of this target; the
+inventory above remains explicit so reviewers can verify the exact delta from
+`e9883e6`.
 
 ### Named outcome
 
