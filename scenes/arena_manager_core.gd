@@ -386,7 +386,7 @@ func _on_raid_started() -> void:
 	call("_push_feed", "Raid iniciou — %s" % raid.time_text())
 
 func _on_raid_ended(outcome: int) -> void:
-	if scenario != null and outcome != Raid.Outcome.SURVIVED and outcome != Raid.Outcome.RUN_THROUGH and scenario.state == Raid1ScenarioScript.State.ACTIVE:
+	if scenario != null and outcome != Raid.Outcome.SURVIVED and outcome != Raid.Outcome.RUN_THROUGH and outcome != Raid.Outcome.SCENARIO_CLEARED and scenario.state == Raid1ScenarioScript.State.ACTIVE:
 		scenario.fail(raid.outcome_name(outcome))
 		scenario.discard_carry(player.get_equipped_backpack())
 	_raid_over = true
@@ -421,11 +421,13 @@ func _on_extracted(point: ExtractionPoint) -> void:
 		raid.end(Raid.Outcome.LEFT_BEHIND)
 		call("_push_feed", "Falha:intel não coletado — kit perdido")
 		return
+	var out: int
 	if scenario != null:
 		scenario.prepare_success_carried(player.get_equipped_backpack())
-	var out: int = raid.extract(point)
-	if scenario != null and (out == Raid.Outcome.SURVIVED or out == Raid.Outcome.RUN_THROUGH):
 		scenario.complete(point)
+		out = raid.complete_scenario(point)
+	else:
+		out = raid.extract(point)
 	call("_push_feed", "Extraído por %s [%s]" % [point.display_name, raid.outcome_name(out)])
 
 ## Rebuild the raid portion of the HUD (timer, extractions, coin, EXP).

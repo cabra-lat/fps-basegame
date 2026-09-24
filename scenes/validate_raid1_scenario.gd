@@ -28,6 +28,25 @@ func _initialize() -> void:
 	_check(scenario.state == Raid1ScenarioScript.State.SUCCESS, "complete marks success")
 	_check(scenario.carried_item_id == Raid1ScenarioScript.OBJECTIVE_ID, "success carries marked intel")
 
+	var clear_raid := Raid.new()
+	root.add_child(clear_raid)
+	clear_raid.begin()
+	clear_raid.elapsed = Raid1ScenarioScript.DURATION_SECONDS
+	var clear_outcome: int = clear_raid.complete_scenario(gated)
+	_check(clear_outcome == Raid.Outcome.SCENARIO_CLEARED, "600s RAID-1 completion has distinct outcome")
+	_check(clear_raid.outcome_name() == "SCENARIO CLEARED", "scenario outcome has explicit display name")
+
+	var fallback_raid := Raid.new()
+	root.add_child(fallback_raid)
+	fallback_raid.begin()
+	var fallback_scenario := Raid1ScenarioScript.new()
+	fallback_scenario.begin(fallback_raid, profile, fallback, gated)
+	_check(fallback_scenario.can_extract(fallback), "fallback remains physically open")
+	fallback_scenario.fail("marked intel not extracted")
+	fallback_raid.end(Raid.Outcome.LEFT_BEHIND)
+	_check(fallback_scenario.state == Raid1ScenarioScript.State.FAILURE, "fallback without objective fails scenario")
+	_check(fallback_raid.outcome == Raid.Outcome.LEFT_BEHIND, "fallback failure ends before generic success")
+
 	var failed := Raid1ScenarioScript.new()
 	failed.begin(raid, profile, fallback, gated)
 	failed.collect(Raid1ScenarioScript.OBJECTIVE_ID)

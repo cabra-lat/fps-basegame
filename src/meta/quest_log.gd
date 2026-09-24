@@ -96,9 +96,10 @@ func on_loot(item: Resource) -> void:
 			if obj.kind == QuestObjective.Kind.LOOT_ITEM and obj.matches_item(item):
 				_bump(id, i, 1)
 
-## Extraction objectives only count on a real SURVIVED (RUN_THROUGH excluded).
+## Extraction objectives count on real successful extractions; RUN_THROUGH
+## remains excluded, while RAID-1 SCENARIO_CLEARED is successful by contract.
 func on_extracted(point: Node, outcome: int) -> void:
-	if outcome != Raid.Outcome.SURVIVED:
+	if outcome != Raid.Outcome.SURVIVED and outcome != Raid.Outcome.SCENARIO_CLEARED:
 		return
 	var pname := _point_name(point)
 	for id in _active_ids():
@@ -109,8 +110,9 @@ func on_extracted(point: Node, outcome: int) -> void:
 				_bump(id, i, 1)
 
 func on_raid_ended(outcome: int) -> void:
-	# "survive and extract" is SURVIVED only; RUN_THROUGH is explicitly excluded.
-	if outcome == Raid.Outcome.SURVIVED:
+	# "survive and extract" excludes RUN_THROUGH but includes the explicit
+	# RAID-1 scenario-clear outcome.
+	if outcome == Raid.Outcome.SURVIVED or outcome == Raid.Outcome.SCENARIO_CLEARED:
 		for id in _active_ids():
 			var q: Quest = _quests[id]
 			for i in range(q.objectives.size()):

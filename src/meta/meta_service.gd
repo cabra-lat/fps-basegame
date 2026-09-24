@@ -167,7 +167,8 @@ func insure_manifest() -> Dictionary:
 	return _insured_manifest
 
 ## The heart: resolve a finished raid against the carrier and persist.
-## SURVIVED/RUN_THROUGH -> carried loot to the stash, loadout kept, currency+EXP.
+## SURVIVED/RUN_THROUGH/SCENARIO_CLEARED -> successful settlement; the exact
+## outcome remains in the report so RAID-1 is not mislabeled as RUN_THROUGH.
 ## KIA/MIA/LEFT_BEHIND -> equipment forfeited, loot discarded, stash untouched.
 func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	if profile == null or _resolving:
@@ -176,7 +177,9 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	var report := RaidReport.new()
 	report.outcome = outcome
 	report.outcome_name = _outcome_name(outcome)
-	report.survived = outcome == Raid.Outcome.SURVIVED or outcome == Raid.Outcome.RUN_THROUGH
+	report.survived = outcome == Raid.Outcome.SURVIVED \
+		or outcome == Raid.Outcome.RUN_THROUGH \
+		or outcome == Raid.Outcome.SCENARIO_CLEARED
 	report.exp = maxi(exp, 0)
 
 	var carried_loadout := ItemCodec.encode_equipment(_equipment)
@@ -348,4 +351,5 @@ func _outcome_name(outcome: int) -> String:
 		Raid.Outcome.MIA: return "MIA"
 		Raid.Outcome.KIA: return "KIA"
 		Raid.Outcome.LEFT_BEHIND: return "LEFT BEHIND"
+		Raid.Outcome.SCENARIO_CLEARED: return "SCENARIO CLEARED"
 		_: return "—"
