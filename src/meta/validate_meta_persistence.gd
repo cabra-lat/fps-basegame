@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_scenario_missing_and_atomic()
 	_scenario_v1_migration()
 	_scenario_role_state()
+	_scenario_hub_deploy_contract()
 
 	quit(v.finish())
 
@@ -323,6 +324,79 @@ func _kit_mass(kit: Dictionary) -> float:
 			if item != null:
 				total += item.get_mass()
 	return total
+
+func _scenario_hub_deploy_contract() -> void:
+	print("\n[8] HUB-1 deploy contract: validate, exact transfer, restart, once-only report")
+	var path := TEST_DIR + "/deploy.save"
+	ProfileStore.delete(path)
+	var service := MetaService.new()
+	service.save_path = path
+	var profile := MetaProfile.new()
+	service.use_profile(profile, path)
+	var starter := load(STARTER) as StarterLoadout
+	_check(service.grant_starter_loadout(starter) == 2, "starter granted once")
+	_check(service.grant_starter_loadout(starter) == 0, "starter grant is idempotent (no duplicate starter)")
+
+	var selected := profile.loadout.duplicate(true)
+	var selected_sig := _loadout_signature(selected)
+	var valid := service.validate_deploy(selected)
+	_check(valid.get("ok", false), "selected two-site loadout validates")
+	var bad := service.validate_deploy({"primary": [{"kind": "container", "path": ""}]})
+	_check(not bad.get("ok", false), "unknown item is rejected safely")
+	_check(profile.loadout == selected, "rejected selection does not mutate profile")
+
+	var deployed := service.deploy_loadout(selected)
+	_check(deployed.get("ok", false), "deploy stages the owned two-site loadout")
+	_check(_loadout_signature(profile.loadout) == selected_sig, "deploy records exactly the selected kit")
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	_check(service.prepare_raid() == 2, "prepare equips both selected weapons")
+	_check(_loadout_signature(profile.loadout) == selected_sig, "deployed manifest survives until raid resolution")
+	var restarted := ProfileStore.load_profile(path)
+	_check(_loadout_signature(restarted.loadout) == selected_sig, "restart after prepare recovers the deployment manifest")
+	var report := service.resolve_raid(Raid.Outcome.SURVIVED, 25)
+	_check(report != null, "first raid report is returned")
+	_check(service.resolve_raid(Raid.Outcome.SURVIVED, 25) == null, "duplicate resolution returns no second report")
+	var after := ProfileStore.load_profile(path)
+	_check(_loadout_signature(after.loadout) == selected_sig, "survival persists the deployed kit exactly once")
+
+	# Selecting from the stash removes exactly that item; an unselected old kit
+	# item returns to the stash, and failure resolution forfeits only the new kit.
+	var second := MetaProfile.new()
+	var second_service := MetaService.new()
+	var second_path := TEST_DIR + "/deploy_second.save"
+	ProfileStore.delete(second_path)
+	second_service.save_path = second_path
+	second_service.use_profile(second, second_path)
+	second_service.grant_starter_loadout(starter)
+	var old_primary: Array = second.loadout["primary"]
+	var old_secondary: Array = second.loadout["secondary"]
+	second.stash.deposit(ItemCodec.decode_item(old_secondary[0]))
+	second.loadout = {"primary": old_primary}
+	var swap := second_service.deploy_loadout({"primary": [old_secondary[0]]})
+	_check(swap.get("ok", false), "a selected stash weapon can be deployed")
+	_check(second.stash.count_items() == 1 and second.loadout.size() == 1, "unselected kit returned; selected item removed once")
+	var eq2 := Equipment.new()
+	var bag2 := Backpack.new()
+	second_service.bind_carrier(eq2, bag2)
+	_check(second_service.prepare_raid() == 1, "second deployment equips the swapped weapon")
+	var lost := second_service.resolve_raid(Raid.Outcome.KIA, 0)
+	_check(lost != null and lost.lost.size() == 1, "failed second raid reports only the deployed weapon")
+	var second_after := ProfileStore.load_profile(second_path)
+	_check(second_after.loadout.is_empty(), "failed second deployment leaves no active loadout")
+	_check(second_after.stash.count_items() == 1, "failed second deployment preserves the unselected stash weapon")
+
+
+func _loadout_signature(kit: Dictionary) -> String:
+	var parts: Array[String] = []
+	for slot_name in kit:
+		for data in kit[slot_name]:
+			if data is Dictionary:
+				parts.append("%s:%s:%s" % [slot_name, data.get("name", "?"), data.get("path", "")])
+	parts.sort()
+	return "|".join(parts)
+
 
 # ─── HELPERS ────────────────────────────────────────
 
