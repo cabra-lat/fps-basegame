@@ -138,6 +138,23 @@ func flea_report_lines(only_active: bool = true) -> Array[String]:
 
 ## Move the persisted loadout onto the player. Runs before the raid starts.
 ## Un-decodable entries stay in the profile instead of being silently lost.
+## Fail-closed preflight for callers that must persist the loadout before
+## allowing a raid to begin. The legacy prepare_raid() count API remains for
+## existing callers and tests.
+func prepare_raid_checked() -> Dictionary:
+	if profile == null or _equipment == null:
+		return {"ok": false, "reason": "profile or equipment unavailable"}
+	var previous_loadout: Dictionary = profile.loadout.duplicate(true)
+	var moved := prepare_raid()
+	var err := ProfileStore.save(profile, save_path)
+	if err != OK:
+		profile.loadout = previous_loadout
+		_prepared = false
+		save_failed.emit(err)
+		return {"ok": false, "error": err, "reason": "profile save failed"}
+	return {"ok": true, "items_equipped": moved, "error": OK}
+
+
 func prepare_raid() -> int:
 	_prepared = false
 	if profile == null or _equipment == null:

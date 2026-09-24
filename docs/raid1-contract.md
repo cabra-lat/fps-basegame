@@ -30,9 +30,20 @@ claim that the first candidate commit implemented the behavior. The historical
 - MetaService settlement, progression, and result HUD had no distinct
   scenario-clear outcome handling.
 
-The scoped follow-up `a9c6031` is the implementation of this target; the
-inventory above remains explicit so reviewers can verify the exact delta from
-`e9883e6`.
+### Follow-up status
+
+`a9c6031` is **PARTIAL/BLOCKED**, not implementation-complete. It added the
+named outcome and settlement plumbing, but its fallback routing still allowed
+the always-open point to reach generic success without the objective. The
+isolated scenario probe reported 17/17 because it manually called
+`scenario.fail()`; it did not drive the production `_on_extracted` callback.
+That production routing was therefore untested/broken at the `a9c6031` gate.
+
+The corrected target requires the real `_on_extracted` callback to test
+`objective_collected` first, call `scenario.fail()` and discard carry, and end
+`LEFT_BEHIND` before any success settlement. A focused regression must invoke
+that callback rather than manually invoking the failure method. The later
+`35d4326` follow-up is the scoped routing correction under QA review.
 
 ### Named outcome
 
@@ -64,6 +75,8 @@ result, so a 600-second first clear cannot be misclassified by the existing
 This is an integration contract, not a request to alter the already-landed
 candidate's generic raid thresholds.
 
-Focused evidence is recorded by `scenes/validate_raid1_scenario.gd` (12/12 in
-the current worktree). The full parse gate remains environment-blocked by
-pre-existing missing ignored generated/weapon assets in this worktree.
+Focused evidence is recorded by `scenes/validate_raid1_scenario.gd`. The
+isolated scenario portion passed 17/17 before the real-manager callback was
+added; the callback portion is blocked in this worktree by absent ignored
+assets during arena preload. The full parse gate remains environment-blocked
+by pre-existing missing ignored generated/weapon assets in this worktree.

@@ -67,6 +67,15 @@ func _initialize() -> void:
 	_check(routed_scenario.state == Raid1ScenarioScript.State.FAILURE, "real fallback callback fails without objective")
 	_check(routed_raid.outcome == Raid.Outcome.LEFT_BEHIND, "real fallback callback ends before success settlement")
 
+	var prepare_raid := Raid.new()
+	var prepare_meta := MetaService.new()
+	var prepare_manager := ArenaManagerScript.new()
+	prepare_manager.meta = prepare_meta
+	prepare_manager.raid = prepare_raid
+	_check(not prepare_manager.call("_prepare_raid_or_abort"), "caller aborts failed raid preparation")
+	_check(prepare_raid.state == Raid.State.PREP, "failed preparation never begins the raid")
+	_check(prepare_raid.outcome == Raid.Outcome.NONE, "failed preparation leaves raid unresolved")
+
 	var failed := Raid1ScenarioScript.new()
 	failed.begin(raid, profile, fallback, gated)
 	failed.collect(Raid1ScenarioScript.OBJECTIVE_ID)

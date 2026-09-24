@@ -298,7 +298,8 @@ func _setup_raid() -> void:
 	# currency / EXP) lands before the result banner is built.
 	meta.bind_carrier(player.equipment, player.get_equipped_backpack())
 	meta.bind_raid(raid)
-	meta.prepare_raid()
+	if not _prepare_raid_or_abort():
+		return
 	var prog := meta.enable_progression()
 	prog.bind_raid(raid)
 	prog.bind_player(player, PLAYER_ID)
@@ -341,6 +342,16 @@ func _ensure_meta() -> MetaService:
 		m.name = "Meta"
 		get_tree().root.add_child(m)
 	return m
+
+func _prepare_raid_or_abort() -> bool:
+	var result: Dictionary = meta.prepare_raid_checked()
+	if bool(result.get("ok", false)):
+		return true
+	var reason := String(result.get("reason", "prepare_raid failed"))
+	push_error("RAID-1 prepare aborted: %s" % reason)
+	_raid_over = true
+	return false
+
 
 func _on_player_reloaded(_player: PlayerController) -> void:
 	audio.play_reload()
