@@ -1,6 +1,6 @@
 # QA report — fps-basegame
 
-Generated: 2026-09-24T12:49:17.281Z  
+Generated: 2026-09-24T14:00:20.038Z  
 Tool: `tools/qa/audit.mjs` v2.1.0  |  scope: `addons/cabra.lat_shooters/src`, `src`, `scenes`
 
 > Findings are **work orders**, not fixes. Every row carries a number or a `file:line`.
@@ -12,19 +12,19 @@ Tool: `tools/qa/audit.mjs` v2.1.0  |  scope: `addons/cabra.lat_shooters/src`, `s
 | --- | ---: |
 | BLOCKER | 0 |
 | MAJOR | 3 |
-| MINOR | 39 |
+| MINOR | 41 |
 | NIT | 0 |
-| **Total** | **42** |
+| **Total** | **44** |
 
-Scanned 127 shipping `.gd` files, 21112 lines, 1234 functions. 11 functions > 60 lines. Indent census (dominant): 72 tab files / 51 space files.
+Scanned 127 shipping `.gd` files, 21203 lines, 1234 functions. 12 functions > 60 lines. Indent census (dominant): 72 tab files / 51 space files.
 
 ### By rule
 
 | Rule | Count |
 | --- | ---: |
 | debug-print | 13 |
-| long-function | 11 |
-| deep-nesting | 6 |
+| long-function | 12 |
+| deep-nesting | 7 |
 | connect-leak | 5 |
 | lambda-leak | 3 |
 | god-object | 3 |
@@ -39,7 +39,7 @@ Triage: **0** finding(s) suppressed by `tools/qa/ignore.json` (12 entries, each 
 | --- | ---: | ---: |
 | BLOCKER | 0 | 0 |
 | MAJOR | 39 | 3 |
-| MINOR | 37 | 39 |
+| MINOR | 37 | 41 |
 | NIT | 30 | 0 |
 
 Baseline tool v2.1.0
@@ -93,6 +93,8 @@ These findings remain visible for owner follow-up but are intentionally excluded
 | MINOR | long-function | range | `scenes/arena_manager.gd:1080` | _build_hud() is 93 lines (> 60) | ends line 1172 |
 | MINOR | connect-leak | range | `scenes/debug_range.gd:29` | 7 .connect() and 0 .disconnect() in file | no teardown in _exit_tree |
 | MINOR | lambda-leak | range | `scenes/debug_range.gd:35` | 1 lambda .connect() without CONNECT_ONE_SHOT or stored Callable | 35 |
+| MINOR | deep-nesting | range | `scenes/gunsmith_ui.gd:1` | max block nesting depth 5 (>= 5) | measured from function bodies |
+| MINOR | long-function | range | `scenes/gunsmith_ui.gd:536` | _apply() is 65 lines (> 60) | ends line 600 |
 | MINOR | connect-leak | range | `scenes/main_menu.gd:18` | 12 .connect() and 0 .disconnect() in file | no teardown in _exit_tree |
 | MINOR | long-function | meta | `src/meta/meta_service.gd:172` | resolve_raid() is 79 lines (> 60) | ends line 250 |
 | MINOR | deep-nesting | meta | `src/meta/quest_log.gd:1` | max block nesting depth 5 (>= 5) | measured from function bodies |
@@ -110,6 +112,7 @@ These findings remain visible for owner follow-up but are intentionally excluded
 | `addons/cabra.lat_shooters/src/ui/inventory/container.gd` | 0 | 0 | 2 | 0 |
 | `addons/cabra.lat_shooters/src/world/attachment_scope_3d.gd` | 0 | 0 | 2 | 0 |
 | `scenes/debug_range.gd` | 0 | 0 | 2 | 0 |
+| `scenes/gunsmith_ui.gd` | 0 | 0 | 2 | 0 |
 | `addons/cabra.lat_shooters/src/core/armor/armor.gd` | 0 | 0 | 1 | 0 |
 | `addons/cabra.lat_shooters/src/core/health/medical_item.gd` | 0 | 0 | 1 | 0 |
 | `addons/cabra.lat_shooters/src/core/inventory/backpack.gd` | 0 | 0 | 1 | 0 |
@@ -127,7 +130,6 @@ These findings remain visible for owner follow-up but are intentionally excluded
 | `addons/cabra.lat_shooters/src/ui/inventory/slot.gd` | 0 | 0 | 1 | 0 |
 | `addons/cabra.lat_shooters/src/ui/inventory/world_drop_zone.gd` | 0 | 0 | 1 | 0 |
 | `addons/cabra.lat_shooters/src/world/magazine_3d.gd` | 0 | 0 | 1 | 0 |
-| `addons/cabra.lat_shooters/src/world/weapon_3d.gd` | 0 | 0 | 1 | 0 |
 
 ## Duplication (fingerprint, 8-line windows)
 
