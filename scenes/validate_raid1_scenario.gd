@@ -2,6 +2,7 @@ extends SceneTree
 ## Focused headless probe for the RAID-1 collect/extract contract.
 
 const Raid1ScenarioScript = preload("res://scenes/raid1_scenario.gd")
+const ArenaManagerScript = preload("res://scenes/arena_manager.gd")
 
 var _checks := 0
 var _passed := 0
@@ -46,6 +47,25 @@ func _initialize() -> void:
 	fallback_raid.end(Raid.Outcome.LEFT_BEHIND)
 	_check(fallback_scenario.state == Raid1ScenarioScript.State.FAILURE, "fallback without objective fails scenario")
 	_check(fallback_raid.outcome == Raid.Outcome.LEFT_BEHIND, "fallback failure ends before generic success")
+
+	# Drive the real arena callback: Open Lane is physically open, but without
+	# the objective the callback must fail before calling scenario completion.
+	var routed_raid := Raid.new()
+	var routed_profile := PlayerProfile.new()
+	var routed_fallback := ExtractionPoint.new()
+	var routed_gated := ExtractionPoint.new()
+	root.add_child(routed_raid)
+	root.add_child(routed_fallback)
+	root.add_child(routed_gated)
+	var routed_scenario := Raid1ScenarioScript.new()
+	routed_scenario.begin(routed_raid, routed_profile, routed_fallback, routed_gated)
+	var manager := ArenaManagerScript.new()
+	manager.raid = routed_raid
+	manager.scenario = routed_scenario
+	routed_raid.begin()
+	manager.call("_on_extracted", routed_fallback)
+	_check(routed_scenario.state == Raid1ScenarioScript.State.FAILURE, "real fallback callback fails without objective")
+	_check(routed_raid.outcome == Raid.Outcome.LEFT_BEHIND, "real fallback callback ends before success settlement")
 
 	var failed := Raid1ScenarioScript.new()
 	failed.begin(raid, profile, fallback, gated)

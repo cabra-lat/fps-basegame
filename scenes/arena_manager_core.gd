@@ -388,7 +388,7 @@ func _on_raid_started() -> void:
 func _on_raid_ended(outcome: int) -> void:
 	if scenario != null and outcome != Raid.Outcome.SURVIVED and outcome != Raid.Outcome.RUN_THROUGH and outcome != Raid.Outcome.SCENARIO_CLEARED and scenario.state == Raid1ScenarioScript.State.ACTIVE:
 		scenario.fail(raid.outcome_name(outcome))
-		scenario.discard_carry(player.get_equipped_backpack())
+		scenario.discard_carry(_raid1_backpack())
 	_raid_over = true
 	var out_name: String = raid.outcome_name(outcome)
 	if audio:
@@ -396,6 +396,10 @@ func _on_raid_ended(outcome: int) -> void:
 	call("_show_result", out_name, raid.exp)
 	call("_push_feed", "Raid terminou: %s" % out_name)
 	if OS.is_debug_build(): print("RAID ENDED: outcome=%s exp=%d elapsed=%.1f" % [out_name, raid.exp, raid.elapsed])
+
+func _raid1_backpack() -> InventoryContainer:
+	return player.get_equipped_backpack() if player != null else null
+
 
 func _on_exp_gained(amount: int) -> void:
 	if amount > 0:
@@ -413,17 +417,17 @@ func _on_extract_progress(point: ExtractionPoint, _ratio: float) -> void:
 		extract_label.text = "Extraindo em %s... %d/%ds" % [point.display_name, int(point._progress), int(point.extract_time)]
 
 func _on_extracted(point: ExtractionPoint) -> void:
-	if scenario != null and not scenario.can_extract(point):
+	if scenario != null and not scenario.objective_collected:
 		# The fallback is physically open, but leaving without the marked intel is
 		# a failed first clear: the existing meta resolution then forfeits kit.
 		scenario.fail("marked intel not extracted")
-		scenario.discard_carry(player.get_equipped_backpack())
+		scenario.discard_carry(_raid1_backpack())
 		raid.end(Raid.Outcome.LEFT_BEHIND)
 		call("_push_feed", "Falha:intel não coletado — kit perdido")
 		return
 	var out: int
 	if scenario != null:
-		scenario.prepare_success_carried(player.get_equipped_backpack())
+		scenario.prepare_success_carried(_raid1_backpack())
 		scenario.complete(point)
 		out = raid.complete_scenario(point)
 	else:
