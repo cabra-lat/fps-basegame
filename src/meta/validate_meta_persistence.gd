@@ -33,12 +33,14 @@ func _initialize() -> void:
 	_cleanup()
 
 	_scenario_survive_roundtrip()
+	_scenario_scenario_clear_settlement()
 	_scenario_death_preserves_stash()
 	_scenario_weapon_state()
 	_scenario_corrupt()
 	_scenario_missing_and_atomic()
 	_scenario_v1_migration()
 	_scenario_role_state()
+	_scenario_hub_deploy_contract()
 
 	quit(v.finish())
 
@@ -79,6 +81,66 @@ func _scenario_survive_roundtrip() -> void:
 	_check(loaded.raids == 1 and loaded.survived == 1, "raid counters persisted (raids=%d survived=%d)" % [loaded.raids, loaded.survived])
 	_check(loaded.stash.get_total_mass() > 0.0, "stash mass accounted (%.4f kg)" % loaded.stash.get_total_mass())
 	_check(loaded.last_report.get("survived", false) == true, "last raid report persisted")
+
+func _scenario_scenario_clear_settlement() -> void:
+	print("\n[1b] RAID-1 scenario clear settlement")
+	var path := TEST_DIR + "/scenario_clear.save"
+	ProfileStore.delete(path)
+	var service := MetaService.new()
+	service.save_path = path
+	var profile := MetaProfile.new()
+	service.use_profile(profile, path)
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	_add_loot(bag, BANDAGE, 1)
+	var before_currency := profile.currency
+	var report := service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 250)
+	_check(report != null and report.survived, "SCENARIO_CLEARED is a successful raid")
+	_check(report.outcome_name == "SCENARIO CLEARED", "scenario report keeps the exact outcome name")
+	_check(report.gained.is_empty() and report.loot_discarded == 1, "scenario settlement discards non-marked loot")
+	_check(profile.stash.count_items() == 0, "scenario settlement did not bank non-marked loot")
+	_check(profile.currency == before_currency + MetaService.SURVIVAL_REWARD, "scenario clear uses the normal survival reward")
+	_check(profile.raids == 1 and profile.survived == 1, "scenario clear advances successful raid counters")
+	_check(int(profile.role_state()["survived"]) == 1, "scenario clear records successful role progression")
+	_check(service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 250) == null, "scenario clear resolves only once")
+	_check(profile.raids == 1 and profile.currency == before_currency + MetaService.SURVIVAL_REWARD, "duplicate scenario report has no second settlement")
+	_check(service._is_marked_intel({"path": MetaService.RAID1_MARKED_INTEL_PATH}), "marked intel path is recognized")
+
+	# Generic extraction outcomes remain distinct and retain their old settlement.
+	var run_path := TEST_DIR + "/ordinary_run_through.save"
+	var run_service := MetaService.new()
+	run_service.save_path = run_path
+	var run_profile := MetaProfile.new()
+	run_service.use_profile(run_profile, run_path)
+	run_service.bind_carrier(Equipment.new(), Backpack.new())
+	var run_report := run_service.resolve_raid(Raid.Outcome.RUN_THROUGH, 0)
+	_check(run_report != null and run_report.outcome_name == "RUN THROUGH" and run_report.survived, "ordinary RUN_THROUGH remains successful")
+	var survive_path := TEST_DIR + "/ordinary_survived.save"
+	var survive_service := MetaService.new()
+	survive_service.save_path = survive_path
+	var survive_profile := MetaProfile.new()
+	survive_service.use_profile(survive_profile, survive_path)
+	survive_service.bind_carrier(Equipment.new(), Backpack.new())
+	var survive_report := survive_service.resolve_raid(Raid.Outcome.SURVIVED, 250)
+	_check(survive_report != null and survive_report.outcome_name == "SURVIVED" and survive_report.survived, "ordinary SURVIVED remains successful")
+
+	# The marked-intel resource is supplied by RAID-1. When that sibling change is
+	# present, prove the positive banking path too; the base-only meta worktree
+	# still verifies the filter and ordinary outcomes above.
+	if ResourceLoader.exists(MetaService.RAID1_MARKED_INTEL_PATH):
+		var marked_service := MetaService.new()
+		marked_service.save_path = TEST_DIR + "/scenario_marked.save"
+		var marked_profile := MetaProfile.new()
+		marked_service.use_profile(marked_profile, marked_service.save_path)
+		marked_service.bind_carrier(Equipment.new(), Backpack.new())
+		_add_loot(marked_service._backpack, MetaService.RAID1_MARKED_INTEL_PATH, 1)
+		var marked_report := marked_service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 0)
+		_check(marked_report != null and marked_report.gained.size() == 1, "scenario settlement banks marked intel exactly once")
+		_check(marked_profile.stash.count_items() == 1, "scenario settlement keeps only marked intel")
+	else:
+		print("SKIP: marked-intel positive banking awaits the RAID-1 resource sibling")
+
 
 func _scenario_death_preserves_stash() -> void:
 	print("\n[2] die in a raid with 1 item -> stash untouched")
@@ -323,6 +385,148 @@ func _kit_mass(kit: Dictionary) -> float:
 			if item != null:
 				total += item.get_mass()
 	return total
+
+func _scenario_hub_deploy_contract() -> void:
+	print("\n[8] HUB-1 deploy contract: validate, exact transfer, restart, once-only report")
+	var path := TEST_DIR + "/deploy.save"
+	ProfileStore.delete(path)
+	var service := MetaService.new()
+	service.save_path = path
+	var profile := MetaProfile.new()
+	service.use_profile(profile, path)
+	var starter := load(STARTER) as StarterLoadout
+	_check(service.grant_starter_loadout(starter) == 2, "starter granted once")
+	_check(service.grant_starter_loadout(starter) == 0, "starter grant is idempotent (no duplicate starter)")
+	var empty_options := MetaService.new()
+	var empty_profile := MetaProfile.new()
+	empty_options.use_profile(empty_profile, TEST_DIR + "/empty_projection.save")
+	_check(empty_options.deploy_options().is_empty(), "empty profile has no hub deployment option")
+	var projection := service.deploy_options()
+	_check(String(projection.get("id", "")) == "active", "populated kit exposes the active hub option")
+	_check(projection.get("selection", {}) is Dictionary and service.validate_deploy(projection.selection).get("ok", false), "hub projection is canonical and legal")
+
+	var selected := profile.loadout.duplicate(true)
+	var selected_sig := _loadout_signature(selected)
+	var valid := service.validate_deploy(selected)
+	_check(valid.get("ok", false), "selected two-site loadout validates")
+	var bad := service.validate_deploy({"primary": [{"kind": "container", "path": ""}]})
+	_check(not bad.get("ok", false), "unknown item is rejected safely")
+	var empty_primary := service.validate_deploy({"primary": []})
+	_check(not empty_primary.get("ok", false), "empty primary selection is rejected")
+	_check(profile.loadout == selected, "rejected selection does not mutate profile")
+
+	var deployed := service.deploy_loadout(selected)
+	_check(deployed.get("ok", false), "deploy stages the owned two-site loadout")
+	_check(_loadout_signature(profile.loadout) == selected_sig, "deploy records exactly the selected kit")
+	var eq := Equipment.new()
+	var bag := Backpack.new()
+	service.bind_carrier(eq, bag)
+	_check(service.prepare_raid() == 2, "prepare equips both selected weapons")
+	_check(_loadout_signature(profile.loadout) == selected_sig, "deployed manifest survives until raid resolution")
+	var restarted := ProfileStore.load_profile(path)
+	_check(_loadout_signature(restarted.loadout) == selected_sig, "restart after prepare recovers the deployment manifest")
+	var report := service.resolve_raid(Raid.Outcome.SURVIVED, 25)
+	_check(report != null, "first raid report is returned")
+	_check(service.resolve_raid(Raid.Outcome.SURVIVED, 25) == null, "duplicate resolution returns no second report")
+	var after := ProfileStore.load_profile(path)
+	_check(_loadout_signature(after.loadout) == selected_sig, "survival persists the deployed kit exactly once")
+
+	# Selecting from the stash removes exactly that item; an unselected old kit
+	# item returns to the stash, and failure resolution forfeits only the new kit.
+	var second := MetaProfile.new()
+	var second_service := MetaService.new()
+	var second_path := TEST_DIR + "/deploy_second.save"
+	ProfileStore.delete(second_path)
+	second_service.save_path = second_path
+	second_service.use_profile(second, second_path)
+	second_service.grant_starter_loadout(starter)
+	var old_primary: Array = second.loadout["primary"]
+	var old_secondary: Array = second.loadout["secondary"]
+	second.stash.deposit(ItemCodec.decode_item(old_secondary[0]))
+	second.loadout = {"primary": old_primary}
+	var swap := second_service.deploy_loadout({"primary": [old_secondary[0]]})
+	_check(swap.get("ok", false), "a selected stash weapon can be deployed")
+	_check(second.stash.count_items() == 1 and second.loadout.size() == 1, "unselected kit returned; selected item removed once")
+	var eq2 := Equipment.new()
+	var bag2 := Backpack.new()
+	second_service.bind_carrier(eq2, bag2)
+	_check(second_service.prepare_raid() == 1, "second deployment equips the swapped weapon")
+	var lost := second_service.resolve_raid(Raid.Outcome.KIA, 0)
+	_check(lost != null and lost.lost.size() == 1, "failed second raid reports only the deployed weapon")
+	var second_after := ProfileStore.load_profile(second_path)
+	_check(second_after.loadout.is_empty(), "failed second deployment leaves no active loadout")
+	_check(second_after.stash.count_items() == 1, "failed second deployment preserves the unselected stash weapon")
+
+	# A persistence failure must not leave the carrier equipped or the service
+	# claiming that preparation completed.
+	var failed_path := TEST_DIR + "/missing_parent/profile.save"
+	var failed_service := MetaService.new()
+	failed_service.save_path = failed_path
+	var failed_profile := MetaProfile.new()
+	failed_service.use_profile(failed_profile, failed_path)
+	failed_service.grant_starter_loadout(starter)
+	var failed_eq := Equipment.new()
+	failed_service.bind_carrier(failed_eq, Backpack.new())
+	_check(failed_service.prepare_raid() == 0, "prepare fails closed when persistence fails")
+	_check(not failed_eq.is_equipped("primary") and not failed_eq.is_equipped("secondary"), "failed prepare rolls back equipped items")
+	_check(failed_profile.loadout.size() == 2, "failed prepare leaves the recovery manifest intact")
+
+	# Checked preparation uses the same atomic transaction and clears a stale
+	# insurance manifest when the real profile save fails.
+	var checked_service := MetaService.new()
+	checked_service.save_path = TEST_DIR + "/checked_missing_parent/profile.save"
+	var checked_profile := MetaProfile.new()
+	checked_service.use_profile(checked_profile, checked_service.save_path)
+	checked_service.grant_starter_loadout(starter)
+	var checked_eq := Equipment.new()
+	checked_service.bind_carrier(checked_eq, Backpack.new())
+	checked_service._insured_manifest = {"stale": true}
+	var checked := checked_service.prepare_raid_checked()
+	_check(not checked.get("ok", false) and int(checked.get("error", OK)) != OK, "checked prepare reports save failure")
+	_check(not checked_eq.is_equipped("primary") and not checked_eq.is_equipped("secondary"), "checked prepare rolls back equipment")
+	_check(checked_service._insured_manifest.is_empty(), "checked prepare clears stale insurance manifest")
+	_check(checked_profile.loadout.size() == 2, "checked prepare preserves the loadout manifest")
+
+	# Force the second selected stash removal to fail. The deploy transaction
+	# must restore every selected item, including the one removed by the signal.
+	var rollback_profile := MetaProfile.new()
+	var rollback_service := MetaService.new()
+	var rollback_path := TEST_DIR + "/deploy_rollback.save"
+	ProfileStore.delete(rollback_path)
+	rollback_service.save_path = rollback_path
+	rollback_service.use_profile(rollback_profile, rollback_path)
+	var primary_item := ItemCodec.item_from_path("res://resources/weapons/M4_Carbine.tres")
+	var secondary_item := ItemCodec.item_from_path("res://resources/weapons/AK_47.tres")
+	rollback_profile.stash.deposit(primary_item)
+	rollback_profile.stash.deposit(secondary_item)
+	primary_item = rollback_profile.stash.items[0]
+	secondary_item = rollback_profile.stash.items[1]
+	var primary_data := ItemCodec.encode_item(primary_item)
+	var secondary_data := ItemCodec.encode_item(secondary_item)
+	var callback_state := {"ran": false}
+	rollback_profile.stash.item_removed.connect(func(removed_item: InventoryItem) -> void:
+		if not callback_state.ran:
+			callback_state.ran = true
+			if removed_item == primary_item:
+				rollback_profile.stash.remove_item(secondary_item)
+			else:
+				rollback_profile.stash.remove_item(primary_item)
+	)
+	var rollback := rollback_service.deploy_loadout({"primary": [primary_data], "secondary": [secondary_data]})
+	_check(not rollback.get("ok", false), "deploy reports a failed stash removal (reason=%s)" % String(rollback.get("reason", "")))
+	_check(callback_state.ran and rollback_profile.stash.count_items() == 2, "failed stash removal restores every selected item (callback=%s count=%d)" % [callback_state.ran, rollback_profile.stash.count_items()])
+	_check(rollback_profile.loadout.is_empty(), "failed stash removal restores the old loadout")
+
+
+func _loadout_signature(kit: Dictionary) -> String:
+	var parts: Array[String] = []
+	for slot_name in kit:
+		for data in kit[slot_name]:
+			if data is Dictionary:
+				parts.append("%s:%s:%s" % [slot_name, data.get("name", "?"), data.get("path", "")])
+	parts.sort()
+	return "|".join(parts)
+
 
 # ─── HELPERS ────────────────────────────────────────
 

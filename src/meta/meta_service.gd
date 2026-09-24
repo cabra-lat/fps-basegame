@@ -23,6 +23,13 @@ signal report_ready(summary: String)
 signal insurance_claim_available(lost: Array)
 
 const SURVIVAL_REWARD := 5000 # credits for getting out alive
+## Scenario-clear is the shared finite Raid outcome, not a numeric mirror.
+const SCENARIO_CLEARED_OUTCOME := Raid.Outcome.SCENARIO_CLEARED
+const RAID1_MARKED_INTEL_PATH := "res://resources/raid1/marked_intel.tres"
+## HUB-1's deliberately small deploy contract. The hub owns selection UI, but
+## MetaService remains the only authority for what may be deployed and persisted.
+const DEPLOY_SLOTS: Array[String] = ["primary", "secondary"]
+const REQUIRED_DEPLOY_SLOT := "primary"
 
 var profile: MetaProfile
 var raid: Raid
@@ -40,6 +47,12 @@ var _equipment: Equipment
 var _backpack: InventoryContainer
 var _prepared := false
 var _resolving := false
+## A resolved raid is terminal until the next prepare/deploy. This also makes a
+## duplicated raid_ended signal harmless instead of applying a report twice.
+var _resolved := false
+## Encoded entries that could not be equipped. The selected loadout itself stays
+## in the profile as a crash-recovery manifest until the raid resolves.
+var _deploy_leftovers: Dictionary = {}
 
 func _ready() -> void:
 	if profile == null:
@@ -50,6 +63,7 @@ func _ready() -> void:
 ## Test/headless entry: adopt an in-memory profile, optionally redirect the save.
 func use_profile(p: MetaProfile, path: String = "") -> void:
 	profile = p
+	_resolved = false
 	if path != "":
 		save_path = path
 	if profile == null:
@@ -138,45 +152,53 @@ func flea_report_lines(only_active: bool = true) -> Array[String]:
 
 ## Move the persisted loadout onto the player. Runs before the raid starts.
 ## Un-decodable entries stay in the profile instead of being silently lost.
-## Fail-closed preflight for callers that must persist the loadout before
-## allowing a raid to begin. The legacy prepare_raid() count API remains for
-## existing callers and tests.
-func prepare_raid_checked() -> Dictionary:
-	if profile == null or _equipment == null:
-		return {"ok": false, "reason": "profile or equipment unavailable"}
-	var previous_loadout: Dictionary = profile.loadout.duplicate(true)
-	var moved := prepare_raid()
-	var err := ProfileStore.save(profile, save_path)
-	if err != OK:
-		profile.loadout = previous_loadout
-		_prepared = false
-		save_failed.emit(err)
-		return {"ok": false, "error": err, "reason": "profile save failed"}
-	return {"ok": true, "items_equipped": moved, "error": OK}
-
-
+## Legacy count API: returns the number equipped, or 0 when preparation fails.
 func prepare_raid() -> int:
+	var result := _prepare_raid_transaction()
+	return int(result.get("items_equipped", 0)) if bool(result.get("ok", false)) else 0
+
+
+## Fail-closed preparation for callers that must not begin a raid after a
+## persistence error. The same transaction is used by legacy prepare_raid().
+func prepare_raid_checked() -> Dictionary:
+	return _prepare_raid_transaction()
+
+
+func _prepare_raid_transaction() -> Dictionary:
 	_prepared = false
+	_resolved = false
+	_deploy_leftovers = {}
 	if profile == null or _equipment == null:
-		return 0
-	var remaining := {}
+		return {"ok": false, "error": ERR_UNCONFIGURED, "reason": "profile or equipment unavailable", "items_equipped": 0}
 	var moved := 0
+	var equipped_this_call: Array = []
 	for slot_name in profile.loadout:
 		var pending: Array = []
 		for item_data in profile.loadout[slot_name]:
 			var item := ItemCodec.decode_item(item_data)
 			if item != null and _equipment.equip(item, slot_name):
+				equipped_this_call.append([item, slot_name])
 				moved += 1
 			else:
 				pending.append(item_data)
 		if not pending.is_empty():
-			remaining[slot_name] = pending
-	profile.loadout = remaining
+			_deploy_leftovers[slot_name] = pending
 	_prepared = true
+	# One persistence boundary for the whole preparation. If it fails, undo
+	# every carrier mutation and clear all raid-entry state, including a stale
+	# insurance manifest from an earlier attempt.
+	var err := _save()
+	if err != OK:
+		for entry in equipped_this_call:
+			_equipment.unequip(entry[0] as InventoryItem, String(entry[1]))
+		_prepared = false
+		_deploy_leftovers = {}
+		_insured_manifest = {}
+		return {"ok": false, "error": err, "reason": "profile save failed", "items_equipped": 0}
 	if auto_insure and _equipment != null:
 		insure_manifest()
 	raid_prepared.emit(moved)
-	return moved
+	return {"ok": true, "error": OK, "reason": "", "items_equipped": moved}
 
 ## Snapshot the currently-equipped gear as the insured manifest for this raid.
 func insure_manifest() -> Dictionary:
@@ -184,11 +206,10 @@ func insure_manifest() -> Dictionary:
 	return _insured_manifest
 
 ## The heart: resolve a finished raid against the carrier and persist.
-## SURVIVED/RUN_THROUGH/SCENARIO_CLEARED -> successful settlement; the exact
-## outcome remains in the report so RAID-1 is not mislabeled as RUN_THROUGH.
+## SURVIVED/RUN_THROUGH -> carried loot to the stash, loadout kept, currency+EXP.
 ## KIA/MIA/LEFT_BEHIND -> equipment forfeited, loot discarded, stash untouched.
 func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
-	if profile == null or _resolving:
+	if profile == null or _resolving or _resolved:
 		return null
 	_resolving = true
 	var report := RaidReport.new()
@@ -196,15 +217,39 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	report.outcome_name = _outcome_name(outcome)
 	report.survived = outcome == Raid.Outcome.SURVIVED \
 		or outcome == Raid.Outcome.RUN_THROUGH \
-		or outcome == Raid.Outcome.SCENARIO_CLEARED
+		or outcome == SCENARIO_CLEARED_OUTCOME
 	report.exp = maxi(exp, 0)
 
 	var carried_loadout := ItemCodec.encode_equipment(_equipment)
 	var carried_loot := ItemCodec.encode_container(_backpack)
-
 	if report.survived:
-		profile.survived += 1
-		var value := 0
+		_resolve_survival(report, carried_loadout, carried_loot)
+	else:
+		_resolve_loss(report, carried_loadout, carried_loot)
+	_finalize_raid(report)
+	return report
+
+func _resolve_survival(report: RaidReport, carried_loadout: Dictionary, carried_loot: Array) -> void:
+	profile.survived += 1
+	var value := 0
+	if report.outcome == SCENARIO_CLEARED_OUTCOME:
+		# The scenario's backpack filter is authoritative. Settlement banks only
+		# the marked intel; ordinary medical/world loot is deliberately discarded.
+		for data in carried_loot:
+			if not _is_marked_intel(data):
+				report.loot_discarded += 1
+				continue
+			var item := ItemCodec.decode_item(data)
+			if item == null:
+				continue
+			var value_of := _item_value(item)
+			if profile.stash.deposit(item, item.position):
+				report.gained.append(_brief(data))
+				value += value_of
+			else:
+				report.loot_discarded += 1
+				push_warning("MetaService: scenario objective could not be stashed — %s lost" % item.name)
+	else:
 		for data in carried_loot:
 			var item := ItemCodec.decode_item(data)
 			if item == null:
@@ -215,34 +260,34 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 				value += value_of
 			else:
 				push_warning("MetaService: stash full — %s lost" % item.name)
-		# The equipped kit stays available for the next raid. Any loadout entry
-		# prepare_raid() could not equip (leftover) is preserved, not lost.
-		profile.loadout = _merge_loadout(carried_loadout, profile.loadout) if _prepared else carried_loadout
-		report.loadout_restored = true
-		report.currency_delta = value + SURVIVAL_REWARD
-		profile.earn_currency(report.currency_delta)
-	else:
-		profile.kia += 1
-		for data in ItemCodec.flatten_equipment(carried_loadout):
-			report.lost.append(_brief(data))
-		report.loot_discarded = carried_loot.size()
-		# Equipped gear is forfeited. When prepare_raid() ran, profile.loadout
-		# already holds only the leftovers (nothing equipped), so keep them;
-		# otherwise the whole persisted loadout is considered deployed and lost.
-		if not _prepared:
-			profile.loadout = {}
-		if not report.lost.is_empty():
-			insurance_claim_available.emit(report.lost.duplicate(true))
-		# Insurance: the manifest composed at raid entry is what can come back.
-		# No-return maps and killer-looted items never do.
-		var manifest := _insured_manifest if not _insured_manifest.is_empty() else carried_loadout
-		var no_return := false
-		if raid != null:
-			no_return = bool(raid.get_meta("no_return", false))
-		var insured_count := profile.insurance.register_loss(
-			ItemCodec.flatten_equipment(manifest), profile, no_return, enemy_looted_paths)
-		report.insured = insured_count
+	# The equipped kit stays available for the next raid. Only entries that did
+	# not equip are merged; the durable manifest is replaced, never duplicated.
+	profile.loadout = _merge_loadout(carried_loadout, _deploy_leftovers) if _prepared else carried_loadout
+	report.loadout_restored = true
+	report.currency_delta = value + SURVIVAL_REWARD
+	profile.earn_currency(report.currency_delta)
 
+func _resolve_loss(report: RaidReport, carried_loadout: Dictionary, carried_loot: Array) -> void:
+	profile.kia += 1
+	for data in ItemCodec.flatten_equipment(carried_loadout):
+		report.lost.append(_brief(data))
+	report.loot_discarded = carried_loot.size()
+	# A prepared manifest is the deployed kit, not an unowned stash copy. On
+	# failure, only entries that never equipped remain recoverable.
+	profile.loadout = _deploy_leftovers.duplicate(true) if _prepared else {}
+	if not report.lost.is_empty():
+		insurance_claim_available.emit(report.lost.duplicate(true))
+	# Insurance: the manifest composed at raid entry is what can come back.
+	# No-return maps and killer-looted items never do.
+	var manifest := _insured_manifest if not _insured_manifest.is_empty() else carried_loadout
+	var no_return := false
+	if raid != null:
+		no_return = bool(raid.get_meta("no_return", false))
+	var insured_count := profile.insurance.register_loss(
+		ItemCodec.flatten_equipment(manifest), profile, no_return, enemy_looted_paths)
+	report.insured = insured_count
+
+func _finalize_raid(report: RaidReport) -> void:
 	# Due insurance claims are delivered on the NEXT resolved raid (register_loss
 	# uses the current raid counter, so process before incrementing it).
 	profile.insurance.process_returns(profile)
@@ -261,12 +306,13 @@ func resolve_raid(outcome: int, exp: int = 0) -> RaidReport:
 	profile.flea.on_raid_resolved()
 	profile.last_report = report.to_dict()
 	_prepared = false
+	_deploy_leftovers = {}
 	_insured_manifest = {}
 	_resolving = false
 	_save()
+	_resolved = true
 	raid_resolved.emit(report)
 	report_ready.emit(report.summary())
-	return report
 
 func _merge_loadout(body: Dictionary, leftovers: Dictionary) -> Dictionary:
 	var merged := body.duplicate(true)
@@ -319,7 +365,169 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 	profile.role_state()["starter_granted"] = true
 	return added
 
+## Validate a hub selection without mutating the profile. Selection values are
+## ItemCodec dictionaries keyed by the two weapon sites. Each selected item must
+## decode to a Weapon and match exactly one owned item in the stash or the current
+## active loadout. Unknown slots, duplicate items, malformed data, and an empty
+## primary are rejected before any transfer or save.
+func validate_deploy(selection: Dictionary) -> Dictionary:
+	if profile == null:
+		return {"ok": false, "reason": "perfil ausente"}
+	if selection.is_empty():
+		return {"ok": false, "reason": "selecao vazia"}
+	if not selection.has(REQUIRED_DEPLOY_SLOT):
+		return {"ok": false, "reason": "primary obrigatorio"}
+	var seen: Array[String] = []
+	for slot_name in selection:
+		if not DEPLOY_SLOTS.has(slot_name):
+			return {"ok": false, "reason": "slot invalido: %s" % slot_name}
+		var raw: Variant = selection[slot_name]
+		if not (raw is Array):
+			return {"ok": false, "reason": "%s deve ser uma lista" % slot_name}
+		var entries: Array = raw
+		if entries.size() > 1:
+			return {"ok": false, "reason": "%s aceita no maximo uma arma" % slot_name}
+		if entries.is_empty():
+			if slot_name == REQUIRED_DEPLOY_SLOT:
+				return {"ok": false, "reason": "primary obrigatorio"}
+			continue
+		if not (entries[0] is Dictionary):
+			return {"ok": false, "reason": "%s contem dado invalido" % slot_name}
+		var data: Dictionary = entries[0]
+		var item := ItemCodec.decode_item(data)
+		if item == null or not item.extra is Weapon:
+			return {"ok": false, "reason": "%s nao e uma arma valida" % slot_name}
+		var key := _selection_key(data)
+		if seen.has(key):
+			return {"ok": false, "reason": "arma selecionada em dois slots"}
+		seen.append(key)
+		if not _find_owned_item(data).has("item"):
+			return {"ok": false, "reason": "arma nao pertence ao perfil: %s" % String(data.get("name", "?"))}
+	return {"ok": true, "reason": "", "slots": selection.keys()}
+
+## Read-only hub projection of the current legal kit. The opaque id is stable
+## for the UI; `selection` contains the canonical ItemCodec data that must be
+## passed back to validate_deploy()/deploy_loadout(). No starter is granted here.
+func deploy_options() -> Dictionary:
+	if profile == null:
+		return {}
+	var selection: Dictionary = {}
+	for slot_name in DEPLOY_SLOTS:
+		var raw: Variant = profile.loadout.get(slot_name, [])
+		if raw is Array and not (raw as Array).is_empty():
+			selection[slot_name] = (raw as Array).duplicate(true)
+	if not validate_deploy(selection).get("ok", false):
+		return {}
+	return {
+		"id": "active",
+		"label": "Active kit",
+		"selection": selection,
+	}
+
+
+## Stage the selected kit as the profile's active loadout. Items selected from the
+## stash are removed exactly once; unselected items from the old kit are returned
+## to the stash. The operation is persisted immediately, then prepare_raid() moves
+## the staged kit into the live player carrier and persists that transfer too.
+## The hub should call this before changing scene; it never writes a second save.
+func deploy_loadout(selection: Dictionary) -> Dictionary:
+	var check := validate_deploy(selection)
+	if not check.get("ok", false):
+		return check
+	var old_loadout: Dictionary = profile.loadout.duplicate(true)
+	var staged: Dictionary = {}
+	var selected_keys: Array[String] = []
+	var from_stash: Array[InventoryItem] = []
+	for slot_name in selection:
+		var entries: Array = selection[slot_name]
+		if entries.is_empty():
+			continue
+		var data: Dictionary = entries[0]
+		var match := _find_owned_item(data)
+		var item: InventoryItem = match.get("item") as InventoryItem
+		staged[slot_name] = [data.duplicate(true)]
+		selected_keys.append(_selection_key(data))
+		if String(match.get("source", "")) == "stash":
+			from_stash.append(item)
+
+	# Preflight the return path. Roll back anything already returned if a later
+	# item cannot fit; a failed deploy must never partially rearrange ownership.
+	var returned: Array[InventoryItem] = []
+	for slot_name in old_loadout:
+		var old_entries: Array = old_loadout[slot_name]
+		for old_data in old_entries:
+			if not (old_data is Dictionary):
+				_rollback_deploy(old_loadout, returned, [])
+				return {"ok": false, "reason": "loadout salvo contem dado invalido"}
+			var old_key := _selection_key(old_data as Dictionary)
+			if selected_keys.has(old_key):
+				continue
+			var old_item := ItemCodec.decode_item(old_data as Dictionary)
+			if old_item == null:
+				_rollback_deploy(old_loadout, returned, [])
+				return {"ok": false, "reason": "loadout salvo contem item invalido"}
+			if not profile.stash.deposit(old_item):
+				_rollback_deploy(old_loadout, returned, [])
+				return {"ok": false, "reason": "stash sem espaco para trocar o kit"}
+
+	var removed_from_stash: Array[InventoryItem] = []
+	for item in from_stash:
+		if not profile.stash.remove_item(item):
+			_rollback_deploy(old_loadout, returned, from_stash)
+			return {"ok": false, "reason": "item selecionado nao pode ser retirado do stash"}
+		removed_from_stash.append(item)
+	profile.loadout = staged
+	_resolved = false
+	var err := _save()
+	if err != OK:
+		# Best-effort rollback keeps the same ownership contract if persistence is
+		# unavailable; the caller receives the error and can retry or leave the hub.
+		_rollback_deploy(old_loadout, returned, from_stash)
+		return {"ok": false, "reason": "falha ao salvar kit: %d" % err}
+	return {"ok": true, "reason": "", "loadout": staged.duplicate(true)}
+
+
+func _rollback_deploy(old_loadout: Dictionary, returned: Array[InventoryItem], selected_from_stash: Array[InventoryItem]) -> void:
+	for item in selected_from_stash:
+		if profile.stash.items.has(item):
+			continue
+		if not profile.stash.deposit(item):
+			push_error("MetaService: rollback could not restore selected stash item %s" % item.name)
+	for item in returned:
+		profile.stash.remove_item(item)
+	profile.loadout = old_loadout
+
+
+func _is_marked_intel(data: Dictionary) -> bool:
+	if String(data.get("path", "")) == RAID1_MARKED_INTEL_PATH:
+		return true
+	var item := ItemCodec.decode_item(data)
+	return item != null and ItemCodec.content_path(item) == RAID1_MARKED_INTEL_PATH
+
+
+func _selection_key(data: Dictionary) -> String:
+	var item := ItemCodec.decode_item(data)
+	return JSON.stringify(ItemCodec.encode_item(item)) if item != null else JSON.stringify(data)
+
+
+func _find_owned_item(data: Dictionary) -> Dictionary:
+	if profile == null:
+		return {}
+	var key := _selection_key(data)
+	for item in profile.stash.items:
+		if _selection_key(ItemCodec.encode_item(item)) == key:
+			return {"item": item, "source": "stash"}
+	for slot_name in profile.loadout:
+		var entries: Array = profile.loadout[slot_name]
+		for old_data in entries:
+			if old_data is Dictionary and _selection_key(old_data as Dictionary) == key:
+				var old_item := ItemCodec.decode_item(old_data as Dictionary)
+				if old_item != null:
+					return {"item": old_item, "data": old_data, "source": "loadout"}
+	return {}
+
 func reload() -> MetaProfile:
+	_resolved = false
 	profile = ProfileStore.load_profile(save_path)
 	profile_loaded.emit(profile)
 	return profile
@@ -335,13 +543,14 @@ func _on_raid_ended(outcome: int) -> void:
 	var exp := raid.exp if raid != null else 0
 	resolve_raid(outcome, exp)
 
-func _save() -> void:
+func _save() -> Error:
 	var err := ProfileStore.save(profile, save_path)
 	if err != OK:
 		push_error("MetaService: profile save failed (err %d)" % err)
 		save_failed.emit(err)
 	else:
 		profile_saved.emit()
+	return err
 
 func _item_value(item: InventoryItem) -> int:
 	var content = item.extra
@@ -365,8 +574,8 @@ func _outcome_name(outcome: int) -> String:
 	match outcome:
 		Raid.Outcome.SURVIVED: return "SURVIVED"
 		Raid.Outcome.RUN_THROUGH: return "RUN THROUGH"
+		SCENARIO_CLEARED_OUTCOME: return "SCENARIO CLEARED"
 		Raid.Outcome.MIA: return "MIA"
 		Raid.Outcome.KIA: return "KIA"
 		Raid.Outcome.LEFT_BEHIND: return "LEFT BEHIND"
-		Raid.Outcome.SCENARIO_CLEARED: return "SCENARIO CLEARED"
 		_: return "—"
