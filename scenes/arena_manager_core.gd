@@ -355,7 +355,12 @@ func _setup_raid() -> void:
 		raid.player_extracted.connect(_on_player_extracted)
 	var scenario_points: Array[ExtractionPoint] = _configure_raid1_extractions()
 	if scenario_points.size() != 2:
+		push_error("RAID-1 requires exactly two extraction points")
+		# `Raid.end()` is intentionally a no-op while PREP; enter RAID first so
+		# the configuration failure reaches the normal LEFT_BEHIND settlement.
+		raid.begin()
 		raid.end(Raid.Outcome.LEFT_BEHIND)
+		_raid_over = true
 		return
 	for point in get_tree().get_nodes_in_group("extraction_points"):
 		if point is ExtractionPoint:

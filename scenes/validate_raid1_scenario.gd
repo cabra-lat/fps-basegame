@@ -51,6 +51,7 @@ func _initialize() -> void:
 	_check(manager_source.contains("Raid1ArenaDecisionScript.scenario_completion_allowed(raid, scenario, point)"), "manager delegates completion predicate")
 	_check(manager_source.contains("_raid_over = true"), "manager source preserves prepare-abort state")
 	_check(manager_source.contains("if not _prepare_raid_or_abort():"), "manager source gates setup on preparation")
+	_check(manager_source.contains("raid.begin()\n\t\traid.end(Raid.Outcome.LEFT_BEHIND)"), "extraction configuration failure reaches settlement")
 	_check(not manager_source.contains("const BotScene:"), "manager has no eager BotScene preload")
 	_check(manager_source.contains("var BotScene: PackedScene"), "manager BotScene is nullable runtime state")
 	_check(not manager_source.contains("@onready var ammo_template"), "manager has no eager ammo preload")
