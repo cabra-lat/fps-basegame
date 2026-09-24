@@ -23,17 +23,22 @@ const RAID_DURATION := 600.0 # RAID-1 bounded first-clear run (10 minutes)
 
 const SLOT_ORDER: Array[String] = ["primary", "secondary"]
 const INVENTORY_PANEL_CHROME := 64.0
-const BotScene: PackedScene = preload("res://src/npcs/bot/bot.tscn")
+const BOT_SCENE_PATH := "res://src/npcs/bot/bot.tscn"
+const PRIMARY_AMMO_PATH := "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
+const PRIMARY_WEAPON_PATH := "res://resources/weapons/M4_Carbine.tres"
+const SECONDARY_AMMO_PATH := "res://resources/ammo/7_62_39mm_PS_GOST_BR4.tres"
+const SECONDARY_WEAPON_PATH := "res://resources/weapons/AK_47.tres"
 
 const ArenaSpawnSolverScript = preload("./arena_spawn_solver.gd")
 const ArenaResultAdapterScript = preload("./arena_result_adapter.gd")
 const Raid1ScenarioScript = preload("./raid1_scenario.gd")
 const Raid1ArenaDecisionScript = preload("./raid1_arena_decision.gd")
 
-@onready var ammo_template: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
-@onready var weapon_template: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
-@onready var sec_ammo_template: Ammo = preload("res://resources/ammo/7_62_39mm_PS_GOST_BR4.tres")
-@onready var sec_weapon_template: Weapon = preload("res://resources/weapons/AK_47.tres")
+var BotScene: PackedScene
+var ammo_template: Ammo
+var weapon_template: Weapon
+var sec_ammo_template: Ammo
+var sec_weapon_template: Weapon
 @onready var player: PlayerController = $Player
 
 ## Match rules. Leave null to use the SettingsStore choice (default FFA);
@@ -93,6 +98,8 @@ var _hud_t := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if not _load_arena_dependencies():
+		return
 	plate_mat = BallisticMaterial.new()
 	plate_mat.name = "Arena Blockout"
 	plate_mat.type = BallisticMaterial.Type.METAL_MEDIUM
@@ -130,6 +137,41 @@ func _ready() -> void:
 	call("_push_feed", "%s — %d bots" % [game_mode.mode_name, BOT_COUNT])
 	call("_refresh_top", "WASD - 1/2 troca arma - G drop - E pega - H medico - R reload - Esc pausa")
 	if OS.is_debug_build(): print("ARENA READY: %s + %s, mode=%s teams=%d, bots=%d, raid=%.0fs extracts=%d, ray_excludes=%d" % [call("_slot_weapon", "primary").name if call("_slot_weapon", "primary") else "none", call("_slot_weapon", "secondary").name if call("_slot_weapon", "secondary") else "none", game_mode.mode_name, game_mode.team_count, get_tree().get_nodes_in_group("bots").size(), RAID_DURATION, get_tree().get_nodes_in_group("extraction_points").size(), call("_shot_excludes", ).size()])
+
+
+func _load_arena_dependencies() -> bool:
+	var paths: Array[String] = [
+		BOT_SCENE_PATH,
+		PRIMARY_AMMO_PATH,
+		PRIMARY_WEAPON_PATH,
+		SECONDARY_AMMO_PATH,
+		SECONDARY_WEAPON_PATH,
+	]
+	for path in paths:
+		if not ResourceLoader.exists(path):
+			push_error("ARENA: required dependency missing: %s" % path)
+			_raid_over = true
+			set_process(false)
+			set_physics_process(false)
+			return false
+	BotScene = ResourceLoader.load(BOT_SCENE_PATH) as PackedScene
+	if BotScene == null or not BotScene.can_instantiate():
+		push_error("ARENA: bot scene is not an instantiable PackedScene: %s" % BOT_SCENE_PATH)
+		_raid_over = true
+		set_process(false)
+		set_physics_process(false)
+		return false
+	ammo_template = ResourceLoader.load(PRIMARY_AMMO_PATH) as Ammo
+	weapon_template = ResourceLoader.load(PRIMARY_WEAPON_PATH) as Weapon
+	sec_ammo_template = ResourceLoader.load(SECONDARY_AMMO_PATH) as Ammo
+	sec_weapon_template = ResourceLoader.load(SECONDARY_WEAPON_PATH) as Weapon
+	if ammo_template == null or weapon_template == null or sec_ammo_template == null or sec_weapon_template == null:
+		push_error("ARENA: weapon/ammo dependency failed type validation")
+		_raid_over = true
+		set_process(false)
+		set_physics_process(false)
+		return false
+	return true
 
 
 func _disconnect_signal(signal_ref: Signal, method_name: String) -> void:
