@@ -133,8 +133,24 @@ count_checks() { # logfile -> prints a check count or "?"
 #       that --import never touches). This is the bug the old CI step had: a
 #       "parse gate" that could never fail.
 CHECK_SCRIPTS_SCRIPT="res://addons/cabra.lat_shooters/test/check_scripts.gd"
+
+# Remove only import residue, never source assets. Godot's temporary texture
+# names end in .ctex-XXXXXX; a killed import can also leave zero-byte final
+# artifacts or .tmp files. The filesystem and UID caches may point at those
+# incomplete entries, so reset them together before the bounded retry.
+_cleanup_import_cache() {
+  local removed=0 f
+  if [ -d .godot/imported ]; then
+    while IFS= read -r -d "" f; do
+      rm -f -- "$f" && removed=$((removed + 1))
+    done < <(find .godot/imported -maxdepth 1 -type f \( -size 0 -o -name '*.ctex-*' -o -name '*.tmp' \) -print0 2>/dev/null)
+  fi
+  rm -f .godot/editor/filesystem_cache10 .godot/uid_cache.bin 2>/dev/null || true
+  echo "verify-all: import cache cleanup removed ${removed} residue file(s) and reset filesystem/UID caches" >&2
+}
+
 gate_import() {
-  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1 loop_hits
+  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1 loop_hits repeat_count residue_count stale_cache
   # Contention guard: other lanes call `godot --import` DIRECTLY (our per-repo flock
   # does NOT cover them), and concurrent imports on the shared .godot/ can hang
   # forever on a locked/stale file (verifier: `reimport | pistol_9mm_albedo.png`
@@ -152,25 +168,38 @@ gate_import() {
     fi
     [ "$rc" -ne 124 ] && break
     # Distinguish a CONTENTION hang from a STALE-CACHE RETRY LOOP: the latter
-    # repeats the same UID reimport endlessly (`.godot/editor/filesystem_cache10`
-    # pointing at a deleted asset — range/verifier 2026-09-21). A SINGLE occurrence
-    # is benign (Godot falls back to `path=`), so trigger on REPETITION only.
-    loop_hits="$(grep -cE 'during file reimport|Unrecognized UID' "$ilog")"
-    if [ "$loop_hits" -gt 50 ]; then
-      record "import/parse" "FAIL" "import TIMED OUT in a STALE-CACHE RETRY LOOP ($loop_hits repeated reimport lines) — fix: rm -f .godot/uid_cache.bin .godot/editor/filesystem_cache10 && tools/godot-lock.sh --headless --path . --import (see $ilog)"
-      HARD_FAILS=$((HARD_FAILS + 1))
-      return
+    # repeats the same reimport asset or leaves import residue. A SINGLE
+    # occurrence is benign, so trigger only on repetition/residue.
+    loop_hits="$(grep -cE 'during file reimport|Unrecognized UID' "$ilog" 2>/dev/null || true)"
+    repeat_count="$(grep -E 'reimport.*\|' "$ilog" 2>/dev/null | sed -E 's/.*\| //' | sort | uniq -c | sort -nr | sed -n '1s/^ *//p' | cut -d' ' -f1)"
+    repeat_count="${repeat_count:-0}"
+    residue_count="$(find .godot/imported -maxdepth 1 -type f \( -size 0 -o -name '*.ctex-*' -o -name '*.tmp' \) -print 2>/dev/null | wc -l | tr -d '[:space:]')"
+    residue_count="${residue_count:-0}"
+    stale_cache=0
+    if [ "$loop_hits" -gt 50 ] || [ "$repeat_count" -ge 20 ] || [ "$residue_count" -gt 0 ]; then
+      stale_cache=1
     fi
     if [ "$attempt" -ge 2 ]; then
-      record "import/parse" "FAIL" "import TIMED OUT (300s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
+      if [ "$stale_cache" -eq 1 ]; then
+        record "import/parse" "FAIL" "import TIMED OUT after cache cleanup retry (repeat=${repeat_count}, residue=${residue_count}) (see $ilog)"
+      else
+        record "import/parse" "FAIL" "import TIMED OUT (300s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
+      fi
       HARD_FAILS=$((HARD_FAILS + 1))
       return
     fi
-    echo "verify-all: import timed out (likely a concurrent 'godot --import'); waiting 15s + retry once" >&2
-    sleep 15
-    find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
+    if [ "$stale_cache" -eq 1 ]; then
+      cp "$ilog" "$ilog.1" 2>/dev/null || true
+      echo "verify-all: import timeout with repeated reimport/cache residue; purging cache and retrying once" >&2
+      _cleanup_import_cache
+    else
+      echo "verify-all: import timed out (likely a concurrent 'godot --import'); waiting 15s + retry once" >&2
+      sleep 15
+      find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
+    fi
     attempt=$((attempt + 1))
   done
+
   errs="$(grep -cE 'SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile' "$ilog")"
   "$GODOT_BIN" --headless --path . --script "$CHECK_SCRIPTS_SCRIPT" >"$clog" 2>&1
   crc=$?
