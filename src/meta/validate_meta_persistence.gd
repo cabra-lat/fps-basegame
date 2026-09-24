@@ -227,6 +227,7 @@ func _scenario_missing_and_atomic() -> void:
 	ProfileStore.save(profile, mpath)
 	_check(FileAccess.file_exists(mpath), "save file written")
 	_check(not FileAccess.file_exists(mpath + ".tmp"), "atomic save leaves no temp file")
+	_check(not FileAccess.file_exists(mpath + ".previous"), "successful save leaves no rollback backup")
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(mpath))
 	_check(parsed is Dictionary, "save is valid JSON")
 	if parsed is Dictionary:
@@ -422,6 +423,11 @@ func _scenario_hub_deploy_contract() -> void:
 	var bag := Backpack.new()
 	service.bind_carrier(eq, bag)
 	_check(service.prepare_raid() == 2, "prepare equips both selected weapons")
+	_check(not service._insured_manifest.is_empty(), "successful preparation snapshots the current insurance manifest")
+	service.auto_insure = false
+	var no_insure := service.prepare_raid_checked()
+	_check(no_insure.get("ok", false) and service._insured_manifest.is_empty(), "a new preparation clears the previous insurance manifest when auto-insure is disabled")
+	service.auto_insure = true
 	_check(_loadout_signature(profile.loadout) == selected_sig, "deployed manifest survives until raid resolution")
 	var restarted := ProfileStore.load_profile(path)
 	_check(_loadout_signature(restarted.loadout) == selected_sig, "restart after prepare recovers the deployment manifest")

@@ -170,6 +170,9 @@ func _prepare_raid_transaction() -> Dictionary:
 	_prepared = false
 	_resolved = false
 	_deploy_leftovers = {}
+	# A new attempt must never inherit the previous raid's insurance snapshot,
+	# including attempts that intentionally disable auto-insurance.
+	_insured_manifest = {}
 	if profile == null or _equipment == null:
 		return {"ok": false, "error": ERR_UNCONFIGURED, "reason": "profile or equipment unavailable", "items_equipped": 0}
 	var moved := 0

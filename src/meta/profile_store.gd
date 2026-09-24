@@ -22,13 +22,31 @@ static func save(profile: MetaProfile, path: String = PATH) -> Error:
 	f.store_string(text)
 	f.flush()
 	f.close()
-	# Rename over the live save. POSIX replaces; on failure drop the old file
-	# and retry once (Windows-style overwrite refusal).
+	# Prefer the atomic POSIX-style replace. If a platform refuses replacement,
+	# move the old file aside only for the retry, and restore it if the retry
+	# fails; never delete the last known-good save before a replacement exists.
 	var err := DirAccess.rename_absolute(tmp, path)
+	if err == OK:
+		return OK
+	if not FileAccess.file_exists(path):
+		DirAccess.remove_absolute(tmp)
+		return err
+	var backup := path + ".previous"
+	DirAccess.remove_absolute(backup)
+	var backup_err := DirAccess.rename_absolute(path, backup)
+	if backup_err != OK:
+		DirAccess.remove_absolute(tmp)
+		return backup_err
+	err = DirAccess.rename_absolute(tmp, path)
 	if err != OK:
-		DirAccess.remove_absolute(path)
-		err = DirAccess.rename_absolute(tmp, path)
-	return err
+		var restore_err := DirAccess.rename_absolute(backup, path)
+		if restore_err != OK:
+			push_error("ProfileStore: save failed and previous profile could not be restored (err %d)" % restore_err)
+		else:
+			DirAccess.remove_absolute(backup)
+		return err
+	DirAccess.remove_absolute(backup)
+	return OK
 
 static func load_profile(path: String = PATH) -> MetaProfile:
 	if not FileAccess.file_exists(path):
