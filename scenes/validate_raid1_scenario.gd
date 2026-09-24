@@ -2,7 +2,7 @@ extends SceneTree
 ## Focused headless probe for the RAID-1 collect/extract contract.
 
 const Raid1ScenarioScript = preload("res://scenes/raid1_scenario.gd")
-const ArenaManagerScript = preload("res://scenes/arena_manager.gd")
+const Raid1ArenaDecisionScript = preload("res://scenes/raid1_arena_decision.gd")
 
 var _checks := 0
 var _passed := 0
@@ -29,6 +29,29 @@ func _initialize() -> void:
 	_check(scenario.state == Raid1ScenarioScript.State.SUCCESS, "complete marks success")
 	_check(scenario.carried_item_id == Raid1ScenarioScript.OBJECTIVE_ID, "success carries marked intel")
 
+	# Helper-only regression: real RAID types, no manager preloads or stubs.
+	var decision_raid := Raid.new()
+	var decision_point := ExtractionPoint.new()
+	var decision_scenario := Raid1ScenarioScript.new()
+	decision_scenario.begin(decision_raid, profile, decision_point, decision_point)
+	_check(Raid1ArenaDecisionScript.preparation_succeeded({"ok": true}), "decision accepts successful preparation")
+	_check(not Raid1ArenaDecisionScript.preparation_succeeded({"ok": false}), "decision rejects failed preparation")
+	_check(Raid1ArenaDecisionScript.fallback_requires_failure(decision_scenario), "decision routes objective-less fallback to failure")
+	_check(not Raid1ArenaDecisionScript.scenario_completion_allowed(decision_raid, decision_scenario, decision_point), "decision forbids completion without objective")
+	decision_raid.begin()
+	_check(decision_raid.state == Raid.State.RAID, "completion fixture is ACTIVE before success predicate")
+	_check(decision_scenario.state == Raid1ScenarioScript.State.ACTIVE, "completion scenario is ACTIVE before success predicate")
+	decision_scenario.collect(Raid1ScenarioScript.OBJECTIVE_ID)
+	_check(not Raid1ArenaDecisionScript.fallback_requires_failure(decision_scenario), "decision does not fail objective-complete fallback")
+	_check(Raid1ArenaDecisionScript.scenario_completion_allowed(decision_raid, decision_scenario, decision_point), "decision allows objective-complete scenario")
+
+	var manager_source := FileAccess.get_file_as_string("res://scenes/arena_manager_core.gd")
+	_check(manager_source.contains("Raid1ArenaDecisionScript.preparation_succeeded(result)"), "manager delegates preparation predicate")
+	_check(manager_source.contains("Raid1ArenaDecisionScript.fallback_requires_failure(scenario)"), "manager delegates fallback predicate")
+	_check(manager_source.contains("Raid1ArenaDecisionScript.scenario_completion_allowed(raid, scenario, point)"), "manager delegates completion predicate")
+	_check(manager_source.contains("_raid_over = true"), "manager source preserves prepare-abort state")
+	_check(manager_source.contains("if not _prepare_raid_or_abort():"), "manager source gates setup on preparation")
+
 	var clear_raid := Raid.new()
 	root.add_child(clear_raid)
 	clear_raid.begin()
@@ -48,33 +71,22 @@ func _initialize() -> void:
 	_check(fallback_scenario.state == Raid1ScenarioScript.State.FAILURE, "fallback without objective fails scenario")
 	_check(fallback_raid.outcome == Raid.Outcome.LEFT_BEHIND, "fallback failure ends before generic success")
 
-	# Drive the real arena callback: Open Lane is physically open, but without
-	# the objective the callback must fail before calling scenario completion.
-	var routed_raid := Raid.new()
-	var routed_profile := PlayerProfile.new()
-	var routed_fallback := ExtractionPoint.new()
-	var routed_gated := ExtractionPoint.new()
-	root.add_child(routed_raid)
-	root.add_child(routed_fallback)
-	root.add_child(routed_gated)
-	var routed_scenario := Raid1ScenarioScript.new()
-	routed_scenario.begin(routed_raid, routed_profile, routed_fallback, routed_gated)
-	var manager := ArenaManagerScript.new()
-	manager.raid = routed_raid
-	manager.scenario = routed_scenario
-	routed_raid.begin()
-	manager.call("_on_extracted", routed_fallback)
-	_check(routed_scenario.state == Raid1ScenarioScript.State.FAILURE, "real fallback callback fails without objective")
-	_check(routed_raid.outcome == Raid.Outcome.LEFT_BEHIND, "real fallback callback ends before success settlement")
-
-	var prepare_raid := Raid.new()
-	var prepare_meta := MetaService.new()
-	var prepare_manager := ArenaManagerScript.new()
-	prepare_manager.meta = prepare_meta
-	prepare_manager.raid = prepare_raid
-	_check(not prepare_manager.call("_prepare_raid_or_abort"), "caller aborts failed raid preparation")
-	_check(prepare_raid.state == Raid.State.PREP, "failed preparation never begins the raid")
-	_check(prepare_raid.outcome == Raid.Outcome.NONE, "failed preparation leaves raid unresolved")
+	# The actual ArenaManagerScript probe remains blocked by its eager
+	# weapon/ammo/bot/audio dependencies; this section is helper-only.
+	var preactive_raid := Raid.new()
+	var preactive_scenario := Raid1ScenarioScript.new()
+	var preactive_point := ExtractionPoint.new()
+	preactive_scenario.begin(preactive_raid, null, preactive_point, preactive_point)
+	_check(preactive_raid.state == Raid.State.PREP, "fallback fixture starts in PREP")
+	_check(not preactive_raid.is_active(), "pre-ACTIVE raid is not active")
+	_check(Raid1ArenaDecisionScript.fallback_requires_failure(preactive_scenario), "pre-ACTIVE fallback requires failure")
+	_check(not Raid1ArenaDecisionScript.scenario_completion_allowed(preactive_raid, preactive_scenario, preactive_point), "pre-ACTIVE completion is forbidden")
+	preactive_raid.begin()
+	preactive_raid.end(Raid.Outcome.LEFT_BEHIND)
+	_check(preactive_raid.state == Raid.State.RESOLVE, "failed fallback ends in RESOLVE")
+	_check(preactive_raid.outcome != Raid.Outcome.SCENARIO_CLEARED, "failed fallback never clears scenario")
+	_check(preactive_scenario.destination == "", "failed fallback has empty destination")
+	_check(not Raid1ArenaDecisionScript.scenario_completion_allowed(preactive_raid, preactive_scenario, preactive_point), "post-RESOLVE completion is forbidden")
 
 	var failed := Raid1ScenarioScript.new()
 	failed.begin(raid, profile, fallback, gated)

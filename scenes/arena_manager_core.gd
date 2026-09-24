@@ -28,6 +28,7 @@ const BotScene: PackedScene = preload("res://src/npcs/bot/bot.tscn")
 const ArenaSpawnSolverScript = preload("./arena_spawn_solver.gd")
 const ArenaResultAdapterScript = preload("./arena_result_adapter.gd")
 const Raid1ScenarioScript = preload("./raid1_scenario.gd")
+const Raid1ArenaDecisionScript = preload("./raid1_arena_decision.gd")
 
 @onready var ammo_template: Ammo = preload("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
 @onready var weapon_template: Weapon = preload("res://resources/weapons/M4_Carbine.tres")
@@ -45,7 +46,7 @@ var plate_mat: BallisticMaterial
 var audio: GameAudio
 var gunsmith: GunsmithUI
 var raid: Raid
-var scenario: RefCounted
+var scenario: Raid1Scenario
 var profile: PlayerProfile
 var factions: FactionRegistry
 var meta: MetaService
@@ -345,7 +346,7 @@ func _ensure_meta() -> MetaService:
 
 func _prepare_raid_or_abort() -> bool:
 	var result: Dictionary = meta.prepare_raid_checked()
-	if bool(result.get("ok", false)):
+	if Raid1ArenaDecisionScript.preparation_succeeded(result):
 		return true
 	var reason := String(result.get("reason", "prepare_raid failed"))
 	push_error("RAID-1 prepare aborted: %s" % reason)
@@ -428,7 +429,7 @@ func _on_extract_progress(point: ExtractionPoint, _ratio: float) -> void:
 		extract_label.text = "Extraindo em %s... %d/%ds" % [point.display_name, int(point._progress), int(point.extract_time)]
 
 func _on_extracted(point: ExtractionPoint) -> void:
-	if scenario != null and not scenario.objective_collected:
+	if Raid1ArenaDecisionScript.fallback_requires_failure(scenario):
 		# The fallback is physically open, but leaving without the marked intel is
 		# a failed first clear: the existing meta resolution then forfeits kit.
 		scenario.fail("marked intel not extracted")
@@ -437,7 +438,7 @@ func _on_extracted(point: ExtractionPoint) -> void:
 		call("_push_feed", "Falha:intel não coletado — kit perdido")
 		return
 	var out: int
-	if scenario != null:
+	if Raid1ArenaDecisionScript.scenario_completion_allowed(raid, scenario, point):
 		scenario.prepare_success_carried(_raid1_backpack())
 		scenario.complete(point)
 		out = raid.complete_scenario(point)
