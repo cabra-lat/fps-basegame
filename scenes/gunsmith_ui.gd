@@ -51,11 +51,12 @@ var preview_holder: Node3D
 var preview_view: SubViewport
 var close_btn: Button
 
-var _pending: Array = [] # [{kind:"attach"/"detach", point:int, att:Attachment, origin:Dictionary}]
+var _pending: Array = [] # [{kind:"attach"/"detach", weapon_id:int, point:int, att:Attachment, origin:Dictionary}]
 var _active: Dictionary = {}
 var _mounted_origins: Dictionary = {} # current weapon point:int -> {"stash_item": InventoryItem, "source": Variant, "position": Vector2i}
 var _mounted_origins_by_weapon: Dictionary = {} # weapon instance id -> {"weapon_ref": WeakRef, "origins": Dictionary}
 var _t := 0.0
+var _recovery_retry_timer := 0.0
 
 func bind(p_audio: GameAudio) -> void:
 	audio = p_audio
@@ -73,6 +74,8 @@ func is_open() -> bool:
 func open_for_weapon(w: Weapon) -> void:
 	if w == null:
 		return
+	if weapon != null and weapon != w:
+		_cancel_actions_for_weapon_switch()
 	weapon = w
 	_activate_origin_map(w)
 	_prune_origin_map()
@@ -80,6 +83,18 @@ func open_for_weapon(w: Weapon) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_refresh()
 	_rebuild_preview()
+
+func _cancel_actions_for_weapon_switch() -> void:
+	if _pending.is_empty() and _active.is_empty():
+		return
+	_pending.clear()
+	_active = {}
+	_t = 0.0
+	if progress != null:
+		progress.value = 0.0
+	if message != null:
+		message.text = "Ação cancelada: arma mudou"
+
 
 func close() -> void:
 	visible = false
@@ -335,17 +350,71 @@ func _prune_origin_weapon_entries() -> void:
 			_mounted_origins_by_weapon.erase(weapon_id)
 			continue
 		var ref = entry.get("weapon_ref", null)
-		var live_weapon = ref.get_ref() if ref is WeakRef else null
+		var live_weapon: Weapon = null
+		if ref is WeakRef:
+			live_weapon = ref.get_ref() as Weapon
 		var origins = entry.get("origins", null)
-		var has_origins = origins is Dictionary and not origins.is_empty()
-		if not (live_weapon is Weapon) or not has_origins:
+		if live_weapon == null or not (origins is Dictionary):
 			_mounted_origins_by_weapon.erase(weapon_id)
+			continue
+		# An attachment can be removed by another system while this weapon is
+		# not selected. Drop only that point's provenance instead of retaining
+		# its InventoryItem/source references for the rest of the session.
+		for point in origins.keys():
+			var origin = origins[point]
+			var recovering := origin is Dictionary and bool(origin.get("recovery", false))
+			if live_weapon.get_attachment(int(point)) == null and not recovering:
+				origins.erase(point)
+		if origins.is_empty():
+			_mounted_origins_by_weapon.erase(weapon_id)
+
+func _retry_failed_returns(delta: float) -> void:
+	_recovery_retry_timer -= delta
+	if _recovery_retry_timer > 0.0:
+		return
+	_recovery_retry_timer = 0.5
+	for weapon_id in _mounted_origins_by_weapon.keys():
+		var entry = _mounted_origins_by_weapon[weapon_id]
+		if not (entry is Dictionary):
+			continue
+		var ref = entry.get("weapon_ref", null)
+		var live_weapon: Weapon = null
+		if ref is WeakRef:
+			live_weapon = ref.get_ref() as Weapon
+		if live_weapon == null:
+			continue
+		var origins = entry.get("origins", null)
+		if not (origins is Dictionary):
+			continue
+		for point in origins.keys():
+			var origin = origins[point]
+			if not (origin is Dictionary) or not bool(origin.get("recovery", false)):
+				continue
+			if live_weapon.get_attachment(int(point)) != null:
+				origin.erase("recovery")
+				origin.erase("detached_att")
+				continue
+			var item: InventoryItem = origin.get("stash_item") as InventoryItem
+			var source = origin.get("source")
+			var pos: Vector2i = origin.get("position", Vector2i(-1, -1))
+			if InventorySystem.return_item(source, item, pos):
+				origins.erase(point)
+				continue
+			var detached_att: Attachment = origin.get("detached_att") as Attachment
+			if detached_att != null and live_weapon.attach_attachment(int(point), detached_att):
+				origin.erase("recovery")
+				origin.erase("detached_att")
+		if origins.is_empty():
+			_mounted_origins_by_weapon.erase(weapon_id)
+
 
 func _prune_origin_map() -> void:
 	if weapon == null:
 		return
 	for point in _mounted_origins.keys():
-		if weapon.get_attachment(int(point)) == null:
+		var origin = _mounted_origins[point]
+		var recovering := origin is Dictionary and bool(origin.get("recovery", false))
+		if weapon.get_attachment(int(point)) == null and not recovering:
 			_mounted_origins.erase(point)
 	_erase_current_weapon_entry_if_empty()
 
@@ -362,9 +431,9 @@ func _can_drop_on_row(point: int, data: Variant) -> bool:
 	if not (data is Dictionary and data.has("item")):
 		return false
 	var item = data.get("item")
-	if item == null:
+	if not (item is InventoryItem):
 		return false
-	var att = item.get("extra") as Attachment
+	var att = item.extra as Attachment
 	if att == null:
 		return false
 	if att.attachment_point != point:
@@ -390,10 +459,10 @@ func _is_point_busy(point: int) -> bool:
 func _drop_on_row(point: int, data: Variant) -> void:
 	if not _can_drop_on_row(point, data):
 		return
-	var item = data.get("item")
+	var item: InventoryItem = data["item"] as InventoryItem
 	var att: Attachment = item.extra as Attachment
 	var source = data.get("source")
-	var pos: Vector2i = item.position if item != null and "position" in item else Vector2i(-1, -1)
+	var pos: Vector2i = item.position
 	var origin: Dictionary = {
 		"stash_item": item,
 		"source": source,
@@ -404,19 +473,38 @@ func _drop_on_row(point: int, data: Variant) -> void:
 func _request_detach(point: int) -> void:
 	_queue_detach(point)
 
+
 func _queue_attach(point: int, att: Attachment, origin: Dictionary = {}) -> void:
-	_pending.append({"kind": "attach", "point": point, "att": att, "origin": origin})
+	if weapon == null or att == null:
+		return
+	_pending.append({
+		"kind": "attach",
+		"weapon_id": weapon.get_instance_id(),
+		"point": point,
+		"att": att,
+		"origin": origin,
+	})
 	message.text = "Na fila: montar %s" % att.name
 	_refresh()
 
+
 func _queue_detach(point: int) -> void:
+	if weapon == null:
+		return
 	var origin: Dictionary = _mounted_origins.get(point, {})
-	_pending.append({"kind": "detach", "point": point, "att": weapon.get_attachment(point), "origin": origin})
+	_pending.append({
+		"kind": "detach",
+		"weapon_id": weapon.get_instance_id(),
+		"point": point,
+		"att": weapon.get_attachment(point),
+		"origin": origin,
+	})
 	message.text = "Na fila: remover"
 	_refresh()
 
 func _physics_process(delta: float) -> void:
 	_prune_origin_weapon_entries()
+	_retry_failed_returns(delta)
 	if not visible:
 		return
 	if preview_holder != null:
@@ -448,12 +536,21 @@ func _physics_process(delta: float) -> void:
 func _apply(a: Dictionary) -> void:
 	if weapon == null:
 		return
+	var action_weapon_id: int = a.get("weapon_id", weapon.get_instance_id())
+	if action_weapon_id != weapon.get_instance_id():
+		message.text = "Ação ignorada: arma mudou"
+		return
 	var point: int = a.get("point", 0)
 	var origin: Dictionary = a.get("origin", {})
 	if a.get("kind") == "attach":
 		var att: Attachment = a.get("att")
-		if att == null or not weapon.attach_attachment(point, att):
-			message.text = "Falhou ao montar"
+		if att == null:
+			message.text = "Falhou ao montar: recurso inválido"
+			return
+		if not weapon.attach_attachment(point, att):
+			# Core Attachment ownership is single-owner; a rejected second mount
+			# must leave the source wrapper untouched so the player can retry.
+			message.text = "Falhou ao montar: recurso em uso; libere-o e tente novamente"
 			return
 		# Mount first, then take ownership from the source. If the source moved
 		# while the timed action was running, roll the mount back instead of
@@ -461,7 +558,7 @@ func _apply(a: Dictionary) -> void:
 		if not origin.is_empty():
 			var stash_item = origin.get("stash_item")
 			var source = origin.get("source")
-			if not _remove_stash_item(source, stash_item):
+			if not InventorySystem.take_item(source, stash_item):
 				weapon.detach_attachment(point)
 				message.text = "Falhou ao retirar da origem"
 				return
@@ -479,50 +576,25 @@ func _apply(a: Dictionary) -> void:
 			var stash_item = origin.get("stash_item")
 			var source = origin.get("source")
 			var pos: Vector2i = origin.get("position", Vector2i(-1, -1))
-			if not _return_stash_item(source, stash_item, pos):
+			if not InventorySystem.return_item(source, stash_item, pos):
 				# A detach is transactional too: if the source cannot take the
 				# wrapper back, keep it mounted so the player can retry after
 				# freeing space rather than silently losing the item.
 				var restored := mounted_att != null and weapon.attach_attachment(point, mounted_att)
-				message.text = "Falhou ao devolver; %s" % ("montagem mantida" if restored else "montagem nao restaurada")
+				if restored:
+					origin.erase("recovery")
+					origin.erase("detached_att")
+				else:
+					# Keep the wrapper in the origin map and retain the detached
+					# resource for automatic retry; never erase the only owner.
+					origin["recovery"] = true
+					origin["detached_att"] = mounted_att
+					_mounted_origins[point] = origin
+					_recovery_retry_timer = 0.0
+				message.text = "Falhou ao devolver; %s" % ("montagem mantida" if restored else "wrapper retido para recuperação")
 				return
 		_erase_origin(point)
 		message.text = "Removido"
-
-func _remove_stash_item(source: Variant, item: Variant) -> bool:
-	if source == null or item == null:
-		return false
-	if source is InventoryContainer:
-		var c := source as InventoryContainer
-		if item in c.items:
-			return c.remove_item(item)
-	elif source is Equipment:
-		var eq := source as Equipment
-		for slot_name in eq.slots:
-			var slot = eq.slots[slot_name]
-			if item in slot.items:
-				return slot.remove_item(item)
-	elif source.has_method("remove_item"):
-		return source.remove_item(item)
-	return false
-
-func _return_stash_item(source: Variant, item: Variant, preferred_pos: Vector2i = Vector2i(-1, -1)) -> bool:
-	if source == null or item == null:
-		return false
-	if source is InventoryContainer:
-		var c := source as InventoryContainer
-		if preferred_pos != Vector2i(-1, -1) and c.grid != null and c.grid.is_area_free(preferred_pos, item.dimensions):
-			return c.add_item(item, preferred_pos)
-		return c.add_item(item, Vector2i(-1, -1))
-	elif source is Equipment:
-		var eq := source as Equipment
-		for slot_name in eq.slots:
-			var slot = eq.slots[slot_name]
-			if slot.can_add_item(item):
-				return slot.add_item(item)
-	elif source.has_method("add_item"):
-		return source.add_item(item)
-	return false
 
 # ─── 3D PREVIEW ───
 
