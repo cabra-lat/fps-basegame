@@ -102,6 +102,15 @@ theme_override_styles/focus = SubResource("BtnHover")
 theme_override_font_sizes/font_size = 20
 text = "Jogar"
 
+[node name="BtnHub" type="Button" parent="Menu"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("BtnNormal")
+theme_override_styles/hover = SubResource("BtnHover")
+theme_override_styles/pressed = SubResource("BtnPressed")
+theme_override_styles/focus = SubResource("BtnHover")
+theme_override_font_sizes/font_size = 18
+text = "Central de operações"
+
 [node name="BtnSettings" type="Button" parent="Menu"]
 layout_mode = 2
 theme_override_styles/normal = SubResource("BtnNormal")

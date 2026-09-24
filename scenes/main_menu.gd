@@ -4,6 +4,8 @@ extends Control
 ## on change, everything persists to user://settings.cfg on Voltar.
 ## UI clicks via shared GameAudio (UI bus pool).
 
+const HUB_SCENE := "res://scenes/operations_hub.tscn"
+
 var audio: GameAudio
 var settings: Dictionary
 var _sliders: Dictionary = {}
@@ -17,6 +19,8 @@ func _ready() -> void:
 	SettingsStore.apply_volumes(settings)
 	($Menu/BtnPlay as Button).pressed.connect(_on_play)
 	($Menu/BtnPlay as Button).pressed.connect(audio.play_ui)
+	($Menu/BtnHub as Button).pressed.connect(_on_hub)
+	($Menu/BtnHub as Button).pressed.connect(audio.play_ui)
 	($Menu/BtnSettings as Button).pressed.connect(_on_open_settings)
 	($Menu/BtnSettings as Button).pressed.connect(audio.play_ui)
 	($Menu/BtnQuit as Button).pressed.connect(_on_quit)
@@ -25,6 +29,10 @@ func _ready() -> void:
 
 func _on_play() -> void:
 	get_tree().change_scene_to_file("res://scenes/arena_blockout.tscn")
+
+func _on_hub() -> void:
+	get_tree().change_scene_to_file(HUB_SCENE)
+
 
 func _on_quit() -> void:
 	get_tree().quit()
