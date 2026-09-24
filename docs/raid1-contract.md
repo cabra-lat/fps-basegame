@@ -12,23 +12,41 @@ pickup, and two visible destinations.
   the existing MetaService resolution discards raid loot and forfeitures the
   deployed kit.
 
-## Outcome-policy decision still open
+## Product decision: Option A selected
 
-The implementation deliberately does not call the existing **RUN THROUGH**
-classification for a 600-second scenario. `Raid.extract()` currently returns
-`SURVIVED` at 600 seconds because RUN THROUGH requires elapsed time under 420
-seconds and EXP under 200.
+The coordinator selected Option A: preserve the 600-second / 8–12 minute
+RAID-1 scenario and add a distinct scenario-clear outcome. The ordinary
+`RUN_THROUGH` rule remains unchanged for non-RAID-1 raids.
 
-Product must choose one contract before integration:
+### Named outcome
 
-1. Keep the 8–12 minute scenario and add an explicit scenario-clear outcome,
-   including its reward and progression semantics; or
-2. Approve a shorter scenario and an explicit EXP policy so the existing
-   `RUN THROUGH` classification applies.
+`Raid.Outcome.SCENARIO_CLEARED` is the finite outcome for a successful RAID-1
+extraction. It is distinct from both `RUN_THROUGH` and the generic `SURVIVED`
+result, so a 600-second first clear cannot be misclassified by the existing
+`<420s AND EXP<200` rule.
 
-Until that decision, the current candidate retains the bounded 600-second
-implementation and its existing failure semantics without silently selecting
-option 1 or 2.
+### Integration contract
+
+- Add a RAID-1-specific completion path (for example,
+  `Raid.complete_scenario(point)`) that emits the same extraction event and
+  ends with `SCENARIO_CLEARED`. Generic `Raid.extract(point)` must retain its
+  current `RUN_THROUGH`/`SURVIVED` behavior.
+- `MetaService.resolve_raid()` treats `SCENARIO_CLEARED` as a successful raid
+  for persistence and settlement, but reports the distinct outcome and banks
+  only the marked objective already filtered by the RAID-1 backpack contract.
+  The scenario-clear settlement uses the normal survival reward; it does not
+  silently become a RUN THROUGH reward.
+- Progression counts scenario completion as a successful extraction and keeps
+  the exact outcome available to quests. Consumers must not infer RUN THROUGH
+  from elapsed time or EXP.
+- Result HUD/feed text uses `SCENARIO CLEARED` (or the product-approved display
+  spelling) rather than `SURVIVED` or `RUN THROUGH`.
+- Regression tests must cover: 600-second RAID-1 clear → `SCENARIO_CLEARED`,
+  ordinary fast/low-EXP extraction → `RUN_THROUGH`, ordinary slow/high-EXP
+  extraction → `SURVIVED`, and failure → existing discard/kit-forfeiture path.
+
+This is an integration contract, not a request to alter the already-landed
+candidate's generic raid thresholds.
 
 Focused evidence is recorded by `scenes/validate_raid1_scenario.gd` (12/12 in
 the current worktree). The full parse gate remains environment-blocked by
