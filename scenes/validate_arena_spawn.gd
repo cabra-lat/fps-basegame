@@ -60,6 +60,8 @@ var v: ValidateUtil
 var _arena
 var _frame := 0
 var _done := false
+const NO_QUIT_CODE := -999
+var _quit_code := NO_QUIT_CODE
 var _mid_run_names: Array[String] = []
 var _tdm_names: Array[String] = []
 ## The frame-130 block must run exactly once and must NOT end the gate (TDM still follows).
@@ -79,12 +81,15 @@ func _initialize() -> void:
 
 
 func _process(_delta: float) -> bool:
+	if _quit_code != NO_QUIT_CODE:
+		quit(_quit_code)
+		return true
 	if _done:
 		return true
 	if Time.get_ticks_msec() > TIME_BUDGET_MS:
 		print("TIMEOUT: %d frames in %d ms — the engine is starved (shared .godot cache under contention?); re-run, or clear .godot/uid_cache.bin + .godot/editor/filesystem_cache10" % [_frame, Time.get_ticks_msec()])
 		v.check(false, "the frame plan finished inside the %d ms budget" % TIME_BUDGET_MS)
-		quit(1)
+		_cleanup_and_quit(1)
 		return true
 	_frame += 1
 	if _frame == 3:
@@ -107,9 +112,16 @@ func _process(_delta: float) -> bool:
 	if _frame >= TDM_CHECK_FRAME:
 		_done = true
 		_check_tdm_two_teams()
-		quit(v.finish())
+		_cleanup_and_quit(v.finish())
 		return true
 	return false
+
+
+func _cleanup_and_quit(code: int) -> void:
+	if _arena != null:
+		_arena.free()
+		_arena = null
+	_quit_code = code
 
 
 # ─── [1] THE SPAWN CURSOR (no scene) ────────────────

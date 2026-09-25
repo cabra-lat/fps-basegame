@@ -44,6 +44,8 @@ var v: ValidateUtil
 var _ui
 var _frame := 0
 var _done := false
+const NO_QUIT_CODE := -999
+var _quit_code := NO_QUIT_CODE
 var _held: Node = null
 var _held_name := ""
 var _held_start := Vector3.ZERO
@@ -61,6 +63,9 @@ func _initialize() -> void:
 ## The checks need the tree up (add_child must run a scene's _ready) and a few
 ## frames to catch a body that re-enables its own physics.
 func _process(_delta: float) -> bool:
+	if _quit_code != NO_QUIT_CODE:
+		quit(_quit_code)
+		return true
 	if _done:
 		return true
 	_frame += 1
@@ -78,9 +83,16 @@ func _process(_delta: float) -> bool:
 	if _frame >= DRIFT_FRAMES:
 		_done = true
 		_check_no_drift()
-		quit(v.finish())
+		_cleanup_and_quit(v.finish())
 		return true
 	return false
+
+
+func _cleanup_and_quit(code: int) -> void:
+	if _ui != null:
+		_ui.free()
+		_ui = null
+	_quit_code = code
 
 
 func _attachment_files() -> Array[String]:
