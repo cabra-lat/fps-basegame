@@ -92,35 +92,41 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
    Poncelet tissue `P = K·ln(1+E/E1)`. Cert tables in `certification.gd`
    decide armor stops; physics is the fall-through, never the reverse.
 7. **Coordinate via AMQ.** Queue root is `.agent-mail/` (gitignored). Handles:
-   `coordinator`, `ballistics`, `player-rig`, `range`, `spotter`, `npc-body`,
-   `meta`, `testkit`, `qa`. Prefix shell with `export PATH="$HOME/.local/bin:$PATH"`.
-   Skill reference: `.opencode/skills/amq-cli/SKILL.md`.
+   `coordinator`, `agsuite-dev`, `ballistics`, `inventory-ux`, `player-rig`, `range`,
+   `spotter`, `npc-body`, `meta`, `testkit`, `qa`, `verifier`. Prefix shell with
+   `export PATH="$HOME/.local/bin:$PATH"`. Skill reference:
+   `.opencode/skills/amq-cli/SKILL.md`.
 
    **Message protocol (all agents, no exceptions):**
-   - **Drain first:** `amq drain --me <handle> --include-body`, then claim your task
-     in `.opencode/bus/STATUS.md` (`CLAIMED by <handle> <UTC time>`).
-   - **Always reply to the sender.** Every order or question you receive gets an
-     answer to *whoever sent it*, on the same thread:
-     `amq reply --me <handle> --id <msg_id> --body @/tmp/shooter/reply.txt`
-     (it sets to/thread/refs automatically). Do NOT default to reporting to
-     `coordinator` — report to the sender. Only CC `coordinator` when shared state
-     (the board) changes.
-   - **Every message that expects action must say so** (`reply needed`, `ack`,
-     or an explicit question) — and you answer the same way when you receive one.
-   - **Report shape:** (1) what was asked, (2) what was done + files touched,
-     (3) evidence (numbers, paths, commands), (4) blockers/dependencies,
+   - **Drain first:** `herdr-amq mail drain --me <handle> --include-body`, then check
+     assigned tasks with `herdr-amq task drain --me <handle>` and claim one with
+     `herdr-amq task claim <id> --me <handle>` (or `herdr-amq task next --me <handle>`).
+     Use the AMQ/task CLI for card transitions; never edit `.agent-mail/` files directly.
+   - **Reply selectively:** Reply on the original thread only when a message explicitly
+     requests action or asks a question. Informational broadcasts and acknowledgement-only
+     messages need no reply. For an actionable message, reply once with the result/evidence
+     or blocker, then continue the assigned work; never send an acknowledgement-only reply.
+     Use `herdr-amq reply --id <msg_id> --body @/tmp/shooter/reply.txt` (or the equivalent
+     `amq reply --me <handle> --root <queue-root> --id <msg_id> --body @...` form).
+   - **Do not manufacture work:** A doorbell wakes an available agent; it is not a reason
+     to create a reply loop, duplicate a task, or idle while assigned work remains.
+   - **Policy ownership:** Doorbells are delivery, not project policy. Project-specific rules
+     belong in this `AGENTS.md` and the agent cards. Local `.agent-mail/templates/doorbell.md`
+     may customize the prompt, but must not suppress required delivery or task-claim actions.
+   - **Coordinator authority:** The coordinator owns triage, approvals, delegation, and
+     re-scoping without a separate human approval gate. The only standing restriction is
+     remote deletion: never delete remote branches, tags, or other remote refs.
+   - **Report shape:** For replies, include (1) what was asked, (2) what was done and files
+     touched, (3) evidence (numbers, paths, commands), (4) blockers/dependencies, and
      (5) board status. Never invent results; report gates honestly.
-   - **Blocked or need a peer:** message that peer directly. Ask `spotter` for
-     numeric/visual verification.
-   - One agent per file-set; claim before editing. Never touch `.agent-mail/`
-     files directly — `amq` CLI only. Long bodies use `--body @file` (backticks
-     are eaten by the shell and corrupt the message).
-   - **Never verify a diff with the repo's external diff driver on.** This repo sets
-     one (`sem`, the boxed output): bare `git diff` emits **no** `+`/`-` lines, so a
-     check like "the diff only touches icons" can pass *vacuously* instead of failing.
-     Always disable it: `git -c diff.external= diff --no-ext-diff --unified=0
-     <from> <to> -- <paths>`. (Reproduced by `meta`+`testkit`: a "0 changed lines"
-     check where the real diff had 30 — it had falsified an "icon-only" claim.)
+   - **Blocked or need a peer:** message that peer directly. Ask `spotter` for numeric/visual
+     verification. One agent per file-set; claim before editing.
+   - **Never verify a diff with the repo's external diff driver on.** This repo sets one
+     (`sem`, the boxed output): bare `git diff` emits **no** `+`/`-` lines, so a check like
+     "the diff only touches icons" can pass *vacuously* instead of failing. Always disable it:
+     `git -c diff.external= diff --no-ext-diff --unified=0 <from> <to> -- <paths>`.
+     (Reproduced by `meta`+`testkit`: a "0 changed lines" check where the real diff had 30 —
+     it had falsified an "icon-only" claim.)
 
 ## Identity rule (this is a genre framework, NOT a clone)
 
@@ -148,7 +154,7 @@ message semantics. `tools/amq-herdr-bridge.mjs` joins them — same handle names
 both sides, so no mapping is needed. It watches each handle's inbox and, when there
 is unread mail: **idle/done → prompts the agent via herdr to drain and reply to the
 sender**; working → leaves it alone (drains on its next turn); blocked → raises one
-alert to `coordinator` (a blocked agent needs a human answer, not more mail).
+alert to `coordinator` (a blocked agent needs coordinator triage, not another doorbell).
 
 ```bash
 node tools/amq-herdr-bridge.mjs --once --dry-run   # side-effect free preview
