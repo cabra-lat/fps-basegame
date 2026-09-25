@@ -261,15 +261,6 @@ func has_weapon() -> bool:
 	return weapon_enabled and weapon != null
 
 
-func get_weapon() -> Weapon:
-	return weapon if has_weapon() else null
-
-
-func get_inventory() -> InventoryContainer:
-	_ensure_inventory()
-	return inventory
-
-
 ## Scene-owned loot adapters should use this guarded accessor rather than
 ## reaching into `inventory` and accidentally opening a live bot's loadout.
 func get_corpse_inventory() -> InventoryContainer:
@@ -317,10 +308,6 @@ func tier_name() -> String:
 
 func is_reloading() -> bool:
 	return _reloading
-
-
-func weapon_rounds_remaining() -> int:
-	return _weapon_rounds_remaining
 
 
 ## Debug/HUD hook (no in-repo caller yet; kept as API).
