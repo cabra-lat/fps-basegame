@@ -154,7 +154,7 @@ gate_import() {
   # remove source .import files or generate repository files as a side effect.
   find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
   while :; do
-    timeout 120 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+    timeout --kill-after=10s 120s "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
 
     # Godot prefixes progress output with ANSI colour codes and appends a reset
     # sequence to asset names. Strip those codes before grouping by asset. A high
@@ -292,7 +292,7 @@ gate_harness() { # name script
     # that never boots) hangs the WHOLE gate forever — observed: the arena_spawn
     # harness ran 891 s and my full verify-all never reached the summary.
     if command -v timeout >/dev/null 2>&1; then
-      timeout 600 "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1; rc=$?
+      timeout --kill-after=10s 600s "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1; rc=$?
     else
       "$GODOT_BIN" --headless --path . --script "$script" >"$log" 2>&1; rc=$?
     fi
@@ -335,7 +335,7 @@ gate_harness() { # name script
     echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — bounded re-import + retry (attempt $((attempt + 1))/3)" >&2
     local rlog="$LOG_DIR/reimport.$name.log" rrc rloop_stats rloop_count rloop_asset
     if command -v timeout >/dev/null 2>&1; then
-      timeout 120 "$GODOT_BIN" --headless --path . --import >"$rlog" 2>&1
+      timeout --kill-after=10s 120s "$GODOT_BIN" --headless --path . --import >"$rlog" 2>&1
       rrc=$?
     else
       "$GODOT_BIN" --headless --path . --import >"$rlog" 2>&1
@@ -365,7 +365,7 @@ gate_qa() {
   # BOUND it: under heavy .godot/ contention the audit has been seen to run past
   # 300s (coordinator measured it); without a timeout it hangs the whole gate.
   if command -v timeout >/dev/null 2>&1; then
-    timeout 900 node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1; rc=$?
+    timeout --kill-after=10s 900s node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1; rc=$?
   else
     node tools/qa/audit.mjs "${args[@]}" >"$log" 2>&1; rc=$?
   fi
