@@ -76,7 +76,21 @@ jobs:
       # validate_meta_* harnesses, validate_invariants (cross-system regression
       # probes promoted from *_tmp.gd), and the qa quality audit (BLOCKER hard).
       - name: verify-all
+        env:
+          VERIFY_LOG_DIR: ${{ runner.temp }}/verify-all-logs
         run: bash tools/verify-all.sh
+
+      # Keep the complete per-gate logs available from the CI run page, even
+      # when the aggregate command fails. The log directory is supplied by
+      # VERIFY_LOG_DIR so the artifact path is deterministic on GitHub runners.
+      - name: Upload verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-all-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}/verify-all-logs
+          if-no-files-found: warn
+          retention-days: 14
 
   export:
     name: Export binaries (needs templates)
