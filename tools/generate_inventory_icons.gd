@@ -8,7 +8,27 @@
 # background, renders it at 128x128 and writes a PNG plus a manifest.
 #
 # No ripped art, no external icons: the pixels come from `res://src/**` /
-# `assets/models/**`. Re-running is deterministic (no random, fixed framing).
+# `assets/models/**`.
+#
+# RE-RUNS ARE NOT BYTE-REPRODUCIBLE. The pixels come out of a GPU framebuffer
+# (SubViewport + fixed orthographic camera + fixed lights, below), so driver, GPU
+# and engine build are all inputs: two consecutive runs on one machine, same
+# commit, rewrote 15 PNGs and then 13. A non-empty PNG diff after a re-run is
+# EXPECTED, not evidence of corruption — do not file it as a bug, and do not
+# review generated icons by diffing them.
+#
+# What IS reproducible is `manifest.json`, which is computed from the item list
+# rather than from pixels. That is the reviewable artefact; the PNGs are output.
+#
+# The pinning below (camera, lights, environment, resolution, format) is real and
+# worth keeping, but it is not a determinism guarantee. Two specific run-dependent
+# causes were removed — MSAA edge sampling (SUPERSAMPLE, see below) and TIME-driven
+# shader uniforms (_freeze_time_shaders) — and fixing two causes is not what a
+# blanket guarantee looks like. Do not restore one.
+#
+# Contrast, so nobody generalises: the glTF importer's extracted textures (63ea0b2)
+# are pure byte copies of bufferView payloads and ARE byte-stable. Generated
+# assets in this project do not share one reproducibility property.
 #
 # It is a two-phase build tool because a freshly written PNG has no `.import`
 # yet and `load()` would return null:
