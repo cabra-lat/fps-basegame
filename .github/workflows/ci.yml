@@ -56,24 +56,11 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive --depth 1
 
-      # THROWAWAY PROBE -- NOT FOR MERGE. An empty commit in the GodotIK submodule
-      # advances `rev-parse HEAD` without changing a single byte of file content, so
-      # the godotik-build cache key misses by construction and SCons recompiles --
-      # the only condition under which ccache is invoked at all. Every compile stays
-      # byte-identical to a previous run, so a non-trivial HIT count is attributable
-      # to ccache and to nothing else.
-      #
-      # This lives on a branch because an empty commit's SHA comes from the committer
-      # timestamp, so it is NON-DETERMINISTIC. Landed on main it would mint a fresh
-      # cache key every run and the build cache would never hit again, trading a
-      # permanent regression for a one-off measurement.
       - name: Resolve pinned GodotIK revisions
         id: godotik-revisions
         shell: bash
         run: |
           set -euo pipefail
-          git -C third_party/godotik -c user.email=probe@localhost -c user.name=probe \
-            commit --allow-empty -m "probe: bust build key, zero content change" >/dev/null
           echo "godotik=$(git -C third_party/godotik rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "godot_cpp=$(git -C third_party/godotik/godot-cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -114,6 +101,22 @@ jobs:
           # Keep the Actions cache bounded; 1G is ample for this one target.
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
 
+      # THROWAWAY PROBE -- NOT FOR MERGE. Removes the SCons state that
+      # actions/cache just restored, forcing a cold recompile while HEAD stays on
+      # the pinned commit, so build-godotik.sh's pin guard still passes. Every
+      # compile is byte-identical to a previous run, so a non-trivial ccache HIT
+      # count is attributable to ccache and to nothing else. This is the only way
+      # to get a build-cache miss without moving HEAD: an empty commit in the
+      # submodule does move the key, but it also trips the pin guard, which
+      # refuses to build an unpinned tree.
+      - name: PROBE invalidate restored SCons state
+        run: |
+          rm -rf third_party/godotik/.scons-cache \
+                 third_party/godotik/.sconsign.dblite \
+                 third_party/godotik/godot-cpp/.sconsign.dblite \
+                 third_party/godotik/godot-cpp/bin \
+                 third_party/godotik/godot_project/addons/libik/bin
+          echo "probe: SCons state cleared, HEAD still $(git -C third_party/godotik rev-parse --short HEAD)"
       - name: Build and stage GodotIK
         shell: bash
         run: tools/build-godotik.sh
