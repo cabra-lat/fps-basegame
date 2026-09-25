@@ -5,9 +5,11 @@
 // Owned by the `qa` agent; findings are work orders, never auto-fixes.
 //
 // Usage:
-//   node tools/qa/audit.mjs                 # scan + write docs/qa-report.md
+//   node tools/qa/audit.mjs                 # scan only (does not write a report)
+//   node tools/qa/audit.mjs --report <path> # write the report to an explicit path
+//   node tools/qa/audit.mjs --write-report  # explicitly write docs/qa-report.md
 //   node tools/qa/audit.mjs --no-import     # skip the godot import gate (fast)
-//   node tools/qa/audit.mjs --check         # CI mode: exit 1 on BLOCKER,
+//   node tools/qa/audit.mjs --check         # read-only CI mode: exit 1 on BLOCKER,
 //                                           # exit 2 on MAJOR > baseline
 //   node tools/qa/audit.mjs --update-baseline
 //   node tools/qa/audit.mjs --json          # dump findings as JSON to stdout
@@ -174,6 +176,17 @@ const SEVERITY_ORDER = ['BLOCKER', 'MAJOR', 'MINOR', 'NIT'];
 const args = new Set(process.argv.slice(2));
 const flag = (name) => args.has(name);
 
+// Report output is opt-in. A scan is a read-only observation unless the caller
+// names a destination; this keeps `--check` and evidence scans from dirtying a
+// tracked report in every lane's worktree.
+const reportFlagIndex = process.argv.indexOf('--report');
+const reportFlagPath = reportFlagIndex >= 0 ? process.argv[reportFlagIndex + 1] : null;
+if (reportFlagIndex >= 0 && (!reportFlagPath || reportFlagPath.startsWith('--'))) {
+  console.error('audit: --report requires an output path (for example /tmp/shooter/qa-report.md)');
+  process.exit(3);
+}
+const reportPath = reportFlagPath ? resolve(ROOT, reportFlagPath) : null;
+
 // ────────────────────────────────────────────────────────────── helpers ──
 
 function walk(dir, out = []) {
@@ -270,7 +283,7 @@ function enclosingFunc(funcs, line) {
 // `--verify-manual` runs it and flips `status` between `resolved` and `active`
 // (writing the file only when the status actually changes). Entries without a
 // probe stay `unverified` and are reported, not hidden.
-function verifyManualFindings() {
+function verifyManualFindings(writeChanges = true) {
   if (!existsSync(MANUAL_PATH)) return { ran: 0, resolved: 0, active: 0, unverified: 0, errors: 0 };
   let list;
   try {
@@ -315,7 +328,7 @@ function verifyManualFindings() {
       changed = true;
     }
   }
-  if (changed) writeFileSync(MANUAL_PATH, JSON.stringify(list, null, 2) + '\n');
+  if (changed && writeChanges) writeFileSync(MANUAL_PATH, JSON.stringify(list, null, 2) + '\n');
   return stats;
 }
 
@@ -1205,7 +1218,10 @@ function main() {
   // Re-run manual probes before the gate decides, so a fixed finding cannot
   // keep CI red. Plain report runs keep the stored statuses (no re-probing).
   const doVerify = flag('--verify-manual') || (flag('--check') && !flag('--no-verify'));
-  const manualStats = doVerify ? verifyManualFindings() : null;
+  // CI/check is a read-only gate. Probe results may change the in-memory
+  // classification, but only an explicit non-check verification may persist
+  // MANUAL_PATH; otherwise a scan would dirty a tracked worktree file.
+  const manualStats = doVerify ? verifyManualFindings(!flag('--check')) : null;
 
   // Open claims/tasks: an API named here is "pending consumer", not dead.
   let openTasksText = '';
@@ -1296,8 +1312,11 @@ function main() {
   }
 
   const report = renderReport(findings, scans, importGate, dupes, manualStats, ignoreResult, ownerBreakdown, acceptedFollowups);
-  mkdirSync(dirname(REPORT_PATH), { recursive: true });
-  writeFileSync(REPORT_PATH, report + '\n');
+  const reportTarget = reportPath || (flag('--write-report') ? REPORT_PATH : null);
+  if (reportTarget) {
+    mkdirSync(dirname(reportTarget), { recursive: true });
+    writeFileSync(reportTarget, report + '\n');
+  }
 
   const baselineData = {
     generated: new Date().toISOString(),
@@ -1315,7 +1334,7 @@ function main() {
   }
 
   console.log(`QA audit: BLOCKER=${counts.BLOCKER} MAJOR=${counts.MAJOR} MINOR=${counts.MINOR} NIT=${counts.NIT}`);
-  console.log(`report: ${relative(ROOT, REPORT_PATH)}`);
+  console.log(reportTarget ? `report: ${relative(ROOT, reportTarget)}` : 'report: not written (use --report <path> or --write-report)');
   if (importGate) console.log(`import gate: exit ${importGate.code} (${relative(ROOT, importGate.logPath)})`);
 
   if (flag('--check')) {
