@@ -27,7 +27,7 @@ Meta="*res://src/meta/meta_service.gd"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg", "res://addons/cabra.lat_terrains/plugin.cfg")
+enabled=PackedStringArray("res://addons/cabra.lat_cursors/plugin.cfg", "res://addons/cabra.lat_interactions/plugin.cfg", "res://addons/cabra.lat_shooters/plugin.cfg", "res://addons/cabra.lat_state_machines/plugin.cfg")
 
 [filesystem]
 
