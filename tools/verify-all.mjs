@@ -2,14 +2,19 @@
 // Canonical local + CI verification orchestrator.
 // The shell entry point is retained as a compatibility wrapper only.
 //
-// PRECONDITION (order matters, and the failure mode is a hang, not an error):
+// PRECONDITION (order matters, and the failure is SILENT, not loud):
 // stage the GodotIK runtime BEFORE the first import —
 //     tools/build-godotik.sh && node tools/verify-all.mjs
-// A worktree imported before addons/libik exists cannot load
-// player_ik.tscn, so global classes such as Weapon and InventoryContainer
-// fail to parse; a harness that touches the player then stalls until the
-// 600s gate timeout instead of reporting the load failure. CI already
-// satisfies this (build/stage runs before verify-all).
+// With addons/libik absent, player_ik.tscn cannot load and the resource
+// loader reports missing-ext_resource and GDExtension ERRORs, but the
+// harnesses still exit 0 and report PASS (observed: locomotion_orientation
+// 63/63, arena_spawn and invariants, all in ~20-30s). Those lines are ERROR,
+// not SCRIPT ERROR, so the orchestrator's log-honesty check does not catch
+// them. Do not read a green run as proof libik is staged.
+// A tree that was never imported is a different fault: global classes stay
+// unresolved, scripts fail to compile, and a harness can stall until the 600s
+// gate timeout. Import first, then diagnose; do not read that as a libik fault.
+// CI already satisfies this (build/stage runs before verify-all).
 // Unstaged trees also skew the audit count: with addons/libik present
 // qa_audit reports MAJOR=38 (broken-ref 0), without it MAJOR=39 (one
 // libik row). Treat 38 vs 39 as an environment artifact, not a content
