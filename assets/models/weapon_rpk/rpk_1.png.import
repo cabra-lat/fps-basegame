@@ -3,23 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c2mpfhmwss6vk"
-path.s3tc="res://.godot/imported/rpk_1.png-cc28143c143442f8406eb56449a2e6f6.s3tc.ctex"
+path="res://.godot/imported/rpk_1.png-cc28143c143442f8406eb56449a2e6f6.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
-}
-generator_parameters={
-"md5": "8ebaf5c6617fdf9b2e741302b8b2ac70"
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/models/weapon_rpk/rpk_1.png"
-dest_files=["res://.godot/imported/rpk_1.png-cc28143c143442f8406eb56449a2e6f6.s3tc.ctex"]
+dest_files=["res://.godot/imported/rpk_1.png-cc28143c143442f8406eb56449a2e6f6.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -27,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -41,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=0
+detect_3d/compress_to=1
