@@ -10,6 +10,10 @@
 // fail to parse; a harness that touches the player then stalls until the
 // 600s gate timeout instead of reporting the load failure. CI already
 // satisfies this (build/stage runs before verify-all).
+// Unstaged trees also skew the audit count: with addons/libik present
+// qa_audit reports MAJOR=38 (broken-ref 0), without it MAJOR=39 (one
+// libik row). Treat 38 vs 39 as an environment artifact, not a content
+// change.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
