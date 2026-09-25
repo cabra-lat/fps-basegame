@@ -13,10 +13,12 @@ Godot 4.7 FPS testbed. Read this before touching anything.
 
 ```bash
 # THE verification gate (single entry point: parse + all harnesses + quality gate).
+# Node is the canonical local + CI orchestrator; the shell command is only a compatibility wrapper.
 # Aggregate exit code; per-gate PASS/FAIL/SKIP + check counts.
-bash tools/verify-all.sh --quick        # parse + harnesses (~90s)
-bash tools/verify-all.sh                # + quality gate (~150s)
-bash tools/verify-all.sh --with-export  # + Linux/Windows export
+node tools/verify-all.mjs --quick        # parse + harnesses (~90s)
+node tools/verify-all.mjs                # + quality gate (~150s)
+node tools/verify-all.mjs --with-export  # + Linux/Windows export
+bash tools/verify-all.sh --quick         # compatibility wrapper, equivalent flags
 
 # ⚠️ `godot --headless --path . --import` is NOT a parse gate. It exits 0 and prints
 # nothing for a broken script (proven by sabotage). Use it to refresh the import cache,
@@ -46,7 +48,7 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
 
 ## Rules
 
-1. **Never commit/push** unless explicitly asked. Leave trees dirty, report status.
+1. **Commit/push completed QA-PASSED work automatically.** No separate user prompt is required when the exact owned scope has an explicit QA `PASS`, the work is unambiguous, non-destructive, and reversible, and required checks are green. The active `main` ruleset blocks force-push and branch deletion and has no bypass actor, so normal repository history remains recoverable. Keep trees dirty and stop for explicit user approval before destructive or irreversible changes, secrets or external side effects beyond the authorized commit/push, ambiguous product decisions, materially unreviewed or QA-`FAIL`/`BLOCKED` work, attempts to bypass repository rules, changes that broaden the approved task, or a blocker that coordinator/peer agents cannot resolve and that requires user intervention. Always report the exact commit, pushed ref, files, and evidence.
    - **Always commit with an explicit pathspec:** `git commit -m "..." -- <your files>`.
      The worktree is SHARED, so the INDEX carries whatever other lanes staged; a
      pathless `git commit` sweeps their work (proven: board commit `a403a54` reverted
