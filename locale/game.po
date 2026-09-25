@@ -114,3 +114,49 @@ msgstr "Comprado: %s"
 
 msgid "Bought %s"
 msgstr "Comprou %s"
+
+# ── Operations hub ───────────────────────────────────────────────────
+# The loadout payload carries English source strings and the hub translates at
+# render time, so the meta service and the controller must use the SAME key --
+# that is what makes both states of the loadout widget read identically.
+# validate_i18n.gd renders the hub in both states and asserts the result.
+
+msgid "Active kit"
+msgstr "Equipamento ativo"
+
+msgid "Loadout %s"
+msgstr "Equipamento %s"
+
+msgid "Loadout selected"
+msgstr "Equipamento selecionado"
+
+msgid "Loadout needs review"
+msgstr "Equipamento requer revisão"
+
+msgid "No loadout available"
+msgstr "Nenhum equipamento disponível"
+
+msgid "Select a loadout"
+msgstr "Selecione um equipamento"
+
+msgid "No details provided"
+msgstr "Sem detalhes fornecidos"
+
+msgid "Faction: %s"
+msgstr "Facção: %s"
+
+msgid "Credits: %d"
+msgstr "Créditos: %d"
+
+# ── Faction display names (ids stay machine keys) ────────────────────
+# The registry is src/meta/faction_names.gd, checked against the .tres files in
+# both directions. Faction identity is data and is unchanged.
+
+msgid "Contractor"
+msgstr "Contratante"
+
+msgid "Drifter"
+msgstr "Andarilho"
+
+msgid "Raider"
+msgstr "Saqueador"

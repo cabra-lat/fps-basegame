@@ -427,6 +427,10 @@ func deploy_options() -> Dictionary:
 			selection[slot_name] = (raw as Array).duplicate(true)
 	if not validate_deploy(selection).get("ok", false):
 		return {}
+	# `label` is an English source string, i.e. the PO msgid the hub translates at
+	# render time -- NOT finished copy. It is the same key the operations hub
+	# controller projects for the active kit, which is what makes both states of
+	# that widget resolve identically; see the const there for the bug this fixes.
 	return {
 		"id": "active",
 		"label": "Active kit",

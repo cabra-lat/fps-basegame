@@ -20,6 +20,8 @@ const SOURCE_FILES := [
 	"res://scenes/extraction_point.gd",
 	"res://scenes/arena_manager.gd",
 	"res://src/meta/flea_listing.gd",
+	"res://scenes/operations_hub.gd",
+	"res://scenes/operations_hub_controller.gd",
 ]
 ## Every key those files use, plus the ItemNames registry. This is the
 ## catalogue contract: a new call site without an entry here fails, and an entry
@@ -58,12 +60,36 @@ const DECLARED_KEYS := [
 	"Army Bandage",
 	"CAT Hemostatic Tourniquet",
 	"First Aid Kit",
+	# Operations hub. Rendered in BOTH states below, because the defect was that the
+	# two states used different mechanisms and one screenshot only ever showed one.
+	"Active kit",
+	"Loadout %s",
+	"Loadout selected",
+	"Loadout needs review",
+	"No loadout available",
+	"Select a loadout",
+	"No details provided",
+	"Faction: %s",
+	"Credits: %d",
+	# Faction display names: src/meta/faction_names.gd, asserted against the pack.
+	"Contractor",
+	"Drifter",
+	"Raider",
 ]
 ## A key that is deliberately absent, used to prove the invariant has teeth.
 const MISSING_PROBE := "__i18n_missing_probe__"
 ## Both spellings count: tr() inside instances, TranslationServer.translate()
 ## inside the static display helpers, because tr() is instance-bound.
-const KEY_PATTERNS := ['tr\\("([^"]*)"\\)', 'TranslationServer\\.translate\\("([^"]*)"\\)']
+const KEY_PATTERNS := ['tr\\("([^"]*)"\\)', 'TranslationServer\\.translate\\("([^"]*)"\\)',
+	'_t\\("([^"]*)"\\)', '\\.translate\\("([^"]*)"\\)']
+## Keys that are carried as DATA and translated at the render site instead of at a
+## call site. The hub's loadout payload is built by the meta service and the
+## controller and consumed by OperationsHubUI, which translates every label it is
+## handed -- so a key in a payload is used even though no call site names it. These
+## patterns feed ONLY the "is this key used" side of the contract; the rendered
+## check is what proves the renderer really does translate them, so a broken
+## renderer cannot hide behind a key that is merely present in a payload.
+const DATA_KEY_PATTERNS := ['"(?:label|summary)": "([^"]*)"', 'const ACTIVE_LOADOUT_LABEL := "([^"]*)"']
 
 # Preloaded, not referenced by its global class_name: a `--script` runner must
 # not name a global class, or it is compiled before autoloads register.
@@ -91,6 +117,17 @@ func _initialize() -> void:
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
+	# AWAITED, and that word is load-bearing. This check renders a live scene, so
+	# it contains `await`; called without it, GDScript runs it as a coroutine,
+	# returns at the first await, and the rest of it executes after _initialize()
+	# has already printed the summary and quit -- so the check silently contributes
+	# NOTHING and the harness passes. Measured: with this line un-awaited the
+	# counter total did not move and a sabotaged hub rendering the raw English key
+	# passed anyway. The tell is that the arithmetic stops matching: 4 new checks
+	# were added and only 2 appeared.
+	await _check_hub_renders_portuguese_in_both_states()
+	_check_loadout_label_is_one_key_in_both_layers()
+	_check_faction_registry_matches_the_pack()
 	print("i18n probe: checks=%d passed=%d" % [_checks, _passed])
 	print("  passed  %d" % _passed)
 	# verify-all.mjs gates on this exact marker, so a missing translation entry
@@ -124,8 +161,23 @@ func _check_keys_are_declared() -> void:
 	for key in _registry_keys():
 		if not used.has(key):
 			used.append(key)
+	for key in _keys_used_as_data():
+		if not used.has(key):
+			used.append(key)
+	# A declared key also counts as used if it appears as ANY string literal in a
+	# covered source file. Keys legitimately live in shapes this contract does not
+	# model -- an exported default, a ternary arm, a format fallback -- and
+	# enumerating those shapes forever is how a "declared but unused" rule starts
+	# failing for the wrong reason and gets deleted. The strict half of the
+	# contract is untouched: an undeclared key at a call site still fails above,
+	# and the rendered checks are what catch a bypass. What this looser half still
+	# catches is the case it exists for: a catalogue entry whose feature is gone.
+	for path in SOURCE_FILES:
+		for literal in _match_all(_read(path), '"([^"]*)"'):
+			if DECLARED_KEYS.has(literal) and not used.has(literal):
+				used.append(literal)
 	var unused := _keys_in(DECLARED_KEYS, true, used)
-	_check(unused.is_empty(), "every declared key is used by a call site or the registry (unused: %s)" % ", ".join(unused))
+	_check(unused.is_empty(), "every declared key is used by a call site, a registry or a payload (unused: %s)" % ", ".join(unused))
 
 ## THE invariant: a key with no catalogue entry must fail, not fall back.
 func _check_every_key_is_translated() -> void:
@@ -354,6 +406,185 @@ func _append_path(out: Array[String], path: String) -> void:
 	if path != "" and not out.has(path):
 		out.append(path)
 
+## The hub, rendered in BOTH states, because that is the whole defect. The
+## coordinator read two screenshots and found the same widget reading "Active kit"
+## in one state and "Loadout ativo" in the other: the meta payload carried an
+## English literal, the controller's const carried Portuguese copy, and only one of
+## them went anywhere near the translation layer. A check on the SOURCE would have
+## passed while the pixels stayed broken, so this asserts the RENDERED strings,
+## read back off a live OperationsHubUI: the OptionButton item text and the profile
+## label, in the empty state and with an active kit.
+func _check_hub_renders_portuguese_in_both_states() -> void:
+	var hub_scene: PackedScene = load("res://scenes/operations_hub.tscn")
+	if hub_scene == null:
+		_check(false, "I18N-HUB rendered_strings_are_portuguese: operations_hub.tscn missing (F-HUB: the display path cannot be rendered)")
+		return
+	var hub: Node = hub_scene.instantiate()
+	root.add_child(hub)
+	for _i in 4:
+		await process_frame
+	var english := _english_words()
+
+	# State 1: no loadout at all -- the empty state, which is what hub-1 showed.
+	hub.call("set_loadouts", [])
+	await process_frame
+	var empty_strings := _hub_strings(hub)
+	_check_no_english("empty_state_is_portuguese", empty_strings, english,
+		"the empty state renders an English string")
+
+	# State 2: an active kit, projected the way the controller projects it, with
+	# the same key the meta service puts in its payload.
+	hub.call("set_loadouts", [{
+		"id": "active", "label": "Active kit", "valid": true, "summary": "Loadout selected",
+	}])
+	await process_frame
+	hub.call("set_selected_loadout", "active")
+	await process_frame
+	var full_strings := _hub_strings(hub)
+	_check_no_english("active_kit_state_is_portuguese", full_strings, english,
+		"the active-kit state renders an English string")
+	# The two states must not merely both be Portuguese, they must come from the
+	# SAME mechanism: the label that reaches the widget in each state has to be the
+	# same key, or a future edit can reintroduce two mechanisms that both look right.
+	_check(_has_string(full_strings, TranslationServer.translate("Active kit")),
+		"I18N-HUB active_kit_state_uses_the_shared_key: rendered label is '%s' — the active-kit label is not the shared PO key, so the two states resolve through different mechanisms again" % ", ".join(full_strings))
+
+	# The faction line, with a real profile so the faction name is populated.
+	var profile := PlayerProfile.new()
+	profile.currency = 1234
+	hub.call("set_profile", profile)
+	await process_frame
+	var faction_line := String((hub.get("profile_label") as Label).text)
+	var want_credits := TranslationServer.translate("Credits: %d") % 1234
+	var faction_bad := _english_offender([faction_line], english)
+	_check(faction_line.contains(want_credits) and faction_bad == "",
+		"I18N-HUB faction_line_is_portuguese: '%s' (want credits '%s'%s) — the faction line hardcodes its label or renders an English faction name" % [faction_line, want_credits, "" if faction_bad == "" else ", offender %s" % faction_bad])
+	hub.queue_free()
+
+
+## Every string a player can read off the hub: the picker's items, the details
+## line and the profile line. Read from the live node, not recomputed.
+func _hub_strings(hub: Node) -> Array[String]:
+	var out: Array[String] = []
+	var picker: OptionButton = hub.get("loadout_picker")
+	if picker != null:
+		for i in picker.item_count:
+			out.append(picker.get_item_text(i))
+	for name in ["loadout_details", "status_label", "profile_label"]:
+		var node = hub.get(name)
+		if node is Label:
+			out.append((node as Label).text)
+	return out
+
+
+func _has_string(haystack: Array[String], needle: String) -> bool:
+	for s in haystack:
+		if s.contains(needle):
+			return true
+	return false
+
+
+## One assertion for both states: the rendered strings are present AND none of them
+## contains an English word. Split out so the two states cannot drift into
+## checking different things, and so the offender word travels in the message.
+func _check_no_english(id: String, strings: Array, english: Dictionary, why: String) -> void:
+	var offender := _english_offender(strings, english)
+	_check(not strings.is_empty() and offender == "",
+		"I18N-HUB %s: %s%s (F-HUB: %s)" % [id, ", ".join(strings),
+			"" if offender == "" else " — offender %s" % offender, why])
+## The offending word, or "" when every word is fine. Returning the WORD rather
+## than a bool is deliberate: "an English word in the rendered hub" without naming
+## it sent me looking at the wrong label, and a check that cannot tell you what it
+## saw is a check people learn to skip.
+func _english_offender(strings: Array, english: Dictionary) -> String:
+	# Godot 4's strip_edges() takes booleans, not a character set, so punctuation
+	# is removed with a regex instead: keep letters (including pt-BR accents) and
+	# drop everything else. Without this, "Facção:" and "Créditos:" keep their
+	# colons and the word list would have to carry punctuation.
+	var letters := RegEx.new()
+	letters.compile("[^a-zà-ú]")
+	for s in strings:
+		for word in String(s).to_lower().split(" "):
+			var w := letters.sub(word, "", true)
+			if english.has(w):
+				return "'%s' in '%s'" % [w, s]
+	return ""
+
+
+## English words that must never reach a rendered Portuguese string. Deliberately
+## a WORD list rather than a diff against the PO: the property under test is "no
+## English word is visible", and a missing msgstr shows up as the key itself.
+func _english_words() -> Dictionary:
+	var out: Dictionary = {}
+	for w in ["active", "kit", "loadout", "selected", "faction", "credits", "select",
+			"details", "provided", "available", "needs", "review", "contractor",
+			"drifter", "raider", "no", "intel", "marked", "bought", "survived"]:
+		out[w] = true
+	return out
+
+
+## The regression guard for the actual cause: the meta service and the controller
+## must name the same key for the active kit. They did not -- the payload carried
+## one string and the const another -- and every other check here can pass while
+## that is true, because each string is individually valid and the hub translates
+## whatever arrives. Read from source in both layers, deliberately: building a
+## legal profile and calling deploy_options() would need a full deployable kit, and
+## a check that needs a whole subsystem to observe one string is a check that will
+## quietly stop being run. The RENDERED half above is what proves the render path
+## translates the key; this proves both layers send the same one.
+func _check_loadout_label_is_one_key_in_both_layers() -> void:
+	var const_label := _regex_literal("res://scenes/operations_hub_controller.gd", 'const ACTIVE_LOADOUT_LABEL := "([^"]*)"')
+	var payload_label := _regex_literal("res://src/meta/meta_service.gd", '"label": "([^"]*)"')
+	_check(const_label == "Active kit" and payload_label == "Active kit",
+		"I18N-HUB one_label_key_in_both_layers: controller=%s meta_payload=%s — the two layers name the same widget differently, so one state reads English" % [const_label, payload_label])
+
+
+## First capture group of `pattern` in a file, or "" if the pattern does not
+## match. Regex rather than index arithmetic: this file is edited by other lanes,
+## and an offset-based extractor silently reads the wrong literal when a comment
+## or a reformat moves the declaration.
+func _regex_literal(path: String, pattern: String) -> String:
+	var matches := _match_all(_read(path), pattern)
+	return matches[0] if matches.size() > 0 else ""
+
+## Factions are data: a .tres per faction plus a registry. The display registry has
+## to cover the pack in both directions, or a new faction ships English and a
+## removed one leaves a dead key.
+func _check_faction_registry_matches_the_pack() -> void:
+	var pack := _faction_ids_in_pack()
+	var registered := FactionNames.registered_ids()
+	var missing: Array[String] = []
+	for id in pack:
+		if not registered.has(id) or FactionNames.display_name(id) == "":
+			missing.append(id)
+	var stale: Array[String] = []
+	for id in registered:
+		if not pack.has(id):
+			stale.append(id)
+	_check(not pack.is_empty() and missing.is_empty() and stale.is_empty(),
+		"I18N-FAC every_faction_resolves: missing=%s stale=%s (F-FAC: a faction with no catalogue entry renders its English .tres name)" % [", ".join(missing), ", ".join(stale)])
+
+
+## Every faction id the pack ships, read from the .tres files rather than
+## hardcoded, so a new faction cannot pass this check by omission.
+func _faction_ids_in_pack() -> Array[String]:
+	var out: Array[String] = []
+	var d := DirAccess.open("res://resources/meta/factions")
+	if d == null:
+		return out
+	for f in d.get_files():
+		var id := _faction_id_in(f)
+		if id != "" and not out.has(id):
+			out.append(id)
+	return out
+
+
+func _faction_id_in(file_name: String) -> String:
+	if not file_name.ends_with(".tres"):
+		return ""
+	var res := load("res://resources/meta/factions/" + file_name) as Resource
+	return String(res.get("id")) if res != null else ""
+
 func _keys_in(subject: Array, missing_only: bool, other: Array) -> Array[String]:
 	var out: Array[String] = []
 	if missing_only:
@@ -377,6 +608,27 @@ func _keys_used_in_sources() -> Array[String]:
 				found.append(key)
 	return found
 
+
+## Keys carried as data in a payload, which count as used for the "declared but
+## unused" check. Only the presence of the key is established here; the renderer
+## check is what proves the render path translates it.
+func _keys_used_as_data() -> Array[String]:
+	var found: Array[String] = []
+	for path in SOURCE_FILES:
+		for key in _data_keys_in(_read(path)):
+			if not found.has(key):
+				found.append(key)
+	return found
+
+
+## Every payload-carried key in one file's text.
+func _data_keys_in(text: String) -> Array[String]:
+	var out: Array[String] = []
+	for pattern in DATA_KEY_PATTERNS:
+		for key in _match_all(text, pattern):
+			out.append(key)
+	return out
+
 ## Every translation key a single file passes to tr() / translate().
 func _keys_in_text(text: String) -> Array[String]:
 	var found: Array[String] = []
@@ -389,6 +641,13 @@ func _registry_keys() -> Array[String]:
 	var keys: Array[String] = []
 	for id in ItemNames.registered_ids():
 		var key := ItemNames.key_for(id)
+		if not keys.has(key):
+			keys.append(key)
+	# FactionNames is the second registry of the same kind, for the second data
+	# kind the pack ships. Both are id -> key tables; neither is a translation
+	# mechanism of its own, they both resolve through the one PO layer.
+	for id in FactionNames.registered_ids():
+		var key := FactionNames.key_for(id)
 		if not keys.has(key):
 			keys.append(key)
 	return keys

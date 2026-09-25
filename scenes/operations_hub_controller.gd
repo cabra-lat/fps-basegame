@@ -16,7 +16,13 @@ signal hub_return_requested
 const HUB_SCENE := "res://scenes/operations_hub.tscn"
 const DEFAULT_ARENA_SCENE := "res://scenes/arena_blockout.tscn"
 const ACTIVE_LOADOUT_ID := "active"
-const ACTIVE_LOADOUT_LABEL := "Loadout ativo"
+## The loadout label is an ENGLISH SOURCE STRING, i.e. the PO msgid, and it must
+## be the SAME string the meta service puts in the payload. It was not: the
+## payload said "Active kit" and this const said something else entirely, and only
+## one of them was a key -- which is why the same widget read English in one state
+## and Portuguese in the other, and why a screenshot of each state looked like two
+## different bugs. The hub translates at render time, so this is data, not copy.
+const ACTIVE_LOADOUT_LABEL := "Active kit"
 
 @export var arena_scene_path := DEFAULT_ARENA_SCENE
 @export var auto_route := true
@@ -175,7 +181,7 @@ func _project_meta_options(profile_value: Variant) -> void:
 					"id": projected_id,
 					"label": String((projected as Dictionary).get("label", "Loadout %s" % projected_id)),
 					"valid": projected_valid,
-					"summary": String((projected as Dictionary).get("summary", "Loadout selecionado")),
+					"summary": String((projected as Dictionary).get("summary", "Loadout selected")),
 				}])
 				return
 		# An empty projection is the empty state. If Meta still has a non-empty
@@ -188,7 +194,7 @@ func _project_meta_options(profile_value: Variant) -> void:
 				"id": ACTIVE_LOADOUT_ID,
 				"label": ACTIVE_LOADOUT_LABEL,
 				"valid": _selection_is_valid(invalid_selection),
-				"summary": "Loadout requer revisão",
+				"summary": "Loadout needs review",
 			}])
 			return
 		selection_registry.clear()
@@ -207,7 +213,7 @@ func _project_registry() -> void:
 			"id": String(loadout_id),
 			"label": ACTIVE_LOADOUT_LABEL if String(loadout_id) == ACTIVE_LOADOUT_ID else "Loadout %s" % String(loadout_id),
 			"valid": _selection_is_valid(selection as Dictionary),
-			"summary": "Loadout selecionado",
+			"summary": "Loadout selected",
 		}
 		options.append(option)
 	hub.set_loadouts(options)
