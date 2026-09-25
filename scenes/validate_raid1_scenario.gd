@@ -85,9 +85,8 @@ func _initialize() -> void:
 	_check(failed.carried_item_id == "", "failure carries no raid loot")
 	print("RAID-1 scenario probe: checks=%d passed=%d" % [_checks, _passed])
 	print("  passed  %d" % _passed)
-	# verify-all.mjs gates on this marker, so a failed assertion (or an
-	# untranslated HUD string, now that the HUD resolves through the
-	# catalogue) fails the build instead of only this manual probe.
+	# verify-all.mjs's gateHarness decides pass/fail on this marker, so the 22
+	# assertions are gated rather than only run when a human remembers.
 	print("RESULT: %s" % ("PASS" if _passed == _checks else "FAIL"))
 	quit(0 if _passed == _checks else 1)
 
