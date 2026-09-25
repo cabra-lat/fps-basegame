@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 // Canonical local + CI verification orchestrator.
 // The shell entry point is retained as a compatibility wrapper only.
+//
+// PRECONDITION (order matters, and the failure mode is a hang, not an error):
+// stage the GodotIK runtime BEFORE the first import —
+//     tools/build-godotik.sh && node tools/verify-all.mjs
+// A worktree imported before addons/libik exists cannot load
+// player_ik.tscn, so global classes such as Weapon and InventoryContainer
+// fail to parse; a harness that touches the player then stalls until the
+// 600s gate timeout instead of reporting the load failure. CI already
+// satisfies this (build/stage runs before verify-all).
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
