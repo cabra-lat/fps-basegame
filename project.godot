@@ -24,6 +24,7 @@ config/icon="res://icon.svg"
 
 Debug="*res://addons/cabra.lat_shooters/src/player/debug.gd"
 Meta="*res://src/meta/meta_service.gd"
+OperationsHubRoute="*res://scenes/operations_hub_controller.tscn"
 
 [editor_plugins]
 

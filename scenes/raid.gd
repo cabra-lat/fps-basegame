@@ -7,7 +7,7 @@ extends Node
 ## quests/skills (Fase 3+) will subscribe. Emit only; nobody is required.
 
 enum State { PREP, RAID, RESOLVE }
-enum Outcome { NONE, SURVIVED, RUN_THROUGH, MIA, KIA, LEFT_BEHIND }
+enum Outcome { NONE, SURVIVED, RUN_THROUGH, MIA, KIA, LEFT_BEHIND, SCENARIO_CLEARED }
 
 # ─── RAID EVENT BUS (base for quests/skills) ───
 signal raid_started
@@ -94,6 +94,17 @@ func extract(point: Node) -> Outcome:
 	player_extracted.emit(point)
 	return out
 
+
+## RAID-1 completion is deliberately separate from the generic extraction
+## classifier: its 8–12 minute window must not become RUN_THROUGH/SURVIVED.
+func complete_scenario(point: Node) -> Outcome:
+	if state != State.RAID:
+		return outcome
+	_end(Outcome.SCENARIO_CLEARED)
+	player_extracted.emit(point)
+	return outcome
+
+
 ## Hard end (KIA on death, LEFT_BEHIND on abandon).
 func end(out: Outcome) -> void:
 	if state != State.RAID:
@@ -112,6 +123,7 @@ func outcome_name(out: int = -1) -> String:
 		Outcome.MIA: return "MIA"
 		Outcome.KIA: return "KIA"
 		Outcome.LEFT_BEHIND: return "LEFT BEHIND"
+		Outcome.SCENARIO_CLEARED: return "SCENARIO CLEARED"
 		_: return "—"
 
 func time_text() -> String:
