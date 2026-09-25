@@ -10,6 +10,32 @@ env:
   GODOT_VERSION: "4.7.1"
   # Cold source build bound; cached builds are normally seconds.
   GODOTIK_BUILD_TIMEOUT: "1500"
+  # The compiler cache location is PINNED here rather than left to ccache's own
+  # default, because that default moved between major versions: ccache 3.x used
+  # ~/.ccache, ccache 4.x follows the XDG spec and uses ~/.cache/ccache. A cache
+  # action pointed at ~/.ccache is therefore pointed at a directory a 4.x ccache
+  # never creates, so the post-job save fails path validation with "Path(s)
+  # specified in the action for caching do(es) not exist, hence no cache is being
+  # saved", nothing is persisted, and every later run correctly reports 0 hits.
+  # That is a real failure wearing the costume of a correct measurement, so the
+  # path is defined once here and both the build and the cache action read it.
+  #
+  # The context is load-bearing and not cosmetic. This key sits at WORKFLOW
+  # level, before `jobs:`, where the available contexts are `github`, `vars` and
+  # `inputs` -- `runner` is NOT among them. An unresolved expression yields an
+  # empty string, so `${{ runner.temp }}/x` here silently becomes `/x`, which on
+  # a GitHub-hosted runner is a path a non-root user cannot create. The result is
+  # the original fault reproduced exactly: the cache action points at a
+  # directory that does not exist, the save fails path validation, and later runs
+  # correctly report 0 hits. This workflow already uses `runner.temp`
+  # successfully, but at STEP level (VERIFY_LOG_DIR), which is a different scope
+  # with a different context set. `github.workspace` is available at workflow
+  # level, so that is what this key uses; it is also better than a hardcoded
+  # /tmp, since a self-hosted runner with a persistent /tmp would leak one job's
+  # cache into the next. Because CCACHE_DIR is set only by this workflow, a local
+  # run has no CCACHE_DIR at all and falls back to ccache's own default, so
+  # nothing here can create a directory inside a developer's checkout.
+  CCACHE_DIR: ${{ github.workspace }}/.ccache-godotik
 
 jobs:
   gates:
@@ -60,7 +86,9 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          # The pinned CCACHE_DIR, not a literal: see the top-level env comment.
+          # ~/.ccache is ccache 3.x's default and a 4.x ccache never creates it.
+          path: ${{ env.CCACHE_DIR }}
           key: ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-template_release
           restore-keys: |
             ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-
@@ -182,7 +210,9 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          # The pinned CCACHE_DIR, not a literal: see the top-level env comment.
+          # ~/.ccache is ccache 3.x's default and a 4.x ccache never creates it.
+          path: ${{ env.CCACHE_DIR }}
           key: ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-template_release
           restore-keys: |
             ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-

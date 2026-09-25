@@ -117,11 +117,70 @@ if (!locked) {
 
 mkdirSync(logDir, { recursive: true });
 
-if (!existsSync('addons/cabra.lat_shooters/test/check_scripts.gd')) {
-  console.error('verify-all: FATAL: addons/cabra.lat_shooters is not checked out.');
-  console.error('  Initialize the declared submodules or provide the addon checkout.');
-  process.exit(1);
+// HARNESS REGISTRY — the single source of truth for every script this tool
+// runs. Kept at module scope so the existence preflight below and the gates
+// that run later check exactly the same list; a second, drifting copy of these
+// paths is how the stale res://test/... registration hid in CI.
+const HARNESS_SCRIPTS = [
+  ['check_scripts', 'res://addons/cabra.lat_shooters/test/check_scripts.gd'],
+  ['assets', 'res://addons/cabra.lat_shooters/test/validate_assets.gd'],
+  ['ballistics', 'res://addons/cabra.lat_shooters/test/validate_ballistics.gd'],
+  ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
+  ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
+  ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
+  ['meta_progression', 'res://src/meta/validate_meta_progression.gd'],
+  ['meta_market', 'res://src/meta/validate_meta_market.gd'],
+  ['meta_flea', 'res://src/meta/validate_meta_flea.gd'],
+  ['meta_deploy_raid', 'res://src/meta/validate_meta_deploy_raid.gd'],
+  ['i18n', 'res://src/meta/validate_i18n.gd'],
+  ['invariants', 'res://addons/cabra.lat_shooters/test/validate_invariants.gd'],
+  ['locomotion_orientation', 'res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd'],
+  ['factions', 'res://scenes/validate_factions.gd'],
+  ['raid1_scenario', 'res://scenes/validate_raid1_scenario.gd'],
+  ['gunsmith_preview', 'res://scenes/validate_gunsmith_preview.gd'],
+  ['arena_spawn', 'res://scenes/validate_arena_spawn.gd'],
+];
+
+function harnessScript(name) {
+  const entry = HARNESS_SCRIPTS.find(([n]) => n === name);
+  if (!entry) fatal(`no registered harness named '${name}' (internal wiring error)`);
+  return entry[1];
 }
+
+const resToPath = (script) => join(ROOT, script.replace(/^res:\/\//, ''));
+
+// EXISTENCE PREFLIGHT, before the import. A registered path that is not on disk
+// is a wiring fault, not a content fault. Left alone it surfaces two different
+// wrong ways: the import gate fails on a script that was never there, or the
+// gate's own harness reports FAIL for a file that does not exist — which reads
+// as a content regression and sends the next person looking at the wrong code.
+// Report every missing path at once (fixing them one run at a time is the
+// failure mode this replaces) and exit 2, a code distinct from a gate failure.
+// This checks EXISTENCE ONLY: a script that exists but cannot be loaded or run
+// is a different fault and stays with its own harness gate.
+function preflightHarnessPaths() {
+  const missing = HARNESS_SCRIPTS.filter(([, script]) => !existsSync(resToPath(script)));
+  if (missing.length === 0) {
+    record('harness_paths', 'PASS', `${HARNESS_SCRIPTS.length} registered harness scripts present`);
+    return true;
+  }
+  console.error(`verify-all: FATAL: ${missing.length} of ${HARNESS_SCRIPTS.length} registered harness scripts are not on disk:`);
+  for (const [name, script] of missing) console.error(`  ${name.padEnd(25)}${script}`);
+  const addonDir = join(ROOT, 'addons/cabra.lat_shooters');
+  if (!existsSync(addonDir)) {
+    console.error('  addons/cabra.lat_shooters is not checked out — initialize the declared submodules:');
+    console.error('    git submodule update --init --recursive');
+  } else if (!existsSync(join(addonDir, 'test'))) {
+    console.error('  addons/cabra.lat_shooters exists but holds no test/ directory, which is what an');
+    console.error('  uninitialized submodule looks like — initialize the declared submodules:');
+    console.error('    git submodule update --init --recursive');
+  }
+  console.error('  Fix the registration or stage the missing checkout. A gate pointing at a path');
+  console.error('  that is not there is a wiring fault; this run is not evidence about content.');
+  return false;
+}
+
+if (!preflightHarnessPaths()) process.exit(2);
 
 function killTree(child) {
   if (!child?.pid) return;
@@ -232,7 +291,7 @@ async function importGodot() {
     }
     if (result.code !== 124) {
       const errors = countMatches(text, /SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile/g);
-      const scripts = await runLogged('check_scripts', godot, ['--headless', '--path', '.', '--script', 'res://addons/cabra.lat_shooters/test/check_scripts.gd'], 600_000);
+      const scripts = await runLogged('check_scripts', godot, ['--headless', '--path', '.', '--script', harnessScript('check_scripts')], 600_000);
       const scriptText = readLog(scripts.log);
       const compiled = scriptText.match(/scripts compiled:\s*([0-9]+)/i)?.[1] || '?';
       const failures = scriptText.match(/failures:\s*([0-9]+)/i)?.[1] || '?';
@@ -374,26 +433,12 @@ async function main() {
   if (!importOk) {
     record('harnesses', 'SKIP', 'import/parse failed; downstream Godot gates would use an invalid cache');
   } else if (quick) {
-    await gateHarness('assets', 'res://addons/cabra.lat_shooters/test/validate_assets.gd');
+    await gateHarness('assets', harnessScript('assets'));
   } else {
-    const harnesses = [
-      ['assets', 'res://addons/cabra.lat_shooters/test/validate_assets.gd'],
-      ['ballistics', 'res://addons/cabra.lat_shooters/test/validate_ballistics.gd'],
-      ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
-      ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
-      ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
-      ['meta_progression', 'res://src/meta/validate_meta_progression.gd'],
-      ['meta_market', 'res://src/meta/validate_meta_market.gd'],
-      ['meta_flea', 'res://src/meta/validate_meta_flea.gd'],
-      ['meta_deploy_raid', 'res://src/meta/validate_meta_deploy_raid.gd'],
-      ['i18n', 'res://src/meta/validate_i18n.gd'],
-      ['invariants', 'res://addons/cabra.lat_shooters/test/validate_invariants.gd'],
-      ['locomotion_orientation', 'res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd'],
-      ['factions', 'res://scenes/validate_factions.gd'],
-      ['gunsmith_preview', 'res://scenes/validate_gunsmith_preview.gd'],
-      ['arena_spawn', 'res://scenes/validate_arena_spawn.gd'],
-    ];
-    for (const [name, script] of harnesses) await gateHarness(name, script);
+    for (const [name, script] of HARNESS_SCRIPTS) {
+      if (name === 'check_scripts') continue; // runs as the import/parse gate
+      await gateHarness(name, script);
+    }
     if (noQa) record('qa_audit', 'SKIP', '--no-qa'); else await gateQa();
     if (withExport) await gateExport(); else record('export', 'SKIP', 'pass --with-export to include');
   }
