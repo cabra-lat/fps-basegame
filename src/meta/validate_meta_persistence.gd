@@ -97,7 +97,7 @@ func _scenario_scenario_clear_settlement() -> void:
 	var before_currency := profile.currency
 	var report := service.resolve_raid(MetaService.SCENARIO_CLEARED_OUTCOME, 250)
 	_check(report != null and report.survived, "SCENARIO_CLEARED is a successful raid")
-	_check(report.outcome_name == "SCENARIO CLEARED", "scenario report keeps the exact outcome name")
+	_check(report.outcome_name == Raid.outcome_display_name(MetaService.SCENARIO_CLEARED_OUTCOME) and report.outcome_name != "SCENARIO CLEARED", "scenario report keeps the localized outcome name")
 	_check(report.gained.is_empty() and report.loot_discarded == 1, "scenario settlement discards non-marked loot")
 	_check(profile.stash.count_items() == 0, "scenario settlement did not bank non-marked loot")
 	_check(profile.currency == before_currency + MetaService.SURVIVAL_REWARD, "scenario clear uses the normal survival reward")
@@ -115,7 +115,7 @@ func _scenario_scenario_clear_settlement() -> void:
 	run_service.use_profile(run_profile, run_path)
 	run_service.bind_carrier(Equipment.new(), Backpack.new())
 	var run_report := run_service.resolve_raid(Raid.Outcome.RUN_THROUGH, 0)
-	_check(run_report != null and run_report.outcome_name == "RUN THROUGH" and run_report.survived, "ordinary RUN_THROUGH remains successful")
+	_check(run_report != null and run_report.outcome_name == Raid.outcome_display_name(Raid.Outcome.RUN_THROUGH) and run_report.outcome_name != "RUN THROUGH" and run_report.survived, "ordinary RUN_THROUGH remains successful")
 	var survive_path := TEST_DIR + "/ordinary_survived.save"
 	var survive_service := MetaService.new()
 	survive_service.save_path = survive_path
@@ -123,7 +123,7 @@ func _scenario_scenario_clear_settlement() -> void:
 	survive_service.use_profile(survive_profile, survive_path)
 	survive_service.bind_carrier(Equipment.new(), Backpack.new())
 	var survive_report := survive_service.resolve_raid(Raid.Outcome.SURVIVED, 250)
-	_check(survive_report != null and survive_report.outcome_name == "SURVIVED" and survive_report.survived, "ordinary SURVIVED remains successful")
+	_check(survive_report != null and survive_report.outcome_name == Raid.outcome_display_name(Raid.Outcome.SURVIVED) and survive_report.outcome_name != "SURVIVED" and survive_report.survived, "ordinary SURVIVED remains successful")
 
 	# The marked-intel resource is supplied by RAID-1. When that sibling change is
 	# present, prove the positive banking path too; the base-only meta worktree

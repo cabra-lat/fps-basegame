@@ -116,15 +116,22 @@ func _end(out: Outcome) -> void:
 	outcome = out
 	raid_ended.emit(out)
 
-func outcome_name(out: int = -1) -> String:
-	match (outcome if out < 0 else out):
-		Outcome.SURVIVED: return "SURVIVED"
-		Outcome.RUN_THROUGH: return "RUN THROUGH"
-		Outcome.MIA: return "MIA"
-		Outcome.KIA: return "KIA"
-		Outcome.LEFT_BEHIND: return "LEFT BEHIND"
-		Outcome.SCENARIO_CLEARED: return "SCENARIO CLEARED"
+## Display name for the HUD, feed and the persisted report. The integer
+## `Outcome` stays the machine-readable key; only this text is localized, so
+## quests, save files and tests keep matching on the enum.
+static func outcome_display_name(out: int) -> String:
+	match out:
+		Outcome.SURVIVED: return "SOBREVIVEU"
+		Outcome.RUN_THROUGH: return "PASSOU DIRETO"
+		Outcome.MIA: return "DESAPARECIDO"
+		Outcome.KIA: return "MORTO EM AÇÃO"
+		Outcome.LEFT_BEHIND: return "DEIXADO PARA TRÁS"
+		Outcome.SCENARIO_CLEARED: return "CENÁRIO CONCLUÍDO"
 		_: return "—"
+
+## Instance convenience wrapper: the current outcome, or a given one.
+func outcome_name(out: int = -1) -> String:
+	return outcome_display_name(outcome if out < 0 else out)
 
 func time_text() -> String:
 	var t: int = int(ceil(maxf(time_left, 0.0)))

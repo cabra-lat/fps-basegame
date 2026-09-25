@@ -579,12 +579,8 @@ func _brief(data: Dictionary) -> Dictionary:
 		"stack": int(data.get("stack", 1)),
 	}
 
+## Single source of truth for the display name: the raid itself owns the
+## localized strings, so the persisted report can never drift to another
+## language. The int outcome remains the machine-readable key.
 func _outcome_name(outcome: int) -> String:
-	match outcome:
-		Raid.Outcome.SURVIVED: return "SURVIVED"
-		Raid.Outcome.RUN_THROUGH: return "RUN THROUGH"
-		SCENARIO_CLEARED_OUTCOME: return "SCENARIO CLEARED"
-		Raid.Outcome.MIA: return "MIA"
-		Raid.Outcome.KIA: return "KIA"
-		Raid.Outcome.LEFT_BEHIND: return "LEFT BEHIND"
-		_: return "—"
+	return Raid.outcome_display_name(outcome)

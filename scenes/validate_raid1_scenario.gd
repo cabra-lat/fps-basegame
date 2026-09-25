@@ -35,7 +35,8 @@ func _initialize() -> void:
 	clear_raid.elapsed = Raid1ScenarioScript.DURATION_SECONDS
 	var clear_outcome: int = clear_raid.complete_scenario(gated)
 	_check(clear_outcome == Raid.Outcome.SCENARIO_CLEARED, "600s RAID-1 completion has distinct outcome")
-	_check(clear_raid.outcome_name() == "SCENARIO CLEARED", "scenario outcome has explicit display name")
+	# The int outcome is the machine key; the display name is localized. Guard the English spelling, not a translation.
+	_check(clear_raid.outcome_name() != "SCENARIO CLEARED" and clear_raid.outcome_name() != "SCENARIO_CLEARED", "scenario outcome display name is localized, not the raw enum key")
 
 	var fallback_raid := Raid.new()
 	root.add_child(fallback_raid)
