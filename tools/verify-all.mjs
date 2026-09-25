@@ -37,7 +37,7 @@
 // tree: initialising submodules does not stage it.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -198,13 +198,16 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-function runLogged(name, command, commandArgs, timeoutMs) {
+function runLogged(name, command, commandArgs, timeoutMs, opts = {}) {
   const log = join(logDir, `${name}.log`);
-  if (stopping) return Promise.resolve({ code: 130, signal: 'SIGTERM', timedOut: false, log });
+  if (stopping) return Promise.resolve({ code: 130, signal: 'SIGTERM', timedOut: false, raised: false, log });
   const output = createWriteStream(log, { flags: 'w' });
   return new Promise((resolveRun) => {
     let timedOut = false;
+    let raised = false;
     let timer;
+    let watcher;
+    const raiseQuietMs = Number(opts.raiseQuietMs) || 0;
     const child = spawn(command, commandArgs, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     activeChild = child;
     const write = (chunk) => {
@@ -221,12 +224,49 @@ function runLogged(name, command, commandArgs, timeoutMs) {
       timedOut = true;
       killTree(child);
     }, timeoutMs);
+    // A GDScript runtime error does not abort the process: it aborts the function it
+    // happened in. When that function is the harness's OWN top-level entry point, the
+    // quit() call below it is never reached, so the process lingers until the hard
+    // timeout even though it has already finished all the work it will ever do. We
+    // detect that as "output went quiet AND a script error is already in the log", and
+    // kill it there rather than spending the full budget waiting for a process that is
+    // never going to return on its own.
+    if (raiseQuietMs) {
+      let lastSize = -1;
+      let quietSince = Date.now();
+      watcher = setInterval(() => {
+        let size = 0;
+        try {
+          size = statSync(log).size;
+        } catch {
+          return;
+        }
+        if (size !== lastSize) {
+          lastSize = size;
+          quietSince = Date.now();
+          return;
+        }
+        if (Date.now() - quietSince < raiseQuietMs) return;
+        let text = '';
+        try {
+          text = readFileSync(log, 'utf8');
+        } catch {
+          return;
+        }
+        if (countMatches(text, /SCRIPT ERROR/g) > 0) {
+          raised = true;
+          clearInterval(watcher);
+          killTree(child);
+        }
+      }, 2000);
+    }
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      if (watcher) clearInterval(watcher);
       activeChild = null;
       output.end(() => {
         if (stopping) process.exit(130);
-        resolveRun({ code: timedOut ? 124 : (code ?? 1), signal, timedOut, log });
+        resolveRun({ code: raised ? 125 : (timedOut ? 124 : (code ?? 1)), signal, timedOut, raised, log });
       });
     });
   });
@@ -365,10 +405,23 @@ async function reimportAfterHarness(name) {
 }
 
 async function gateHarness(name, script) {
+  const budgetMs = 600_000;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const result = await runLogged(name, godot, ['--headless', '--path', '.', '--script', script], 600_000);
+    const result = await runLogged(name, godot, ['--headless', '--path', '.', '--script', script], budgetMs, { raiseQuietMs: 20_000 });
+    const raisedErrors = result.raised ? countMatches(readLog(result.log), /SCRIPT ERROR/g) : 0;
+    if (result.raised) {
+      record(name, 'FAIL', `harness raised and stopped reporting — ${raisedErrors} script error(s) and no RESULT line. A raise in the harness's OWN top-level function aborts it before quit(), so it never returns; the cause is in its own output, NOT in .godot and NOT in a scene that failed to boot (see ${result.log})`);
+      return;
+    }
     if (result.code === 124) {
-      record(name, 'FAIL', `harness TIMED OUT (600s) — hung; suspect stale .godot or a scene that never boots (see ${result.log})`);
+      // Reached the budget. Read the log before blaming the cache: a harness that raised
+      // and kept its error to a trailing line can still time out, and telling the next
+      // reader to clear .godot when the log names the script is the misdirection this
+      // message exists to stop.
+      const timedOutErrors = countMatches(readLog(result.log), /SCRIPT ERROR/g);
+      record(name, 'FAIL', timedOutErrors > 0
+        ? `harness TIMED OUT (${Math.round(budgetMs / 1000)}s) — but its own log has ${timedOutErrors} script error(s), so it raised rather than hung; look there first, not in .godot (see ${result.log})`
+        : `harness TIMED OUT (${Math.round(budgetMs / 1000)}s) — hung with no script error in its output; suspect stale .godot or a scene that never boots (see ${result.log})`);
       return;
     }
     const text = readLog(result.log);
