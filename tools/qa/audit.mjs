@@ -39,7 +39,25 @@ const SCRATCH = '/tmp/shooter';
 // Shipping source roots audited for metrics. `test/` trees are indexed for
 // reference-counting but never reported as findings (they are allowed to print).
 const SCAN_DIRS = ['addons/cabra.lat_shooters/src', 'src', 'scenes'];
+// Only declared code/data roots can be live consumers. A whole-repo walk made
+// documentation, agent instructions, and vendored third-party source suppress
+// dead-API findings merely by mentioning a symbol. Keep this list explicit and
+// path-based so optional checkouts cannot change the result.
 const REFERENCE_EXTS = ['.gd', '.tscn', '.tres', '.godot', '.cfg'];
+const REFERENCE_ROOTS = [
+  'addons/cabra.lat_shooters/src',
+  'addons/cabra.lat_shooters/test',
+  'src',
+  'scenes',
+  'resources',
+  'test',
+  'tools',
+];
+
+function isReferencePath(rel) {
+  if (!REFERENCE_EXTS.some((ext) => rel.endsWith(ext))) return false;
+  return REFERENCE_ROOTS.some((root) => rel === root || rel.startsWith(`${root}/`));
+}
 
 // Full vocabulary of rule names the tool can emit (scanner + manual findings).
 // The baseline stores this so `--check` can tell a real rule-set change from a
@@ -1205,8 +1223,8 @@ function main() {
   const refCorpusRaw = new Map();
   for (const dir of ['.']) {
     for (const full of walk(join(ROOT, dir))) {
-      if (!REFERENCE_EXTS.some((e) => full.endsWith(e))) continue;
       const rel = relative(ROOT, full);
+      if (!isReferencePath(rel)) continue;
       const raw = readText(full);
       refCorpusRaw.set(rel, raw);
       refCorpus.set(rel, stripStrings(raw));
