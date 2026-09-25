@@ -27,6 +27,17 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive --depth 1
 
+      - name: Reject untracked import inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t untracked < <(git ls-files --others --exclude-standard -- assets addons src scenes project.godot)
+          if ((${#untracked[@]})); then
+            printf 'Untracked import inputs are forbidden in CI:\n' >&2
+            printf '  %s\n' "${untracked[@]}" >&2
+            exit 1
+          fi
+
       - name: Cache Godot
         uses: actions/cache@v4
         with:
@@ -46,20 +57,16 @@ jobs:
           fi
           echo "$HOME/godot" >> "$GITHUB_PATH"
 
-      # Import cache: `.godot/` is Godot's import DB + compiled resource caches.
-      # A warm cache makes the ~90 s cold import an incremental refresh, which
-      # buys CI time WITHOUT weakening any gate: gate 1 still re-runs
-      # `godot --import` + check_scripts, so a stale cache can never let a
-      # broken script pass — it can only cost (or save) wall time. Preferred
-      # over dropping the qa re-probe (`--qa-fast`), which is where the quality
-      # gate's teeth live. Falls back to the latest cache for this OS/version.
+      # Import cache: `.godot/` is generated, never committed. Version the cache
+      # and key it to all import-relevant source roots so a cache from before an
+      # asset/addon/project change cannot be restored as if it were current.
       - name: Cache Godot import (.godot)
         uses: actions/cache@v4
         with:
           path: .godot
-          key: godot-import-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('project.godot') }}
+          key: godot-import-v2-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('project.godot', 'assets/**', 'addons/**', 'src/**', 'scenes/**', 'tools/**', 'test/**', '**/*.gd', '**/*.tscn', '**/*.tres', '**/*.import') }}
           restore-keys: |
-            godot-import-${{ runner.os }}-${{ env.GODOT_VERSION }}-
+            godot-import-v2-${{ runner.os }}-${{ env.GODOT_VERSION }}-
 
       # Single verification entry point — the SAME command a human runs.
       # Replaces the old per-harness steps AND the old import-only "parse gate"

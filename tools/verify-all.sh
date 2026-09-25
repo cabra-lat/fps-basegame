@@ -332,8 +332,23 @@ gate_harness() { # name script
     # because a FLAKY gate is worse than none (a false FAIL trains people to ignore
     # red): the arena_spawn canary served stale .godot bytecode ~1/7 runs, and
     # (1/7)^3 makes a false FAIL negligible. A real regression still fails every time.
-    echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — re-import + retry (attempt $((attempt + 1))/3, transient .godot race?)" >&2
-    "$GODOT_BIN" --headless --path . --import >"$LOG_DIR/reimport.$name.log" 2>&1
+    echo "verify-all: $name failed (rc=$rc, load=$lerr script=$lse) — bounded re-import + retry (attempt $((attempt + 1))/3)" >&2
+    local rlog="$LOG_DIR/reimport.$name.log" rrc rloop_stats rloop_count rloop_asset
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 120 "$GODOT_BIN" --headless --path . --import >"$rlog" 2>&1
+      rrc=$?
+    else
+      "$GODOT_BIN" --headless --path . --import >"$rlog" 2>&1
+      rrc=$?
+    fi
+    rloop_stats="$(sed -n 's/.*reimport | //p' "$rlog" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=C sort | uniq -c | LC_ALL=C sort -nr | head -1 || true)"
+    rloop_count="$(printf '%s\n' "$rloop_stats" | awk 'NF {print $1; exit}')"
+    rloop_asset="$(printf '%s\n' "$rloop_stats" | awk 'NF {$1=""; sub(/^ /, ""); print; exit}')"
+    if [ "$rrc" -eq 124 ] || [ "${rloop_count:-0}" -gt 50 ] || grep -qE 'Unrecognized UID|Can.t find file .* during file reimport' "$rlog"; then
+      record "$name" "FAIL" "re-import after harness failure hit a UID/import loop or timeout (rc=$rrc, repeats=${rloop_count:-0}, asset=${rloop_asset:-unknown}; see $rlog)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
+    fi
     attempt=$((attempt + 1))
   done
 }
