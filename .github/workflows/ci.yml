@@ -78,7 +78,8 @@ jobs:
       - name: verify-all
         env:
           VERIFY_LOG_DIR: ${{ runner.temp }}/verify-all-logs
-        run: bash tools/verify-all.sh
+          VERIFY_LIVE_LOGS: "1"
+        run: node tools/verify-all.mjs
 
       # Keep the complete per-gate logs available from the CI run page, even
       # when the aggregate command fails. The log directory is supplied by
