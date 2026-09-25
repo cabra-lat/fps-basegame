@@ -21,7 +21,18 @@ func expires_at_raid() -> int:
 func is_expirable() -> bool:
 	return expiry_raids >= 0
 
+## Escrow payload display. The dict is ItemCodec encoding and carries "path", so
+## the name resolves through the SAME registry as the trader offers — the raw
+## payload "name" is a warned fallback for an item nobody registered. Flea
+## listings are unbounded (any item a player owns), so there is no "every flea
+## item is registered" invariant; what is enforced is that the path the player
+## earned through a trader renders the same way here as it does in the market.
 func item_name() -> String:
+	var path := String(item.get("path", ""))
+	var localized := ItemNames.display_name_for_path(path)
+	if localized != "":
+		return localized
+	push_warning("FleaListing: '%s' has no ItemNames entry; rendering the payload name" % path)
 	return String(item.get("name", "?"))
 
 func status_name() -> String:

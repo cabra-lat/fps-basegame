@@ -19,6 +19,7 @@ const SOURCE_FILES := [
 	"res://scenes/arena_manager_core.gd",
 	"res://scenes/extraction_point.gd",
 	"res://scenes/arena_manager.gd",
+	"res://src/meta/flea_listing.gd",
 ]
 ## Every key those files use, plus the ItemNames registry. This is the
 ## catalogue contract: a new call site without an entry here fails, and an entry
@@ -89,6 +90,7 @@ func _initialize() -> void:
 	_check_every_offered_item_is_registered()
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
+	_check_flea_listing_resolves_through_the_registry()
 	print("i18n probe: checks=%d passed=%d" % [_checks, _passed])
 	print("  passed  %d" % _passed)
 	# verify-all.mjs gates on this exact marker, so a missing translation entry
@@ -226,7 +228,36 @@ func _check_purchase_feed_is_localized() -> void:
 	_check(wrapped_name != "" and wrapped_name != "5_56_45mm_SS109_VPAM_PM7",
 		"I18N-MKT wrapper_resolves_too: the InventoryItem a purchase returns resolves to '%s' (F-MKT: InventoryItem.resource_path is empty; a wrapper must resolve through ItemCodec.content_path)" % wrapped_name)
 
-## The check above composes the line ITSELF, which proves the mechanism works but
+## The player-to-player surface has the same defect the market had: the listing
+## rendered the escrow payload's own "name", so a listing of the 5.56 ammo read
+## `556_SS109_VPAM_PM7` next to a Portuguese row. The escrow dict IS ItemCodec
+## encoding and carries "path", so the same registry entry serves both surfaces —
+## which is the point of the registry rather than a per-surface string table.
+##
+## Flea listings cannot be enumerated (any item a player owns is listable), so the
+## check is the enforceable half: for every item the game's own content can hand a
+## player, the listing path resolves to the same name the market renders.
+func _check_flea_listing_resolves_through_the_registry() -> void:
+	var paths := _trader_item_paths()
+	var leaked: Array[String] = []
+	for path in paths:
+		var listing := FleaListing.new()
+		listing.item = ItemCodec.encode_item(ItemCodec.item_from_path(path))
+		var rendered: String = listing.item_name()
+		var expected := ItemNames.display_name_for_path(path)
+		var payload_name := String(listing.item.get("name", "?"))
+		if rendered != expected or rendered == payload_name or rendered.contains(payload_name):
+			leaked.append("%s: listing='%s' expected='%s' payload='%s'" % [path, rendered, expected, payload_name])
+	_check(not paths.is_empty() and leaked.is_empty(),
+		"I18N-FLEA every_listable_item_renders_the_registry_name: %d leaked (F-FLEA: the listing bypasses the registry and renders the escrow payload's own name)" % leaked.size())
+	# Same precedence rule as the market: the registry lookup must come first, or a
+	# fallback that runs first is the defect again.
+	var body := _function_body("res://src/meta/flea_listing.gd", "item_name")
+	var registry_at := body.find("ItemNames.display_name_for_path")
+	var raw_at := body.find("item.get(\"name\"")
+	_check(registry_at >= 0 and raw_at > registry_at,
+		"I18N-FLEA flea_call_site_uses_the_registry: registry@%d raw@%d (F-FLEA: precedence is the whole fix)" % [registry_at, raw_at])
+
 ## says nothing about whether the real call site uses it. Measured: reverting
 ## _market_buy to `item.name` left that check GREEN, because the harness never
 ## ran the function. Driving _market_buy needs a live MetaService, a profile and
