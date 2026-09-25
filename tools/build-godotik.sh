@@ -68,6 +68,56 @@ if [[ -e "$RUNTIME" ]]; then
   exit 1
 fi
 
+command -v ccache >/dev/null 2>&1 && ccache --version >/dev/null 2>&1 && ccache_usable=1 || ccache_usable=0
+
+# ── ccache shims ─────────────────────────────────────────────────────────────
+# godot-cpp resolves its compiler BY NAME from PATH: SConstruct builds a default
+# Environment before opts.Update(env), and CC/CXX are not registered variables
+# (tools/godotcpp.py declares target/platform/arch/threads/... but never CC or
+# CXX), so `scons CC="ccache g++"` is dropped as an unknown variable and SCons
+# prints a warning about it. The other injection point, the custom.py that
+# SConstruct imports from the source root, is forbidden by the pristine-source
+# checks above. A directory of same-named shims prepended to PATH is therefore
+# the only route that survives both, and it keeps common_compiler_flags.py's
+# `os.path.basename(env["CC"])` is-clang test honest: basename stays "g++"
+# instead of becoming the string "ccache g++".
+#
+# This is safe to share between machines only while the build uses baseline ISA
+# flags. `arch=x86_64` expands to -march=x86-64, a fixed target, so objects stay
+# portable. If anyone adds -march=native or -mtune=native, a shared ccache stops
+# being sound and must be disabled.
+#
+# Why this is worth having: the GodotIK build cache in CI is keyed on the exact
+# pinned commits and deliberately has no restore-keys, so bumping a pin restores
+# nothing and forces a full cold rebuild. That is the case ccache exists for --
+# godot-cpp's headers barely move when the extension's own sources do, so most
+# translation units become cache hits. When the pins have not moved, the build
+# cache already makes the build a no-op and ccache changes nothing.
+ccache_shim_dir=""
+if [[ "$ccache_usable" == 1 && "${GODOTIK_USE_CCACHE:-1}" != "0" ]]; then
+  ccache_shim_dir="$(mktemp -d)"
+  for cc_name in gcc g++ cc c++ clang clang++; do
+    cc_real="$(command -v "$cc_name" 2>/dev/null || true)"
+    # Never shim a name that already resolves inside the shim dir.
+    [[ -n "$cc_real" && "$cc_real" != "$ccache_shim_dir"/* ]] || continue
+    printf '#!/usr/bin/env bash\nexec ccache %q "$@"\n' "$cc_real" > "$ccache_shim_dir/$cc_name"
+    chmod +x "$ccache_shim_dir/$cc_name"
+  done
+  if [[ -z "$(command -v gcc 2>/dev/null || true)" ]]; then
+    echo "ccache shims produced no compiler; building without ccache" >&2
+    rm -rf "$ccache_shim_dir"
+    ccache_shim_dir=""
+  else
+    export PATH="$ccache_shim_dir:$PATH"
+    ccache --set-config=quiet=true >/dev/null 2>&1 || true
+    printf 'ccache enabled (compiler cache at %s)\n' "${CCACHE_DIR:-$HOME/.ccache}"
+  fi
+elif [[ "$ccache_usable" != 1 ]]; then
+  echo "ccache not available; building without a compiler cache" >&2
+elif [[ "${GODOTIK_USE_CCACHE:-1}" == "0" ]]; then
+  echo "GODOTIK_USE_CCACHE=0; building without a compiler cache" >&2
+fi
+
 jobs="${GODOTIK_BUILD_JOBS:-$(nproc)}"
 [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || { echo "GODOTIK_BUILD_JOBS must be a positive integer" >&2; exit 1; }
 build_timeout="${GODOTIK_BUILD_TIMEOUT:-1500}"
@@ -82,11 +132,33 @@ mkdir -p "$cache_dir"
 if (cd "$SOURCE" && timeout --kill-after=10s "${build_timeout}s" \
   env SCONS_CACHE_DIR="$cache_dir" scons \
     target=template_release platform=linux arch=x86_64 -j"$jobs"); then
-  :
+  build_rc=0
 else
-  rc=$?
-  echo "GodotIK SCons build failed or timed out (rc=$rc, limit=${build_timeout}s)" >&2
-  exit "$rc"
+  build_rc=$?
+fi
+
+# Report the compiler cache whatever happened. A build that dies on the timeout
+# is exactly when you want to know how much of it was reusable, and the
+# hard-killed children cannot report for themselves: ccache flushes its counters
+# on a clean exit, so after a kill the counters read zero even though the
+# results are on disk. Count the stored result files as well, because that
+# number survives a kill and is the measure that actually matters.
+if [[ -n "$ccache_shim_dir" ]]; then
+  ccache_dir="${CCACHE_DIR:-$HOME/.ccache}"
+  printf 'ccache: %s cached result file(s) in %s\n' \
+    "$(find "$ccache_dir" -type f 2>/dev/null | wc -l)" "$ccache_dir"
+  ccache_stats="$(ccache --show-stats 2>/dev/null || ccache -s 2>/dev/null || true)"
+  if printf '%s' "$ccache_stats" | grep -qE 'Cacheable calls'; then
+    printf '%s\n' "$ccache_stats"
+  else
+    echo "ccache: counters unavailable, which is expected if the build was" \
+      "killed mid-flight; the cached result file count above is the real measure"
+  fi
+fi
+
+if [[ "$build_rc" != 0 ]]; then
+  echo "GodotIK SCons build failed or timed out (rc=$build_rc, limit=${build_timeout}s)" >&2
+  exit "$build_rc"
 fi
 
 [[ -f "$SOURCE/godot_project/addons/libik/bin/libik.so" ]] || {

@@ -49,11 +49,29 @@ jobs:
             third_party/godotik/godot_project/addons/libik/bin
           key: godotik-build-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ steps.godotik-revisions.outputs.godotik }}-${{ steps.godotik-revisions.outputs.godot_cpp }}
 
+      # The GodotIK build cache above is keyed on the exact pinned commits and
+      # deliberately has NO restore-keys, so a commit bump restores nothing.
+      # That is correct for the .so (a stale binary must never ship) and it is
+      # exactly the case a compiler cache pays off in: godot-cpp's headers
+      # barely change when the extension's own sources do, so most of a cold
+      # rebuild becomes ccache hits. Keyed WITHOUT the source commits on
+      # purpose, with restore-keys so a pin bump still gets the compiler cache.
+      # ccache invalidates on its own when the compiler changes.
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-template_release
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-
+
       - name: Install GodotIK build tools
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y scons g++
+          sudo apt-get install --no-install-recommends -y scons g++ ccache
+          # Keep the Actions cache bounded; 1G is ample for this one target.
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
 
       - name: Build and stage GodotIK
         shell: bash
@@ -161,11 +179,20 @@ jobs:
             third_party/godotik/godot_project/addons/libik/bin
           key: godotik-build-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ steps.godotik-revisions.outputs.godotik }}-${{ steps.godotik-revisions.outputs.godot_cpp }}
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-template_release
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-x86_64-
+
       - name: Install GodotIK build tools
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y scons g++
+          sudo apt-get install --no-install-recommends -y scons g++ ccache
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
 
       - name: Build and stage GodotIK
         shell: bash
