@@ -26,9 +26,10 @@
 # shader uniforms (_freeze_time_shaders) — and fixing two causes is not what a
 # blanket guarantee looks like. Do not restore one.
 #
-# Contrast, so nobody generalises: the glTF importer's extracted textures (63ea0b2)
-# are pure byte copies of bufferView payloads and ARE byte-stable. Generated
-# assets in this project do not share one reproducibility property.
+# Contrast, so nobody generalises: the glTF textures Godot extracts on cold
+# import (documented in 63ea0b2) are pure byte copies of bufferView payloads
+# and ARE byte-stable. Generated assets in this project do not share one
+# reproducibility property.
 #
 # It is a two-phase build tool because a freshly written PNG has no `.import`
 # yet and `load()` would return null:
