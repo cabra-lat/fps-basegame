@@ -64,9 +64,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .godot
-          key: godot-import-v2-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('project.godot', 'assets/**', 'addons/**', 'src/**', 'scenes/**', 'tools/**', 'test/**', '**/*.gd', '**/*.tscn', '**/*.tres', '**/*.import') }}
-          restore-keys: |
-            godot-import-v2-${{ runner.os }}-${{ env.GODOT_VERSION }}-
+          key: godot-import-v3-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ hashFiles('project.godot', 'assets/**', 'addons/**', 'src/**', 'scenes/**', 'tools/**', 'test/**', '**/*.gd', '**/*.tscn', '**/*.tres', '**/*.import') }}
 
       # Single verification entry point — the SAME command a human runs.
       # Replaces the old per-harness steps AND the old import-only "parse gate"

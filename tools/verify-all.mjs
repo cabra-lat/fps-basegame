@@ -176,12 +176,24 @@ function hasUidFailure(text) {
 async function importGodot() {
   const importLog = join(logDir, 'import.log');
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const result = await runLogged('import', godot, ['--headless', '--path', '.', '--import'], 120_000);
+    let detected = null;
+    const running = runLogged('import', godot, ['--headless', '--path', '.', '--import'], 120_000);
+    const watcher = setInterval(() => {
+      const liveText = readLog(importLog);
+      const [liveAsset, liveRepeats] = largestReimportLoop(liveText);
+      if (!detected && (liveRepeats > 50 || hasUidFailure(liveText))) {
+        detected = { asset: liveAsset, repeats: liveRepeats };
+        if (activeChild) killTree(activeChild);
+      }
+    }, 250);
+    const result = await running;
+    clearInterval(watcher);
     const text = readLog(importLog);
     const [asset, repeats] = largestReimportLoop(text);
-    if (repeats > 50 || hasUidFailure(text)) {
-      record('import/parse', 'FAIL', `import reimport loop/UID failure: '${asset}' repeated ${repeats} times (see ${importLog})`);
-      return;
+    if (detected || repeats > 50 || hasUidFailure(text)) {
+      const failure = detected || { asset, repeats };
+      record('import/parse', 'FAIL', `import reimport loop/UID failure: '${failure.asset}' repeated ${failure.repeats} times (see ${importLog})`);
+      return false;
     }
     if (result.code !== 124) {
       const errors = countMatches(text, /SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile/g);
@@ -191,10 +203,11 @@ async function importGodot() {
       const failures = scriptText.match(/failures:\s*([0-9]+)/i)?.[1] || '?';
       if (result.code !== 0 || errors > 0 || scripts.code !== 0) {
         record('import/parse', 'FAIL', `import rc=${result.code} errors=${errors}; scripts rc=${scripts.code} failures=${failures}`);
+        return false;
       } else {
         record('import/parse', 'PASS', `0 parse errors, ${compiled} scripts compiled`);
       }
-      return;
+      return true;
     }
     if (attempt < 2) {
       console.error('verify-all: import timed out; waiting 5s + retry once');
@@ -202,6 +215,7 @@ async function importGodot() {
     }
   }
   record('import/parse', 'FAIL', `import TIMED OUT (120s x2) (see ${importLog})`);
+  return false;
 }
 
 function gitOutput(repo, gitArgs) {
@@ -320,9 +334,11 @@ async function gateExport() {
 async function main() {
   console.log(`=== verify-all ===  root=${ROOT}  godot=${spawnSync(godot, ['--version'], { encoding: 'utf8' }).stdout.trim()}`);
   console.log(`logs: ${logDir}\n`);
-  await importGodot();
+  const importOk = await importGodot();
   gateUidTracking();
-  if (quick) {
+  if (!importOk) {
+    record('harnesses', 'SKIP', 'import/parse failed; downstream Godot gates would use an invalid cache');
+  } else if (quick) {
     await gateHarness('assets', 'res://addons/cabra.lat_shooters/test/validate_assets.gd');
   } else {
     const harnesses = [
