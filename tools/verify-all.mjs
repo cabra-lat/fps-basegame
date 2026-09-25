@@ -1,6 +1,40 @@
 #!/usr/bin/env node
 // Canonical local + CI verification orchestrator.
 // The shell entry point is retained as a compatibility wrapper only.
+//
+// PRECONDITION (order matters, and the failure is SILENT, not loud):
+// stage the GodotIK runtime BEFORE the first import —
+//     tools/build-godotik.sh && node tools/verify-all.mjs
+// With addons/libik absent, player_ik.tscn cannot load, yet the harnesses
+// still exit 0 and the run reports RESULT: PASS. The orchestrator's
+// log-honesty check greps SCRIPT ERROR, and that count is 0, so a missing
+// rig is not caught here. DO NOT READ A GREEN RUN AS PROOF THAT libik IS
+// STAGED. (Observed on f30e0f9: `verify-all --quick` returned RESULT: PASS
+// with addons/libik entirely absent and SCRIPT ERROR count 0. verifier
+// reports the loader's missing-ext_resource and GDExtension ERROR lines
+// scrolling past in the same state; the honesty check greps SCRIPT ERROR,
+// a different string, which is why they pass through.)
+// A tree that was never imported is a DIFFERENT fault: global classes stay
+// unresolved, scripts fail to compile, and a harness can stall until the
+// 600s gate timeout. Import first, then diagnose; do not read that as a
+// libik fault. CI satisfies the ordering by construction (build/stage runs
+// before verify-all), so CI is protected by ORDERING, not by DETECTION —
+// if the stage step ever silently no-ops, CI stays green too.
+//
+// The audit count is the ONLY signal that distinguishes the two states, and
+// it is an ENVIRONMENT-DIQUALIFIED pair, never a single number:
+//   libik STAGED -> qa_audit MAJOR=36
+//   libik absent -> qa_audit MAJOR=37
+// measured on f30e0f9. The delta is exactly one broken-ref row:
+//   addons/cabra.lat_shooters/src/player/scenes/player_ik.tscn:5
+//     dangling res:// addons/libik/script/pole_bone_constraint.gd
+// Both values move as content changes, so quote the PAIR and name which
+// side you measured. "37 on an otherwise-green run" is not a content
+// regression; it is the signature of a GodotIK build or stage step that did
+// not take effect, and it is the one thing that distinguishes a green run
+// from a green run with a broken rig. Note that addons/libik is a BUILT
+// extension produced by tools/build-godotik.sh, not a checked-out source
+// tree: initialising submodules does not stage it.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
