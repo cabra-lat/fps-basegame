@@ -11,7 +11,6 @@ enum State { PREP, ACTIVE, SUCCESS, FAILURE }
 
 const DURATION_SECONDS := 600.0
 const OBJECTIVE_ID := "marked_intel" # machine key: ids are never localized
-const OBJECTIVE_NAME := "Intel Marcado" # display text only
 
 var state: State = State.PREP
 var objective_collected := false
@@ -107,10 +106,10 @@ func complete(point: ExtractionPoint) -> void:
 
 func status_text() -> String:
 	if state == State.SUCCESS:
-		return "INTEL GARANTIDO → %s" % destination
+		return tr("INTEL SECURED -> %s") % destination
 	if state == State.FAILURE:
-		return "RAID FALHOU: %s" % failure_reason
-	var objective := "GARANTIDO" if objective_collected else "ACHE %s" % OBJECTIVE_NAME
+		return tr("RAID FAILED: %s") % failure_reason
+	var objective := tr("SECURED") if objective_collected else tr("FIND %s") % ItemNames.display_name(OBJECTIVE_ID)
 	return "%s | %s / %s" % [objective, _time_text(), "10:00"]
 
 

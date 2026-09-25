@@ -17,6 +17,7 @@ enum Kind { INSTANT, PAID, FLARE, LEVER, COOP, TIMED }
 @export var extract_time: float = 0.0 ## seconds held inside (INSTANT = 0)
 @export var single_use: bool = false
 @export var required_item: String = "" ## item_id gating the point (note/key)
+@export var required_item_name: String = "" ## optional display override; empty resolves the id through ItemNames
 @export var paid_cost: int = 0 ## paid extract: credits charged on completion
 @export var timed_open: float = 0.0 ## raid seconds when the window opens
 @export var timed_close: float = 0.0 ## raid seconds when it closes (0 = never)
@@ -63,7 +64,7 @@ func can_use() -> Dictionary:
 	if not allowed_factions.is_empty() and not allowed_factions.has(profile.faction):
 		return _no(faction_gate_text())
 	if required_item != "" and not profile.has_item(required_item):
-		return _no("precisa %s" % required_item)
+		return _no(tr("requires %s") % _required_item_display())
 	match kind:
 		Kind.PAID:
 			if not profile.can_afford(paid_cost):
@@ -108,15 +109,41 @@ func progress_ratio() -> float:
 	var need: float = maxf(extract_time, 0.01)
 	return clampf(_progress / need, 0.0, 1.0)
 
-func kind_name() -> String:
-	match kind:
-		Kind.INSTANT: return "INSTANT"
-		Kind.PAID: return "PAID"
-		Kind.FLARE: return "FLARE"
-		Kind.LEVER: return "LEVER"
-		Kind.COOP: return "COOP"
-		Kind.TIMED: return "TIMED"
+## Player-facing name for the item gate. `required_item` is a machine key (it is
+## what has_item/consume_item compare against), so it must never be interpolated
+## into a HUD string: the id is resolved through the ItemNames registry, which
+## maps it to a tr() key, and the generic fallback keeps an unknown id out of
+## the UI instead of leaking it.
+func _required_item_display() -> String:
+	if required_item_name != "":
+		return required_item_name
+	var resolved := ItemNames.display_name(required_item)
+	if resolved == "":
+		if OS.is_debug_build():
+			push_warning("ExtractionPoint '%s': required_item '%s' has no ItemNames entry" % [name, required_item])
+		return tr("a specific item")
+	return resolved
+
+
+## Localized display text for the point list. The `Kind` enum stays the
+## machine-readable key (scenes and quests match on it), so only this text is
+## translated; the gate reasons in can_use() are already Portuguese and the two
+## strings are read on the same HUD line. Static, so keys resolve through
+## TranslationServer rather than the instance-bound tr().
+static func kind_display_name(k: Kind) -> String:
+	match k:
+		Kind.INSTANT: return TranslationServer.translate("INSTANT")
+		Kind.PAID: return TranslationServer.translate("PAID")
+		Kind.FLARE: return TranslationServer.translate("FLARE")
+		Kind.LEVER: return TranslationServer.translate("LEVER")
+		Kind.COOP: return TranslationServer.translate("COOP")
+		Kind.TIMED: return TranslationServer.translate("TIMED")
 	return "?"
+
+
+## Instance convenience wrapper: this point's kind.
+func kind_name() -> String:
+	return kind_display_name(kind)
 
 ## HUD one-liner: name, kind, gate status.
 func status_text() -> String:

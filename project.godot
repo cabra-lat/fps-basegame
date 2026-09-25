@@ -257,3 +257,7 @@ precision_multiplier={
 "type": "float",
 "value": 1.0
 }
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://locale/game.po")

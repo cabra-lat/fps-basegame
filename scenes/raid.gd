@@ -118,15 +118,18 @@ func _end(out: Outcome) -> void:
 
 ## Display name for the HUD, feed and the persisted report. The integer
 ## `Outcome` stays the machine-readable key; only this text is localized, so
-## quests, save files and tests keep matching on the enum.
+## quests, save files and tests keep matching on the enum. The English source
+## string is the translation key: Portuguese comes from locale/game.po, never
+## from a literal here. This is a static helper, so it resolves keys through
+## TranslationServer rather than the instance-bound tr().
 static func outcome_display_name(out: int) -> String:
 	match out:
-		Outcome.SURVIVED: return "SOBREVIVEU"
-		Outcome.RUN_THROUGH: return "PASSOU DIRETO"
-		Outcome.MIA: return "DESAPARECIDO"
-		Outcome.KIA: return "MORTO EM AÇÃO"
-		Outcome.LEFT_BEHIND: return "DEIXADO PARA TRÁS"
-		Outcome.SCENARIO_CLEARED: return "CENÁRIO CONCLUÍDO"
+		Outcome.SURVIVED: return TranslationServer.translate("SURVIVED")
+		Outcome.RUN_THROUGH: return TranslationServer.translate("RUN THROUGH")
+		Outcome.MIA: return TranslationServer.translate("MIA")
+		Outcome.KIA: return TranslationServer.translate("KIA")
+		Outcome.LEFT_BEHIND: return TranslationServer.translate("LEFT BEHIND")
+		Outcome.SCENARIO_CLEARED: return TranslationServer.translate("SCENARIO CLEARED")
 		_: return "—"
 
 ## Instance convenience wrapper: the current outcome, or a given one.

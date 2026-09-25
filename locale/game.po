@@ -1,0 +1,82 @@
+# Portuguese (Brazil) catalogue for the shipped UI.
+# msgid is always the ENGLISH source string, exactly as it appears in code; the
+# code never carries a translated literal. English stays readable in the source
+# tree and pt_BR ships here. A missing msgstr is not a silent fallback: the
+# i18n harness (src/meta/validate_i18n.gd) fails when a key is untranslated.
+msgid ""
+msgstr ""
+"Project-Id-Version: fps-basegame\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+# ── Raid outcomes (Raid.outcome_display_name) ────────────────────────────────
+msgid "SURVIVED"
+msgstr "SOBREVIVEU"
+
+msgid "RUN THROUGH"
+msgstr "PASSOU DIRETO"
+
+msgid "MIA"
+msgstr "DESAPARECIDO"
+
+msgid "KIA"
+msgstr "MORTO EM AÇÃO"
+
+msgid "LEFT BEHIND"
+msgstr "DEIXADO PARA TRÁS"
+
+msgid "SCENARIO CLEARED"
+msgstr "CENÁRIO CONCLUÍDO"
+
+# ── Extraction point kinds (ExtractionPoint.kind_display_name) ──────────────
+msgid "INSTANT"
+msgstr "INSTANTÂNEA"
+
+msgid "PAID"
+msgstr "PAGA"
+
+msgid "FLARE"
+msgstr "SINALIZADOR"
+
+msgid "LEVER"
+msgstr "ALAVANCA"
+
+msgid "COOP"
+msgstr "COOPERATIVA"
+
+msgid "TIMED"
+msgstr "JANELA"
+
+# ── Item gate (ExtractionPoint.can_use) ─────────────────────────────────────
+msgid "requires %s"
+msgstr "precisa %s"
+
+msgid "a specific item"
+msgstr "um item específico"
+
+# ── RAID-1 scenario HUD (Raid1Scenario.status_text) ────────────────────────
+msgid "INTEL SECURED -> %s"
+msgstr "INTEL GARANTIDO → %s"
+
+msgid "RAID FAILED: %s"
+msgstr "RAID FALHOU: %s"
+
+msgid "SECURED"
+msgstr "GARANTIDO"
+
+msgid "FIND %s"
+msgstr "ACHE %s"
+
+# ── Item display names (ItemNames registry; ids are the machine key) ────────
+msgid "Marked Intel"
+msgstr "Intel Marcado"
+
+# ── RAID-1 feed and failure reason (arena_manager_core) ─────────────────────
+msgid "marked intel not extracted"
+msgstr "intel marcado não foi extraído"
+
+msgid "Failure: intel not collected — kit lost"
+msgstr "Falha: intel não coletado — kit perdido"

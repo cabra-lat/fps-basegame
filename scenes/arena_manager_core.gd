@@ -431,10 +431,10 @@ func _on_extracted(point: ExtractionPoint) -> void:
 	if scenario != null and not scenario.objective_collected:
 		# The fallback is physically open, but leaving without the marked intel is
 		# a failed first clear: the existing meta resolution then forfeits kit.
-		scenario.fail("intel marcado não foi extraído")
+		scenario.fail(tr("marked intel not extracted"))
 		scenario.discard_carry(_raid1_backpack())
 		raid.end(Raid.Outcome.LEFT_BEHIND)
-		call("_push_feed", "Falha:intel não coletado — kit perdido")
+		call("_push_feed", tr("Failure: intel not collected — kit lost"))
 		return
 	var out: int
 	if scenario != null:

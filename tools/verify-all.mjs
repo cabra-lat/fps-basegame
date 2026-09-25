@@ -386,6 +386,7 @@ async function main() {
       ['meta_market', 'res://src/meta/validate_meta_market.gd'],
       ['meta_flea', 'res://src/meta/validate_meta_flea.gd'],
       ['meta_deploy_raid', 'res://src/meta/validate_meta_deploy_raid.gd'],
+      ['i18n', 'res://src/meta/validate_i18n.gd'],
       ['invariants', 'res://addons/cabra.lat_shooters/test/validate_invariants.gd'],
       ['locomotion_orientation', 'res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd'],
       ['factions', 'res://scenes/validate_factions.gd'],
