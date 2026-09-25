@@ -1,9 +1,3 @@
-[gd_scene load_steps=2 format=3 uid="uid://cuqlfnss80c0b"]
-
-[ext_resource type="Script" uid="uid://cbbo4l7k1k36x" path="res://addons/cabra.lat_terrains/src/tile_terrain_root.gd" id="1_vjhlg"]
+[gd_scene load_steps=1 format=3 uid="uid://cuqlfnss80c0b"]
 
 [node name="terrain" type="Node3D"]
-
-[node name="TileTerrainRoot" type="StaticBody3D" parent="."]
-script = ExtResource("1_vjhlg")
-metadata/_custom_type_script = "uid://cbbo4l7k1k36x"
