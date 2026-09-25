@@ -1182,7 +1182,15 @@ func _tick_anim() -> void:
 func _tick_lod() -> void:
 	if _rig == null:
 		return
-	var cam := get_viewport().get_camera_3d()
+	# `get_viewport()` is null while the bot is out of the tree, which is exactly
+	# what raid settlement/teardown does. Guard the viewport itself: the old
+	# `cam == null` check below guarded the wrong null, so the chain still
+	# dereferenced null here (bot.gd:1185, seen by spotter at every settlement).
+	# Same null-chain shape as scenes/arena_manager.gd:290.
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var cam := vp.get_camera_3d()
 	if cam == null:
 		return
 	var d := global_position.distance_to(cam.global_position)
