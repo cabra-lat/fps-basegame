@@ -84,6 +84,11 @@ func _initialize() -> void:
 	_check(failed.state == Raid1ScenarioScript.State.FAILURE, "timer failure marks failure")
 	_check(failed.carried_item_id == "", "failure carries no raid loot")
 	print("RAID-1 scenario probe: checks=%d passed=%d" % [_checks, _passed])
+	print("  passed  %d" % _passed)
+	# verify-all.mjs gates on this marker, so a failed assertion (or an
+	# untranslated HUD string, now that the HUD resolves through the
+	# catalogue) fails the build instead of only this manual probe.
+	print("RESULT: %s" % ("PASS" if _passed == _checks else "FAIL"))
 	quit(0 if _passed == _checks else 1)
 
 func _check(condition: bool, label: String) -> void:
