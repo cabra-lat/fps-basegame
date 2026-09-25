@@ -82,5 +82,19 @@
     "name": "get_effective_magnification",
     "confirmed_by": "ballistics",
     "reason": "forward optic-override API consumed by player-rig's ADS/FOV queue"
+  },
+  {
+    "file": "addons/cabra.lat_shooters/src/player/humanoid_rig.gd",
+    "rule": "unused-func",
+    "name": "has_ik_target",
+    "confirmed_by": "player-rig",
+    "reason": "Phase 2 reader for the addon-side ANALYTIC arm solver (task_98cb5c88cf, first triaged pending-consumer). Feature is live: viewmodel_rig.gd:79-80 binds the grips under the has_method guard at :72, and HumanoidRig._process:277 follows the bound targets each frame; this is a reader with no caller yet, not a dead solver. NOT a GodotIK arm path - humanoid_rig.gd:10-13 records that GDExtension never applied its solve (effector moved 1 m, hand moved 0.0000, isolated 2026-09-22) and forbids depending on it for arms. Do not restate this entry as GodotIK."
+  },
+  {
+    "file": "addons/cabra.lat_shooters/src/player/humanoid_rig.gd",
+    "rule": "unused-func",
+    "name": "arm_ik_error",
+    "confirmed_by": "player-rig",
+    "reason": "Phase 2 probe/spotter readout over the addon-side ANALYTIC arm solver (task_98cb5c88cf); its own doc comment names the consumer class. Reads the same _ik_targets the analytic solver drives, so it tracks arm error without depending on GodotIK. Do not restate this entry as GodotIK."
   }
 ]
