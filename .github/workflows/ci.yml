@@ -8,11 +8,14 @@ on:
 
 env:
   GODOT_VERSION: "4.7.1"
+  # Cold source build bound; cached builds are normally seconds.
+  GODOTIK_BUILD_TIMEOUT: "1500"
 
 jobs:
   gates:
     name: Headless gates
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout game repo
         uses: actions/checkout@v4
@@ -26,6 +29,35 @@ jobs:
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive --depth 1
+
+      - name: Resolve pinned GodotIK revisions
+        id: godotik-revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "godotik=$(git -C third_party/godotik rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "godot_cpp=$(git -C third_party/godotik/godot-cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache GodotIK build
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/godotik/.scons-cache
+            third_party/godotik/.sconsign.dblite
+            third_party/godotik/godot-cpp/.sconsign.dblite
+            third_party/godotik/godot-cpp/bin
+            third_party/godotik/godot_project/addons/libik/bin
+          key: godotik-build-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ steps.godotik-revisions.outputs.godotik }}-${{ steps.godotik-revisions.outputs.godot_cpp }}
+
+      - name: Install GodotIK build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y scons g++
+
+      - name: Build and stage GodotIK
+        shell: bash
+        run: tools/build-godotik.sh
 
       - name: Reject untracked import inputs
         shell: bash
@@ -94,6 +126,7 @@ jobs:
   export:
     name: Export binaries (needs templates)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: gates
     # Opt-in: set the repo variable RUN_EXPORT=true once export templates are
     # provisioned. Left off by default so a missing template cannot redden CI.
@@ -108,6 +141,35 @@ jobs:
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive --depth 1
+
+      - name: Resolve pinned GodotIK revisions
+        id: godotik-revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "godotik=$(git -C third_party/godotik rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "godot_cpp=$(git -C third_party/godotik/godot-cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache GodotIK build
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/godotik/.scons-cache
+            third_party/godotik/.sconsign.dblite
+            third_party/godotik/godot-cpp/.sconsign.dblite
+            third_party/godotik/godot-cpp/bin
+            third_party/godotik/godot_project/addons/libik/bin
+          key: godotik-build-v1-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ steps.godotik-revisions.outputs.godotik }}-${{ steps.godotik-revisions.outputs.godot_cpp }}
+
+      - name: Install GodotIK build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y scons g++
+
+      - name: Build and stage GodotIK
+        shell: bash
+        run: tools/build-godotik.sh
 
       - name: Install Godot ${{ env.GODOT_VERSION }}
         run: |

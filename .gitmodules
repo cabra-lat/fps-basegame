@@ -10,3 +10,6 @@
 [submodule "addons/cabra.lat_state_machines"]
 	path = addons/cabra.lat_state_machines
 	url = git@github.com:cabra-lat/cabra.lat_state_machines.git
+[submodule "godotik"]
+	path = third_party/godotik
+	url = https://github.com/monxa/GodotIK.git
