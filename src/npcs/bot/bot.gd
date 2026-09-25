@@ -648,6 +648,11 @@ func _engage_range() -> float:
 
 ## Nearest hostile CharacterBody3D with health; rescanned on a short interval.
 func _acquire_target() -> void:
+	# Same class as the _tick_lod deref: this runs from the physics tick, which is
+	# still scheduled while the node is mid-removal at settlement, so `get_tree()`
+	# can be null here even though the call site looks in-tree.
+	if not is_inside_tree():
+		return
 	_target = NpcTargeting.acquire(
 		self, get_tree().current_scene, team, friendly_fire)
 
@@ -1183,14 +1188,16 @@ func _tick_lod() -> void:
 	if _rig == null:
 		return
 	# `get_viewport()` is null while the bot is out of the tree, which is exactly
-	# what raid settlement/teardown does. Guard the viewport itself: the old
-	# `cam == null` check below guarded the wrong null, so the chain still
-	# dereferenced null here (bot.gd:1185, seen by spotter at every settlement).
-	# Same null-chain shape as scenes/arena_manager.gd:290.
-	var vp := get_viewport()
-	if vp == null:
+	# what raid settlement/teardown does, and the bot's physics tick is still
+	# scheduled in that window. The old `cam == null` check below guarded the
+	# wrong null: it tested the RESULT of get_camera_3d() while the null was the
+	# RECEIVER, so the chain still dereferenced null here (bot.gd:1185, seen by
+	# spotter at every settlement). `is_inside_tree()` is this file's own idiom
+	# for the same condition, and it is the guard that has to exist: `cam == null`
+	# must never be the only one.
+	if not is_inside_tree():
 		return
-	var cam := vp.get_camera_3d()
+	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
 	var d := global_position.distance_to(cam.global_position)
