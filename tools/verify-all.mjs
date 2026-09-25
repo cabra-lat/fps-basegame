@@ -164,6 +164,7 @@ function largestReimportLoop(text) {
     const match = line.match(/reimport \| (.*)$/);
     if (!match) continue;
     const asset = match[1].trim();
+    if (!asset || /^(preparing files to reimport|started \(re\)importing assets|executing pre-reimport operations)/i.test(asset)) continue;
     counts.set(asset, (counts.get(asset) || 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || ['', 0];
