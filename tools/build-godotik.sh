@@ -70,6 +70,39 @@ fi
 
 command -v ccache >/dev/null 2>&1 && ccache --version >/dev/null 2>&1 && ccache_usable=1 || ccache_usable=0
 
+# Where ccache ACTUALLY writes is not something to assume. The default moved
+# between major versions: 3.x used ~/.ccache, 4.x follows the XDG spec and uses
+# ~/.cache/ccache. Guessing wrong here is not a cosmetic problem, because
+# actions/cache refuses to save a path that does not exist, so a build pointed
+# at a directory ccache never creates reports 0 stored results, fails path
+# validation on save, and is indistinguishable from a build that cached nothing
+# on purpose. Ask ccache which directory it resolved, honour an explicit
+# CCACHE_DIR over both, and create it up front so the save has something to find.
+resolve_ccache_dir() {
+  local cfg from_env from_default
+  if [[ -n "${CCACHE_DIR:-}" ]]; then
+    printf '%s' "$CCACHE_DIR"
+    return
+  fi
+  cfg="$(ccache -p 2>/dev/null || true)"
+  from_env="$(printf '%s\n' "$cfg" | sed -n 's/^(environment) cache_dir = //p' | head -1)"
+  if [[ -n "$from_env" ]]; then
+    printf '%s' "$from_env"
+    return
+  fi
+  # ccache labels a config-FILE override with the file's own path instead of the
+  # word "environment", e.g. "(/home/u/.config/ccache/ccache.conf) cache_dir = ...".
+  # The leading slash in the pattern is what keeps this from also matching the
+  # "(default)" and "(environment)" labels, which are handled above and below.
+  from_file="$(printf '%s\n' "$cfg" | sed -n 's/^(\/[^)]*) cache_dir = //p' | head -1)"
+  if [[ -n "$from_file" ]]; then
+    printf '%s' "$from_file"
+    return
+  fi
+  from_default="$(printf '%s\n' "$cfg" | sed -n 's/^(default) cache_dir = //p' | head -1)"
+  printf '%s' "${from_default:-$HOME/.ccache}"
+}
+
 # ── ccache shims ─────────────────────────────────────────────────────────────
 # godot-cpp resolves its compiler BY NAME from PATH: SConstruct builds a default
 # Environment before opts.Update(env), and CC/CXX are not registered variables
@@ -110,7 +143,9 @@ if [[ "$ccache_usable" == 1 && "${GODOTIK_USE_CCACHE:-1}" != "0" ]]; then
   else
     export PATH="$ccache_shim_dir:$PATH"
     ccache --set-config=quiet=true >/dev/null 2>&1 || true
-    printf 'ccache enabled (compiler cache at %s)\n' "${CCACHE_DIR:-$HOME/.ccache}"
+    ccache_cache_dir="$(resolve_ccache_dir)"
+    mkdir -p "$ccache_cache_dir" 2>/dev/null || true
+    printf 'ccache enabled (compiler cache at %s)\n' "$ccache_cache_dir"
   fi
 elif [[ "$ccache_usable" != 1 ]]; then
   echo "ccache not available; building without a compiler cache" >&2
@@ -144,10 +179,23 @@ fi
 # results are on disk. Count the stored result files as well, because that
 # number survives a kill and is the measure that actually matters.
 if [[ -n "$ccache_shim_dir" ]]; then
-  ccache_dir="${CCACHE_DIR:-$HOME/.ccache}"
-  printf 'ccache: %s cached result file(s) in %s\n' \
-    "$(find "$ccache_dir" -type f 2>/dev/null | wc -l)" "$ccache_dir"
+  ccache_dir="${ccache_cache_dir:-$(resolve_ccache_dir)}"
   ccache_stats="$(ccache --show-stats 2>/dev/null || ccache -s 2>/dev/null || true)"
+  ccache_result_files="$(find "$ccache_dir" -type f 2>/dev/null | wc -l | tr -d ' ')"
+  printf 'ccache: %s cached result file(s) in %s\n' "$ccache_result_files" "$ccache_dir"
+  # ccache processed compilations but left nothing behind: the directory it was
+  # pointed at is not the directory it wrote to. That is a fault, and it is
+  # silent in the worst way, because the counters still read a healthy-looking
+  # 99.9% cacheable and the next run reports a perfectly truthful 0 hits. Gated
+  # on a non-zero cacheable count so a build killed before it cached anything,
+  # where empty is the expected and correct outcome, does not cry wolf.
+  ccache_cacheable="$(printf '%s' "$ccache_stats" | sed -n 's/^ *Cacheable calls: *\([0-9][0-9]*\).*/\1/p' | head -1)"
+  if [[ "$ccache_result_files" == 0 && "${ccache_cacheable:-0}" -gt 0 ]]; then
+    echo "ccache: WARNING nothing was stored in $ccache_dir despite" >&2
+    echo "  $ccache_cacheable cacheable call(s). If a cache action points" >&2
+    echo "  there it cannot save, and later runs will correctly report 0" >&2
+    echo "  hits. Check CCACHE_DIR, 'ccache -p' and the action's path agree." >&2
+  fi
   if printf '%s' "$ccache_stats" | grep -qE 'Cacheable calls'; then
     printf '%s\n' "$ccache_stats"
   else
