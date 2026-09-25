@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/godot-lock.sh — run Godot under the SAME per-repo lock as verify-all.sh.
+# tools/godot-lock.sh — run Godot under the SAME per-cache lock as verify-all.sh.
 #
 # WHY: `.godot/` is a SHARED cache. The gate's own flock serializes verify-all
 # runs against each other, but NOT the direct `godot --import` / harness calls
@@ -15,8 +15,8 @@
 # Extra flag (consumed here, not passed to Godot):
 #   --clean-tmp   delete leftover 0-byte .godot/imported/*.tmp before running.
 #
-# The lock path MUST match verify-all.sh exactly (same ROOT -> same cksum), so
-# do not "improve" one side without the other.
+# The lock path MUST match verify-all.sh exactly (same resolved .godot cache
+# path), so do not "improve" one side without the other.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,8 +32,14 @@ for a in "$@"; do
   esac
 done
 
+if ! command -v flock >/dev/null 2>&1; then
+  echo "godot-lock: flock is required to protect the shared .godot cache" >&2
+  exit 69
+fi
+
 mkdir -p /tmp/shooter
-LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
+GODOT_CACHE="$(realpath .godot 2>/dev/null || printf '%s' "$ROOT/.godot")"
+LOCK_FILE="/tmp/shooter/verify-all.${GODOT_CACHE//\//_}.lock"
 
 # A Node/timeout intermediary can sit between verify-all.sh and this wrapper,
 # so argv-based ancestor detection alone is not sufficient.  If any ancestor
@@ -113,7 +119,7 @@ if [ -n "$_gate_script" ] && [ -d /proc/self ]; then
 fi
 if [ "$_in_gate" -eq 1 ] || _lock_held_by_ancestor "$LOCK_FILE"; then
   echo "godot-lock: nested inside verify-all ($ROOT) — gate already holds the lock, skipping re-lock" >&2
-elif command -v flock >/dev/null 2>&1; then
+else
   exec 9>"$LOCK_FILE"
   if flock -n 9; then
     # Lock was FREE -> any `godot` already running is NOT holding it (bypass).

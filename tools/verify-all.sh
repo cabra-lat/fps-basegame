@@ -59,7 +59,6 @@ GODOT_BIN="${GODOT_BIN:-godot}"
 # PASS" actually present in the final file). VERIFY_LOG_DIR still forces an exact
 # path when a caller wants one.
 LOG_DIR="${VERIFY_LOG_DIR:-/tmp/shooter/verify.$$}"
-mkdir -p "$LOG_DIR"
 
 QUICK=0 WITH_EXPORT=0 NO_QA=0 QA_FAST=0 QA_SOFT=0
 
@@ -83,20 +82,33 @@ if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   echo "verify-all: godot not found (set GODOT_BIN)" >&2
   exit 64
 fi
+if ! command -v flock >/dev/null 2>&1; then
+  echo "verify-all: flock is required to protect the shared .godot cache" >&2
+  exit 69
+fi
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "verify-all: timeout is required to bound Godot processes" >&2
+  exit 69
+fi
+
+# ─── LOCKING: acquire the per-cache lock before any Godot/cache work ──────
+# Worktrees have separate source directories, but this checkout's .godot may be a
+# symlink to the main checkout's cache. Lock by the resolved cache path, not by
+# the worktree root, so every process touching that cache gets the same lock.
+mkdir -p /tmp/shooter
+GODOT_CACHE="$(realpath .godot 2>/dev/null || printf '%s' "$ROOT/.godot")"
+LOCK_FILE="/tmp/shooter/verify-all.${GODOT_CACHE//\//_}.lock"
+exec 9>"$LOCK_FILE"
+flock -w 900 9 || { echo "verify-all: FATAL: lock not acquired in 900s" >&2; exit 1; }
+
+mkdir -p "$LOG_DIR"
 
 # ─── PREFLIGHT: the addon harnesses live in a SEPARATE repo ──────────
-# A clean clone of THIS repo has no `addons/`: `.gitmodules` declares the
-# submodules but HEAD carries NO gitlink (mode 160000), so `git submodule update
-# --init` is a no-op. check_scripts.gd and EVERY harness live in the addon, so
-# without it the gate can only fail at gate 1 with a cryptic "Can't load script"
-# (meta, 2026-09-21). Say it plainly and stop, instead of printing per-gate
-# failures that look like code regressions.
+# The addon contains check_scripts.gd and the shared validation harnesses. A
+# missing checkout is an environment/setup failure, not a code regression.
 if [ ! -f "addons/cabra.lat_shooters/test/check_scripts.gd" ]; then
   echo "verify-all: FATAL: addons/cabra.lat_shooters is not checked out." >&2
-  echo "  The game repo has .gitmodules but NO gitlinks in HEAD, and .gitignore" >&2
-  echo "  ignores addons/, so a fresh clone has no addons/ and 'git submodule" >&2
-  echo "  update --init' is a no-op. The parse gate + every harness live in the" >&2
-  echo "  addon, so NOTHING can be verified here." >&2
+  echo "  Initialize the declared submodules or provide the addon checkout." >&2
   if [ -f .gitmodules ]; then
     echo "  Addons declared in .gitmodules  [status] path  url:" >&2
     while read -r _key path; do
@@ -105,9 +117,7 @@ if [ ! -f "addons/cabra.lat_shooters/test/check_scripts.gd" ]; then
       if [ -f "$path/.git" ] || [ -d "$path/.git" ]; then st="present"; else st="MISSING"; fi
       printf '    [%-7s] %s  %s\n' "$st" "$path" "${url:-?}" >&2
     done < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null)
-    echo "  To obtain (if submodules): git submodule update --init --recursive" >&2
-    echo "  (or clone each url above into its path). submodule-vs-vendored is the" >&2
-    echo "  user's decision; do not edit .gitignore/.gitmodules to force it." >&2
+    echo "  To obtain declared submodules: git submodule update --init --recursive" >&2
   fi
   exit 1
 fi
@@ -138,40 +148,35 @@ count_checks() { # logfile -> prints a check count or "?"
 #       "parse gate" that could never fail.
 CHECK_SCRIPTS_SCRIPT="res://addons/cabra.lat_shooters/test/check_scripts.gd"
 gate_import() {
-  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1 loop_hits
-  # Contention guard: other lanes call `godot --import` DIRECTLY (our per-repo flock
-  # does NOT cover them), and concurrent imports on the shared .godot/ can hang
-  # forever on a locked/stale file (verifier: `reimport | pistol_9mm_albedo.png`
-  # loop, exit 124, plus 34 leftover 0-byte .godot/imported/*.tmp). Drop that
-  # residue and BOUND the import; a real timeout is reported, never an infinite hang.
-  # Godot's import temp residue is named `<file>-<hash>.<fmt>.ctex-XXXXXX` (mktemp
-  # suffix), NOT `*.tmp` — so match BOTH. 0 non-zero files carry the `-XXXXXX`
-  # suffix, so this is precise (verifier, 2026-09-21).
+  local ilog="$LOG_DIR/import.log" clog="$LOG_DIR/check_scripts.log" rc errs crc cfail n attempt=1
+  local loop_stats loop_count loop_asset
+  # The lock is already held here. Remove only zero-byte import residue; never
+  # remove source .import files or generate repository files as a side effect.
   find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
   while :; do
-    if command -v timeout >/dev/null 2>&1; then
-      timeout 600 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
-    else
-      "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+    timeout 120 "$GODOT_BIN" --headless --path . --import >"$ilog" 2>&1; rc=$?
+
+    # Godot prefixes progress output with ANSI colour codes and appends a reset
+    # sequence to asset names. Strip those codes before grouping by asset. A high
+    # count for ONE asset is a deterministic stale-metadata loop, not ordinary
+    # contention. Scan after every attempt, including successful exits.
+    loop_stats="$(sed -n 's/.*reimport | //p' "$ilog" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=C sort | uniq -c | LC_ALL=C sort -nr | head -1 || true)"
+    loop_count="$(printf '%s\n' "$loop_stats" | awk 'NF {print $1; exit}')"
+    loop_asset="$(printf '%s\n' "$loop_stats" | awk 'NF {$1=""; sub(/^ /, ""); print; exit}')"
+    if [ "${loop_count:-0}" -gt 50 ]; then
+      record "import/parse" "FAIL" "import reimport loop detected: '$loop_asset' reimported $loop_count times. Fix the source .import metadata, then rerun (see $ilog)"
+      HARD_FAILS=$((HARD_FAILS + 1))
+      return
     fi
+
     [ "$rc" -ne 124 ] && break
-    # Distinguish a CONTENTION hang from a STALE-CACHE RETRY LOOP: the latter
-    # repeats the same UID reimport endlessly (`.godot/editor/filesystem_cache10`
-    # pointing at a deleted asset — range/verifier 2026-09-21). A SINGLE occurrence
-    # is benign (Godot falls back to `path=`), so trigger on REPETITION only.
-    loop_hits="$(grep -cE 'during file reimport|Unrecognized UID' "$ilog")"
-    if [ "$loop_hits" -gt 50 ]; then
-      record "import/parse" "FAIL" "import TIMED OUT in a STALE-CACHE RETRY LOOP ($loop_hits repeated reimport lines) — fix: rm -f .godot/uid_cache.bin .godot/editor/filesystem_cache10 && tools/godot-lock.sh --headless --path . --import (see $ilog)"
-      HARD_FAILS=$((HARD_FAILS + 1))
-      return
-    fi
     if [ "$attempt" -ge 2 ]; then
-      record "import/parse" "FAIL" "import TIMED OUT (600s x2) — concurrent 'godot --import' contention on .godot/ (see $ilog)"
+      record "import/parse" "FAIL" "import TIMED OUT (120s x2) — concurrent import contention or a non-repeating hang (see $ilog)"
       HARD_FAILS=$((HARD_FAILS + 1))
       return
     fi
-    echo "verify-all: import timed out (likely a concurrent 'godot --import'); waiting 15s + retry once" >&2
-    sleep 15
+    echo "verify-all: import timed out; waiting 5s + retry once" >&2
+    sleep 5
     find .godot/imported -maxdepth 1 -type f -size 0 \( -name '*.ctex-*' -o -name '*.tmp' \) -delete 2>/dev/null || true
     attempt=$((attempt + 1))
   done
@@ -201,8 +206,9 @@ gate_import() {
 # addon the runner could not fetch) is skipped rather than faked green.
 UID_REPOS=("." "addons/cabra.lat_shooters")
 gate_uid_tracking() {
-  local repo f n u total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log"
+  local repo total=0 checked=0 skipped="" details="" list="$LOG_DIR/uid_missing.log"
   local headf="$LOG_DIR/.uid_head" scr="$LOG_DIR/.uid_scripts" trk="$LOG_DIR/.uid_tracked"
+  local scr_uid="$LOG_DIR/.uid_script_uids" missing="$LOG_DIR/.uid_missing" orphan="$LOG_DIR/.uid_orphan"
   : >"$list"
   for repo in "${UID_REPOS[@]}"; do
     # Must be its OWN repo TOPLEVEL, not a subdirectory of a parent repo. If the
@@ -235,24 +241,22 @@ gate_uid_tracking() {
     # hidden dirs, so it NEVER generates a .uid for e.g. `.opencode/**/*.gd` — the
     # invariant would be unsatisfiable there (verifier: 152 false positives at HEAD
     # 31a5fcc). Content roots (src, scenes, the addon, resources, tools) are kept.
-    grep -E '\.(gd|gdshader|gdshaderinc)$' "$headf" | grep -vE '(^|/)\.' >"$scr"
-    grep -E '\.uid$' "$headf" | grep -vE '(^|/)\.' >"$trk"
-    n=0
-    while IFS= read -r f; do
-      [ -z "$f" ] && continue
-      if ! grep -qxF "$f.uid" "$trk"; then
-        printf '%s/%s (script without .uid)\n' "$repo" "$f" >>"$list"
-        n=$((n + 1))
-      fi
-    done <"$scr"
-    while IFS= read -r u; do
-      [ -z "$u" ] && continue
-      if ! grep -qxF "${u%.uid}" "$scr"; then
-        printf '%s/%s (uid without script)\n' "$repo" "$u" >>"$list"
-        n=$((n + 1))
-      fi
-    done <"$trk"
+    grep -E '\.(gd|gdshader|gdshaderinc)$' "$headf" | grep -vE '(^|/)\.' | LC_ALL=C sort >"$scr"
+    grep -E '\.uid$' "$headf" | grep -vE '(^|/)\.' | LC_ALL=C sort >"$trk"
+    sed 's/$/.uid/' "$scr" | LC_ALL=C sort >"$scr_uid"
+    comm -23 "$scr_uid" "$trk" >"$missing"
+    comm -13 "$scr_uid" "$trk" >"$orphan"
+    n="$(wc -l <"$missing")"
+    n=$((n + $(wc -l <"$orphan")))
     if [ "$n" -gt 0 ]; then
+      while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        printf '%s/%s (script without .uid)\n' "$repo" "${f%.uid}" >>"$list"
+      done <"$missing"
+      while IFS= read -r u; do
+        [ -z "$u" ] && continue
+        printf '%s/%s (uid without script)\n' "$repo" "$u" >>"$list"
+      done <"$orphan"
       total=$((total + n))
       details+="$repo:$n "
     fi
@@ -404,22 +408,6 @@ gate_export() {
 echo "=== verify-all ===  root=$ROOT  godot=$("$GODOT_BIN" --version 2>/dev/null)"
 echo "logs: $LOG_DIR"
 echo ""
-
-# Serialize concurrent verify-all runs. Two Godot processes importing/loading
-# against the SAME .godot/ cache can corrupt it and make a harness fail
-# spuriously (meta saw market 7/45 with "invalid UID"/"Resource file not found",
-# green again after a solo --import) — the same class of race the per-run LOG_DIR
-# above fixes for the logs. flock makes a second run WAIT instead of race; the
-# timeout is generous so a genuinely stuck run cannot block forever.
-mkdir -p /tmp/shooter
-if command -v flock >/dev/null 2>&1; then
-  # Per-REPO lock (keyed on the repo root): the lock protects THIS project's
-  # .godot/ cache, so a clone or a second checkout must not block on it. meta hit
-  # a 300s hang from the old fixed path while a clone waited on the main repo.
-  LOCK_FILE="/tmp/shooter/verify-all.$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).lock"
-  exec 9>"$LOCK_FILE"
-  flock -w 900 9 || echo "verify-all: WARNING: lock not acquired in 900s; proceeding (results may be flaky)" >&2
-fi
 
 gate_import
 gate_uid_tracking
