@@ -27,3 +27,18 @@ assets/models/weapon_thirty_twelve/
 
 # Local Laya decision-model weights (large, fetched per-machine)
 laya-models/
+
+# glTF embedded-texture extraction output (Godot writes these on every cold
+# import of the model, as <glb_stem>_<image_name>.png next to the .glb).
+# Listed one path per line, never as a glob, so authored art whose name happens
+# to contain underscores stays visible to git. Each is a byte-identical
+# duplicate of a tracked texture, so nothing references these copies:
+#   scope_Material_albedo.png      == assets/models/weapon_aglc/scope_material.png
+#   PSX_Battle_Rifle_T_Battle.png  == assets/models/weapon_battle_rifle/PSX_Battle_Rifle_T_Battle_Rifle.png
+# (md5 955fa408d8b72bc8c3af0f9a43e57038 and 7c75d2d5831bc31f188940a5c424cdf3)
+# Note: this hides the files from `git status`; it does NOT stop Godot from
+# writing them or from packing them into an export.
+assets/models/weapon_aglc/scope_Material_albedo.png
+assets/models/weapon_aglc/scope_Material_albedo.png.import
+assets/models/weapon_battle_rifle/PSX_Battle_Rifle_T_Battle.png
+assets/models/weapon_battle_rifle/PSX_Battle_Rifle_T_Battle.png.import
