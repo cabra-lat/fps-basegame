@@ -3,23 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://civchvcghlx8q"
-path.s3tc="res://.godot/imported/PS1 ar15_0.png-3cd72ded107f97db442a7a9553fec984.s3tc.ctex"
+path="res://.godot/imported/PS1 ar15_0.png-3cd72ded107f97db442a7a9553fec984.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
-}
-generator_parameters={
-"md5": "180d37dec31ea54e9cf4398bb86e7ae7"
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/models/weapon_ar15/PS1 ar15_0.png"
-dest_files=["res://.godot/imported/PS1 ar15_0.png-3cd72ded107f97db442a7a9553fec984.s3tc.ctex"]
+dest_files=["res://.godot/imported/PS1 ar15_0.png-3cd72ded107f97db442a7a9553fec984.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -27,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -41,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=0
+detect_3d/compress_to=1
