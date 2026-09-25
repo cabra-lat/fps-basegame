@@ -18,6 +18,7 @@ const SOURCE_FILES := [
 	"res://scenes/raid1_scenario.gd",
 	"res://scenes/arena_manager_core.gd",
 	"res://scenes/extraction_point.gd",
+	"res://scenes/arena_manager.gd",
 ]
 ## Every key those files use, plus the ItemNames registry. This is the
 ## catalogue contract: a new call site without an entry here fails, and an entry
@@ -44,6 +45,18 @@ const DECLARED_KEYS := [
 	"Marked Intel",
 	"marked intel not extracted",
 	"Failure: intel not collected — kit lost",
+	# Market surface. The next two are the purchase feed in arena_manager.gd; the
+	# rest are the item registry, asserted by _check_market_surface.
+	"Bought: %s",
+	"Bought %s",
+	"an item",
+	"5.56x45mm Ammo",
+	"Red Dot Sight",
+	"Muzzle Suppressor",
+	"M4 Carbine",
+	"Army Bandage",
+	"CAT Hemostatic Tourniquet",
+	"First Aid Kit",
 ]
 ## A key that is deliberately absent, used to prove the invariant has teeth.
 const MISSING_PROBE := "__i18n_missing_probe__"
@@ -72,6 +85,10 @@ func _initialize() -> void:
 	_check_item_registry()
 	_check_helpers_are_translation_backed()
 	_check_gated_reason_is_localized()
+	_check_registry_ids_match_their_resources()
+	_check_every_offered_item_is_registered()
+	_check_purchase_feed_is_localized()
+	_check_market_call_site_uses_the_registry()
 	print("i18n probe: checks=%d passed=%d" % [_checks, _passed])
 	print("  passed  %d" % _passed)
 	# verify-all.mjs gates on this exact marker, so a missing translation entry
@@ -175,6 +192,137 @@ func _check_gated_reason_is_localized() -> void:
 
 ## Keys in `subject` that are not in `other`, or (when `missing_only` is false)
 ## keys in `other` that are not in `subject`.
+## The market surface, end to end, because this is the class of defect that a
+## screenshot cannot catch: a display path that BYPASSES the registry and looks
+## correct until a human reads the string. Buying the marked intel used to render
+## "Comprou marked intel", an English noun inside a Portuguese sentence, because
+## arena_manager.gd read item.name off the .tres while every other surface
+## resolved through ItemNames.
+func _check_purchase_feed_is_localized() -> void:
+	var intel := load("res://resources/raid1/marked_intel.tres")
+	if intel == null:
+		_check(false,
+			"I18N-MKT purchase_feed_uses_the_registry: marked_intel.tres missing — cannot exercise the purchase feed (F-MKT: a display path that bypasses ItemNames renders the .tres name)")
+		return
+	var resolved := ItemNames.display_name_for_item(intel)
+	var line := TranslationServer.translate("Bought %s") % resolved
+	var tres_name := String(intel.name)
+	_check(resolved != "" and resolved != tres_name,
+		"I18N-MKT registry_wins_over_the_tres_name: tres='%s' resolves to '%s' (F-MKT: a display path that bypasses ItemNames renders the .tres name)" % [tres_name, resolved])
+	_check(line.contains(resolved) and not line.contains(tres_name),
+		"I18N-MKT purchase_feed_is_fully_portuguese: '%s' (F-MKT: English noun inside a Portuguese sentence)" % line)
+	# The raw name must be a FALLBACK, not the answer: a registry entry is what
+	# makes the difference, so an unregistered id has to resolve to nothing and
+	# leave the choice to the caller rather than silently returning a name.
+	_check(ItemNames.display_name("__not_registered__") == "",
+		"I18N-MKT unregistered_resolves_to_nothing: callers must fall back deliberately (F-MKT: a silent default would hide every future unregistered item)")
+	# The WRAPPER case, which is what a purchase actually returns. Added because
+	# driving the real _market_buy showed the leak surviving the fix: the buy
+	# hands back an InventoryItem whose resource_path is EMPTY, so resolving by
+	# the wrapper's own path returned "" and the caller fell back to the .tres
+	# name. Asserting the .tres case alone would have stayed green through it.
+	var wrapped := ItemCodec.item_from_path("res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres")
+	var wrapped_name := ItemNames.display_name_for_item(wrapped)
+	_check(wrapped_name != "" and wrapped_name != "5_56_45mm_SS109_VPAM_PM7",
+		"I18N-MKT wrapper_resolves_too: the InventoryItem a purchase returns resolves to '%s' (F-MKT: InventoryItem.resource_path is empty; a wrapper must resolve through ItemCodec.content_path)" % wrapped_name)
+
+## The check above composes the line ITSELF, which proves the mechanism works but
+## says nothing about whether the real call site uses it. Measured: reverting
+## _market_buy to `item.name` left that check GREEN, because the harness never
+## ran the function. Driving _market_buy needs a live MetaService, a profile and
+## an offer index, and a harness that constructs a market and asserts on a
+## rendered feed line is a second subsystem's worth of fixture. So this asserts
+## the call site directly instead, in the only way that can fail today: the
+## registry lookup must be present, must come BEFORE the raw .tres name, and the
+## raw name must sit behind an emptiness check so it is a fallback rather than
+## the answer. Re-run the sabotage (restore `var nm: String = item.name ...` in
+## _market_buy) and this fails.
+func _check_market_call_site_uses_the_registry() -> void:
+	var body := _function_body("res://scenes/arena_manager.gd", "_market_buy")
+	if body == "":
+		_check(false, "I18N-MKT market_call_site_uses_the_registry: _market_buy not found in arena_manager.gd (F-MKT: a renamed or moved call site would go unchecked)")
+		return
+	var registry_at := body.find("ItemNames.display_name_for_item")
+	var raw_at := body.find(".name")
+	var guard_at := body.find("== \"\"")
+	_check(registry_at >= 0,
+		"I18N-MKT market_call_site_uses_the_registry: _market_buy does not consult ItemNames (F-MKT: the purchase line bypasses the registry and renders the .tres name)")
+	_check(registry_at >= 0 and (raw_at < 0 or registry_at < raw_at) and guard_at > registry_at,
+		"I18N-MKT market_call_site_uses_the_registry: the raw .tres name is read before the registry, or is not behind an emptiness check (registry@%d raw@%d guard@%d) — precedence is the whole fix, a fallback that runs first is the defect again" % [registry_at, raw_at, guard_at])
+
+## The source text of one function, so a call site can be asserted without
+## building the object it belongs to. Empty when the function is not found.
+func _function_body(path: String, func_name: String) -> String:
+	var text := _read(path)
+	var start := text.find("func %s(" % func_name)
+	if start < 0:
+		return ""
+	var next := text.find("\nfunc ", start + 1)
+	return text.substr(start, next - start) if next > 0 else text.substr(start)
+## resource must be loadable. This is what keeps `id_for_path` honest instead of
+## a convention nobody checks: add an id whose file is named differently and the
+## market silently falls back to the .tres name.
+func _check_registry_ids_match_their_resources() -> void:
+	var mismatched: Array[String] = []
+	for id in ItemNames.registered_ids():
+		var found := ""
+		for path in _trader_item_paths():
+			if path.get_file().get_basename() == id:
+				found = path
+				break
+		if found == "" and FileAccess.file_exists("res://resources/raid1/%s.tres" % id):
+			found = "res://resources/raid1/%s.tres" % id
+		if found == "" or ItemNames.id_for_path(found) != id or load(found) == null:
+			mismatched.append(id)
+	_check(mismatched.is_empty(),
+		"I18N-MKT registered_ids_resolve_from_their_resource: mismatched: %s (an id whose file is named differently would silently fall back to the .tres name)" % ", ".join(mismatched))
+
+## The strong half: nothing a trader can sell or barter may be missing from the
+## registry, because that is exactly how "Comprou marked intel" happened. Adding
+## an offer without registering its item fails here rather than shipping English.
+func _check_every_offered_item_is_registered() -> void:
+	var paths := _trader_item_paths()
+	var unregistered: Array[String] = []
+	for path in paths:
+		if ItemNames.display_name_for_path(path) == "":
+			unregistered.append(path)
+	_check(not paths.is_empty() and unregistered.is_empty(),
+		"I18N-MKT every_offered_item_is_registered: unregistered: %s (adding an offer without registering its item is how 'Comprou marked intel' shipped)" % ", ".join(unregistered))
+
+## Offer and barter item paths, read from the trader resources rather than
+## hardcoded here, so a new offer cannot slip past the check by omission. Split
+## into helpers because the nesting limit is 5 and the inline version hit 6.
+func _trader_item_paths() -> Array[String]:
+	var out: Array[String] = []
+	for trader_path in ["res://resources/meta/traders/field_surgeon.tres",
+			"res://resources/meta/traders/quartermaster.tres",
+			"res://resources/meta/traders/gunsmith.tres"]:
+		var trader := load(trader_path) as Resource
+		if trader == null:
+			continue
+		# A typed local, no `or []` idiom: an empty Dictionary is FALSY in GDScript,
+		# so `get("barter_required") or {}` changes type with the data and `x or []`
+		# returns the bool when x is a non-empty array.
+		var offers: Array = trader.get("offers")
+		for offer in offers:
+			_collect_offer_paths(out, offer as Resource)
+	return out
+
+
+func _collect_offer_paths(out: Array[String], offer: Resource) -> void:
+	if offer == null:
+		return
+	_append_path(out, String(offer.get("item_path")))
+	var barter: Variant = offer.get("barter_required")
+	if barter is Dictionary:
+		for path in barter:
+			_append_path(out, String(path))
+
+
+func _append_path(out: Array[String], path: String) -> void:
+	if path != "" and not out.has(path):
+		out.append(path)
+
 func _keys_in(subject: Array, missing_only: bool, other: Array) -> Array[String]:
 	var out: Array[String] = []
 	if missing_only:

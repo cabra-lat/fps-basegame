@@ -22,6 +22,14 @@ func is_barter() -> bool:
 func item_name() -> String:
 	if item_path == "":
 		return "?"
+	# Resolved through ItemNames so the market row and the purchase feed speak the
+	# same language as the rest of the HUD. Falls back to the .tres name when the
+	# item is not registered, which the i18n invariant forbids for anything a
+	# trader can actually sell.
+	var localized := ItemNames.display_name_for_path(item_path)
+	if localized != "":
+		return localized
+	push_warning("TraderOffer: '%s' has no ItemNames entry; rendering the .tres name" % item_path)
 	var res := load(item_path)
 	return String(res.name) if res != null else item_path.get_file()
 
@@ -38,5 +46,8 @@ func sell_text() -> String:
 	return "—" if sell_price <= 0 else "%d cr" % sell_price
 
 func _short_name(path: String) -> String:
+	var localized := ItemNames.display_name_for_path(path)
+	if localized != "":
+		return localized
 	var res := load(path)
 	return String(res.name) if res != null else path.get_file()

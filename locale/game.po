@@ -80,3 +80,37 @@ msgstr "intel marcado não foi extraído"
 
 msgid "Failure: intel not collected — kit lost"
 msgstr "Falha: intel não coletado — kit perdido"
+
+# ── Market surface: trader offers and the purchase feed ─────────────
+# Every item a trader can sell is registered in src/meta/item_names.gd, and
+# validate_i18n.gd fails if one is not. The msgids are the English source names.
+
+msgid "5.56x45mm Ammo"
+msgstr "Munição 5.56x45mm"
+
+msgid "Red Dot Sight"
+msgstr "Mira dot vermelho"
+
+msgid "Muzzle Suppressor"
+msgstr "Supressor de boca"
+
+msgid "M4 Carbine"
+msgstr "Carabina M4"
+
+msgid "Army Bandage"
+msgstr "Bandagem de campanha"
+
+msgid "CAT Hemostatic Tourniquet"
+msgstr "Torniqueto hemostático"
+
+msgid "First Aid Kit"
+msgstr "Kit de primeiros socorros"
+
+msgid "an item"
+msgstr "um item"
+
+msgid "Bought: %s"
+msgstr "Comprado: %s"
+
+msgid "Bought %s"
+msgstr "Comprou %s"
