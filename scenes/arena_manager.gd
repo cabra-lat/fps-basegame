@@ -250,7 +250,14 @@ func _show_result(out_name: String, exp: int) -> void:
 	death_label.visible = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	# freeze combat: stop waves, pause bots' aggression by pausing physics.
-	for b in get_tree().get_nodes_in_group("bots"):
+	# Guard the accessor, not the value it returns: `get_tree()` is null once this
+	# node leaves the tree, which is the settlement/teardown window that produced the
+	# bot.gd:1185 deref. Every line above has already run by this point, so returning
+	# here leaves the player with a correct result panel and skips only the freeze.
+	var tree := get_tree()
+	if tree == null:
+		return
+	for b in tree.get_nodes_in_group("bots"):
 		if b is NpcBot:
 			(b as NpcBot).set_physics_process(false)
 
@@ -290,9 +297,18 @@ func _slots_line() -> String:
 func _show_damage_direction() -> void:
 	if dir_marker == null or player == null or player.camera == null:
 		return
+	# Same receiver-guard as _show_result and bot.gd:1185. The check above tests the
+	# values about to be dereferenced, but `get_tree()` is the receiver and can be null
+	# on its own. Reached from _on_player_damaged via health_changed, so the
+	# settlement path that exposed the bot.gd site does not cover it. The static
+	# chain is verified; the dynamic half is NOT: spotter runs log damage_events=0
+	# with HP stuck at -1.0, so this call has never been observed firing.
+	var tree := get_tree()
+	if tree == null:
+		return
 	var best: NpcBot = null
 	var best_d := INF
-	for n in get_tree().get_nodes_in_group("bots"):
+	for n in tree.get_nodes_in_group("bots"):
 		if n is NpcBot and (n as NpcBot).is_alive():
 			var d: float = player.global_position.distance_squared_to((n as Node3D).global_position)
 			if d < best_d:
