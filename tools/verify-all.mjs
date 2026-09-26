@@ -147,6 +147,72 @@ function harnessScript(name) {
   return entry[1];
 }
 
+// MINIMUM CHECK COUNT per gated harness. A floor, not a target: adding checks
+// must stay free (a harness that legitimately grows passes with no edit here),
+// and LOSING checks must never be silent.
+//
+// What this is for, narrowly. The loud case is already covered: gateHarness
+// below fails a harness whose log contains SCRIPT ERROR lines, so a compile
+// error in the class under test — which kills the check functions that touch it
+// and leaves the survivors reporting RESULT: PASS — is already a red gate. What
+// is NOT covered is quiet truncation: a deleted check, a check skipped behind a
+// guard, a renamed function whose checks nobody notices are gone, or a log whose
+// count cannot be parsed at all. Those all produce a green gate today, and a
+// green gate that is missing a third of itself is indistinguishable from success
+// in the output.
+//
+// A missing key is a hard failure on purpose. A floor someone has to remember
+// to write is a floor the next harness added will be missing, and a default of
+// zero-and-ignore is exactly the silent pass this exists to prevent. When you
+// register a harness in HARNESS_SCRIPTS, add its count here in the same commit.
+//
+// Values are the counts the tree produced on 2026-09-26 (verify-all from the
+// repository root). Raise a floor when you add checks to that harness; never
+// lower one to make a run green. inventory_ux is 77 rather than the 102 this
+// tree shows with the unlanded node-reuse patch applied: the floor describes
+// what the COMMITTED harness does, so it is not a reason for a red gate on
+// every other lane's checkout while that patch waits to land.
+const MIN_CHECKS = {
+  assets: 123,
+  ballistics: 52,
+  weapon_mechanics: 45,
+  inventory_ux: 77,
+  meta_persistence: 126,
+  meta_progression: 44,
+  meta_market: 61,
+  meta_flea: 35,
+  meta_deploy_raid: 42,
+  i18n: 12,
+  invariants: 40,
+  locomotion_orientation: 63,
+  factions: 63,
+  raid1_scenario: 22,
+  gunsmith_preview: 83,
+  arena_spawn: 60,
+};
+// check_scripts is intentionally absent: it runs as the import/parse gate and
+// never goes through gateHarness, so there is no countChecks() to compare.
+
+// Returns null when the run is within its floor, or the reason it is not.
+// countChecks() returns the string '?' when it cannot find a count, which is
+// itself a violation: a harness whose count cannot be read cannot be floored,
+// and treating that as a pass is the same silent green this guards against.
+function floorViolation(name, text) {
+  const floor = MIN_CHECKS[name];
+  if (floor === undefined) {
+    return `no MIN_CHECKS entry for '${name}' in tools/verify-all.mjs — an unfloored harness can lose checks silently; add its count in the same commit that registers it`;
+  }
+  const reported = countChecks(text);
+  if (reported === '?') {
+    return `could not read a check count from the log (countChecks returned '?') — a harness whose count cannot be read cannot be floored`;
+  }
+  const count = Number(reported);
+  if (count < floor) {
+    return `${count} checks, floor is ${floor}: checks were lost, not passed`;
+  }
+  return null;
+}
+
 const resToPath = (script) => join(ROOT, script.replace(/^res:\/\//, ''));
 
 // EXISTENCE PREFLIGHT, before the import. A registered path that is not on disk
@@ -438,6 +504,14 @@ async function gateHarness(name, script) {
     const scriptErrors = countMatches(text, /^SCRIPT ERROR/gm);
     const invalidUid = countMatches(text, /invalid UID/g);
     if (result.code === 0 && /RESULT: PASS/.test(text) && loadErrors === 0 && scriptErrors === 0) {
+      // Floor check, after the existing pass predicate and without touching it:
+      // a harness that passed but reported fewer checks than this tree expects
+      // has lost checks, and must not be recorded as a pass.
+      const floorProblem = floorViolation(name, text);
+      if (floorProblem) {
+        record(name, 'FAIL', `${floorProblem} (see ${result.log})`);
+        return;
+      }
       record(name, 'PASS', `${countChecks(text)} checks${invalidUid ? ` (${invalidUid} invalid-UID warning(s))` : ''}${attempt > 1 ? ' (retried after re-import)' : ''}`);
       return;
     }
