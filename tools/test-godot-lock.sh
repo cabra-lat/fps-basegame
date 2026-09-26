@@ -272,6 +272,34 @@ case "${GODOT_LOCK_TEST_FLAKE:-}" in
   always) echo "  FAIL  deliberate permanent flake (proves the gate does NOT mask a real failure)"; FAIL=$((FAIL + 1)) ;;
 esac
 
+echo "[F3] a repeated --path is rejected, not resolved"
+# Godot honours the LAST occurrence (measured: an invalid path aborts in either
+# order). A guard that validates the first and forwards both is therefore not a
+# conservative check, it is a bypass - and the failure runs the dangerous way.
+OUT="$(GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --headless --path . --path /tmp/shooter/othertree --import 2>&1)"
+RC=$?
+printf '%s\n' "$OUT" | sed 's/^/    | /'
+[ "$RC" -eq 64 ];                                   check "safe-first/foreign-last is REFUSED, not forwarded" $? "rc=$RC"
+lacks "GODOT-RAN";                                   check "Godot is not run against the foreign tree" $?
+has "was given 2 times";                             check "says the flag was repeated" $?
+has "Godot honours the LAST";                        check "states which occurrence Godot uses, and why that matters" $?
+
+OUT="$(GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --headless --path /tmp/shooter/othertree --path . --import 2>&1)"
+RC=$?
+[ "$RC" -eq 64 ];                                   check "foreign-first/safe-last is refused too (no guessing which was meant)" $? "rc=$RC"
+
+OUT="$(GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --headless --path=. --path=/tmp/shooter/othertree --import 2>&1)"
+RC=$?
+[ "$RC" -eq 64 ];                                   check "the --path=VALUE form is counted the same way" $? "rc=$RC"
+
+echo "[F4] the allowed subdirectory substitution says so"
+OUT="$(cd "$ROOT/scenes" && GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --headless --path . --import 2>&1)"
+RC=$?
+printf '%s\n' "$OUT" | sed 's/^/    | /'
+[ "$RC" -eq 0 ];                                     check "still allowed from a subdirectory (exit 0)" $?
+has "pwd=$ROOT";                                     check "and it opened the repo root, not the subdirectory" $?
+has "note: called from";                             check "but it says the substitution happened (QA: a deliberate exception nobody can see is not deliberate)" $?
+
 printf '\n  %d passed, %d failed\n' "$PASS" "$FAIL"
 if [ "$FAIL" -ne 0 ]; then
   echo "RESULT: FAIL"

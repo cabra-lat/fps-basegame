@@ -136,6 +136,13 @@ elif [ "$CALLER_INSIDE" -eq 0 ] && [ "$ALLOW_CROSS_TREE" -eq 0 ]; then
 fi
 if [ "$PROJECT_DIR" != "$ROOT_RESOLVED" ] || [ "$CALLER_INSIDE" -eq 0 ]; then
   echo "godot-lock: WARNING: --allow-cross-tree given; the lock protects ${ROOT}/.godot while Godot will open ${PROJECT_DIR} (your cwd was ${CALLER_CWD})" >&2
+elif [ "$CALLER_RESOLVED" != "$ROOT_RESOLVED" ]; then
+  # The deliberate exception, made visible. This IS a substitution - a relative
+  # --path resolves against ROOT, not the caller's directory - and allowing it
+  # is correct because the repo root is the only Godot project. But silence here
+  # would make the allowed case indistinguishable from the bug this guard exists
+  # to catch, and a deliberate exception nobody can see is not deliberate.
+  echo "godot-lock: note: called from ${CALLER_CWD} (a subdirectory), so a relative --path resolved to the repo root ${ROOT}" >&2
 fi
 
 if ! command -v flock >/dev/null 2>&1; then
@@ -144,6 +151,40 @@ if ! command -v flock >/dev/null 2>&1; then
 fi
 
 mkdir -p /tmp/shooter
+
+# A REPEATED `--path` is rejected rather than resolved. Measured against the
+# real binary: `godot --path <valid> --path <invalid>` aborts with "Invalid
+# project path specified", and so does the reverse order — Godot honours the
+# LAST occurrence, not the first. That makes a single-occurrence check a bypass
+# rather than a guess: validating the first value while Godot opens the last is
+# exactly the "validate one thing, ship another" shape, and the failure is not
+# a false refusal but a foreign tree walked straight through.
+#
+# This is also the third instance tonight of one class — a repeated flag parsed
+# by more than one party, with the parties disagreeing. The fix is to remove the
+# ambiguity, not to pick a winner: nobody can know which occurrence a caller
+# MEANT, so the honest answer is to refuse and name both values.
+_path_count=0
+_path_seen=""
+_prev=""
+for a in "$@"; do
+  if [ "$_prev" = "--path" ]; then
+    _path_count=$((_path_count + 1))
+    _path_seen="${_path_seen} '${a}'"
+  fi
+  case "$a" in
+    --path=*) _path_count=$((_path_count + 1)); _path_seen="${_path_seen} '${a#--path=}'" ;;
+  esac
+  _prev="$a"
+done
+if [ "$_path_count" -gt 1 ]; then
+  echo "godot-lock: REFUSING: --path was given ${_path_count} times (${_path_seen# })" >&2
+  echo "godot-lock:        this wrapper validates ONE of them, and Godot honours the LAST" >&2
+  echo "godot-lock:        (measured: an invalid path aborts in either order), so validating the" >&2
+  echo "godot-lock:        first would pass a foreign tree straight through to Godot" >&2
+  echo "godot-lock:        pass exactly one --path" >&2
+  exit 64
+fi
 GODOT_CACHE="$(realpath .godot 2>/dev/null || printf '%s' "$ROOT/.godot")"
 LOCK_FILE="${GODOT_LOCK_FILE:-/tmp/shooter/verify-all.${GODOT_CACHE//\//_}.lock}"
 
