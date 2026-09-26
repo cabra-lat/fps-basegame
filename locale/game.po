@@ -115,6 +115,15 @@ msgstr "Comprado: %s"
 msgid "Bought %s"
 msgstr "Comprou %s"
 
+msgid "Rejected: %s"
+msgstr "Recusado: %s"
+
+msgid "Sold for %d cr"
+msgstr "Vendido por %d cr"
+
+msgid "Sold %d cr"
+msgstr "Vendeu por %d cr"
+
 # ── Operations hub ───────────────────────────────────────────────────
 # The loadout payload carries English source strings and the hub translates at
 # render time, so the meta service and the controller must use the SAME key --

@@ -52,6 +52,9 @@ const DECLARED_KEYS := [
 	# rest are the item registry, asserted by _check_market_surface.
 	"Bought: %s",
 	"Bought %s",
+	"Rejected: %s",
+	"Sold for %d cr",
+	"Sold %d cr",
 	"an item",
 	"5.56x45mm Ammo",
 	"Red Dot Sight",
@@ -326,17 +329,77 @@ func _check_flea_listing_resolves_through_the_registry() -> void:
 ## the answer. Re-run the sabotage (restore `var nm: String = item.name ...` in
 ## _market_buy) and this fails.
 func _check_market_call_site_uses_the_registry() -> void:
-	var body := _function_body("res://scenes/arena_manager.gd", "_market_buy")
-	if body == "":
-		_check(false, "I18N-MKT market_call_site_uses_the_registry: _market_buy not found in arena_manager.gd (F-MKT: a renamed or moved call site would go unchecked)")
-		return
-	var registry_at := body.find("ItemNames.display_name_for_item")
-	var raw_at := body.find(".name")
-	var guard_at := body.find("== \"\"")
-	_check(registry_at >= 0,
-		"I18N-MKT market_call_site_uses_the_registry: _market_buy does not consult ItemNames (F-MKT: the purchase line bypasses the registry and renders the .tres name)")
-	_check(registry_at >= 0 and (raw_at < 0 or registry_at < raw_at) and guard_at > registry_at,
-		"I18N-MKT market_call_site_uses_the_registry: the raw .tres name is read before the registry, or is not behind an emptiness check (registry@%d raw@%d guard@%d) — precedence is the whole fix, a fallback that runs first is the defect again" % [registry_at, raw_at, guard_at])
+	var path := "res://scenes/arena_manager.gd"
+	# ENUMERATED BY BEHAVIOUR, NOT BY A NAME LIST. QA's review found this check
+	# bound to "_market_buy" while three of the four untranslated market strings
+	# lived in "_market_sell" -- and the failure message said "_market_buy not
+	# found", so renaming the function produced a message about losing the check
+	# while ADDING a sibling produced silence. A check pinned to one name reports
+	# green on a function it never read.
+	#
+	# Part 1: every assignment into market_msg goes through tr(). Located by
+	# scanning for the assignment, so a NEW market function is covered the day it
+	# is written rather than the day someone remembers to extend a list.
+	var writers := _functions_assigning(path, "market_msg.text")
+	_check(writers.size() >= 2,
+		"I18N-MKT market_writers_found: expected at least the buy and sell paths (found %s) (F-MKT: if this drops, the market surface moved and the check is reading the wrong file)" % ", ".join(writers))
+	for func_name in writers:
+		var body := _function_body(path, func_name)
+		for line in body.split("\n"):
+			if not line.contains("market_msg.text ="):
+				continue
+			_check(line.contains("tr("),
+				"I18N-MKT market_line_is_translated: %s writes market_msg without tr(): %s (F-MKT: a hardcoded string on one path makes the screen read one language above the other)" % [func_name, line.strip_edges()])
+
+	# Part 2: the registry-precedence half, required wherever an item name is
+	# rendered. Located by what the code DOES (it calls the registry) rather than
+	# by the name of the function that does it, so a rename cannot detach the
+	# check from its subject.
+	var registry_users := _functions_calling(path, "ItemNames.display_name_for_item")
+	_check(not registry_users.is_empty(),
+		"I18N-MKT market_call_site_uses_the_registry: nothing calls ItemNames.display_name_for_item in arena_manager.gd (F-MKT: a rename or move leaves the purchase line rendering the .tres name)")
+	for func_name in registry_users:
+		var body := _function_body(path, func_name)
+		var registry_at := body.find("ItemNames.display_name_for_item")
+		var raw_at := body.find(".name")
+		var guard_at := body.find("== \"\"")
+		_check(raw_at < 0 or (registry_at < raw_at and guard_at > registry_at),
+			"I18N-MKT market_call_site_uses_the_registry: in %s the raw .tres name is read before the registry, or is not behind an emptiness check (registry@%d raw@%d guard@%d) -- precedence is the whole fix, a fallback that runs first is the defect again" % [func_name, registry_at, raw_at, guard_at])
+
+## Every function in `path` that assigns `needle`, by name. Derived from the file
+## at run time, so renaming or adding a function cannot silently drop it out of a
+## check that was written against a hardcoded name.
+func _functions_assigning(path: String, needle: String) -> Array[String]:
+	return _functions_matching(path, needle, func(body: String) -> bool: return body.contains(needle + " ="))
+
+## As _functions_assigning, for a call rather than an assignment.
+func _functions_calling(path: String, needle: String) -> Array[String]:
+	return _functions_matching(path, needle, func(body: String) -> bool: return body.contains(needle))
+
+## Walks `path` for function headers and returns those whose body satisfies
+## `predicate`. A `func` mention inside a comment is skipped, because a comment
+## is not a subject and a check that can be satisfied by prose is the failure
+## mode this whole file keeps running into.
+func _functions_matching(path: String, needle: String, predicate: Callable) -> Array[String]:
+	var out: Array[String] = []
+	var text := _strip_comments(_read(path))
+	var at := 0
+	while at < text.length():
+		var start := text.find("func ", at)
+		if start < 0:
+			break
+		var paren := text.find("(", start)
+		if paren < 0:
+			break
+		var name := text.substr(start + 5, paren - start - 5).strip_edges()
+		at = start + 5
+		if name.is_empty() or not name.is_valid_identifier() or out.has(name):
+			continue
+		var next := text.find("\nfunc ", paren)
+		var body := text.substr(start, next - start) if next > 0 else text.substr(start)
+		if predicate.call(body):
+			out.append(name)
+	return out
 
 ## The source text of one function, so a call site can be asserted without
 ## building the object it belongs to. Empty when the function is not found.

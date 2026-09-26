@@ -208,17 +208,17 @@ func _market_buy(index: int) -> void:
 		market_msg.text = tr("Bought: %s") % nm
 		_push_feed(tr("Bought %s") % nm)
 	else:
-		market_msg.text = "Recusado: %s" % String(r.get("reason", "?"))
+		market_msg.text = tr("Rejected: %s") % String(r.get("reason", "?"))
 	meta.persist()
 	_refresh_market()
 
 func _market_sell(index: int) -> void:
 	var r: Dictionary = meta.sell(_market_trader, index)
 	if r.get("ok", false):
-		market_msg.text = "Vendido por %d cr" % int(r.get("price", 0))
-		_push_feed("Vendeu por %d cr" % int(r.get("price", 0)))
+		market_msg.text = tr("Sold for %d cr") % int(r.get("price", 0))
+		_push_feed(tr("Sold %d cr") % int(r.get("price", 0)))
 	else:
-		market_msg.text = "Recusado: %s" % String(r.get("reason", "?"))
+		market_msg.text = tr("Rejected: %s") % String(r.get("reason", "?"))
 	meta.persist()
 	_refresh_market()
 
