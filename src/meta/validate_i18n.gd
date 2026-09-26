@@ -491,7 +491,6 @@ func _trader_item_paths() -> Array[String]:
 			_collect_offer_paths(out, offer as Resource)
 	return out
 
-
 func _collect_offer_paths(out: Array[String], offer: Resource) -> void:
 	if offer == null:
 		return
@@ -500,7 +499,6 @@ func _collect_offer_paths(out: Array[String], offer: Resource) -> void:
 	if barter is Dictionary:
 		for path in barter:
 			_append_path(out, String(path))
-
 
 func _append_path(out: Array[String], path: String) -> void:
 	if path != "" and not out.has(path):
@@ -561,7 +559,6 @@ func _check_hub_renders_portuguese_in_both_states() -> void:
 		"I18N-HUB faction_line_is_portuguese: '%s' (want credits '%s'%s) — the faction line hardcodes its label or renders an English faction name" % [faction_line, want_credits, "" if faction_bad == "" else ", offender %s" % faction_bad])
 	hub.queue_free()
 
-
 ## Every string a player can read off the hub: the picker's items, the details
 ## line and the profile line. Read from the live node, not recomputed.
 func _hub_strings(hub: Node) -> Array[String]:
@@ -576,13 +573,11 @@ func _hub_strings(hub: Node) -> Array[String]:
 			out.append((node as Label).text)
 	return out
 
-
 func _has_string(haystack: Array[String], needle: String) -> bool:
 	for s in haystack:
 		if s.contains(needle):
 			return true
 	return false
-
 
 ## One assertion for both states: the rendered strings are present AND none of them
 ## contains an English word. Split out so the two states cannot drift into
@@ -610,7 +605,6 @@ func _english_offender(strings: Array, english: Dictionary) -> String:
 				return "'%s' in '%s'" % [w, s]
 	return ""
 
-
 ## English words that must never reach a rendered Portuguese string. Deliberately
 ## a WORD list rather than a diff against the PO: the property under test is "no
 ## English word is visible", and a missing msgstr shows up as the key itself.
@@ -621,7 +615,6 @@ func _english_words() -> Dictionary:
 			"drifter", "raider", "no", "intel", "marked", "bought", "survived"]:
 		out[w] = true
 	return out
-
 
 ## The regression guard for the actual cause: the meta service and the controller
 ## must name the same key for the active kit. They did not -- the payload carried
@@ -637,7 +630,6 @@ func _check_loadout_label_is_one_key_in_both_layers() -> void:
 	var payload_label := _regex_literal("res://src/meta/meta_service.gd", '"label": "([^"]*)"')
 	_check(const_label == "Active kit" and payload_label == "Active kit",
 		"I18N-HUB one_label_key_in_both_layers: controller=%s meta_payload=%s — the two layers name the same widget differently, so one state reads English" % [const_label, payload_label])
-
 
 ## First capture group of `pattern` in a file, or "" if the pattern does not
 ## match. Regex rather than index arithmetic: this file is edited by other lanes,
@@ -664,7 +656,6 @@ func _check_faction_registry_matches_the_pack() -> void:
 	_check(not pack.is_empty() and missing.is_empty() and stale.is_empty(),
 		"I18N-FAC every_faction_resolves: missing=%s stale=%s (F-FAC: a faction with no catalogue entry renders its English .tres name)" % [", ".join(missing), ", ".join(stale)])
 
-
 ## Every faction id the pack ships, read from the .tres files rather than
 ## hardcoded, so a new faction cannot pass this check by omission.
 func _faction_ids_in_pack() -> Array[String]:
@@ -677,7 +668,6 @@ func _faction_ids_in_pack() -> Array[String]:
 		if id != "" and not out.has(id):
 			out.append(id)
 	return out
-
 
 func _faction_id_in(file_name: String) -> String:
 	if not file_name.ends_with(".tres"):
@@ -719,7 +709,6 @@ func _keys_used_in_sources() -> Array[String]:
 				found.append(key)
 	return found
 
-
 ## Keys carried as data in a payload, which count as used for the "declared but
 ## unused" check. Only the presence of the key is established here; the renderer
 ## check is what proves the render path translates it.
@@ -730,7 +719,6 @@ func _keys_used_as_data() -> Array[String]:
 			if not found.has(key):
 				found.append(key)
 	return found
-
 
 ## Every payload-carried key in one file's text.
 func _data_keys_in(text: String) -> Array[String]:
@@ -750,7 +738,6 @@ func _strip_comments(text: String) -> String:
 		var at := line.find("#")
 		out.append(line if at < 0 else line.substr(0, at))
 	return "\n".join(out)
-
 
 ## Every translation key a single file passes to tr() / translate().
 func _keys_in_text(text: String) -> Array[String]:

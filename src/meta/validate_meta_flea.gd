@@ -18,6 +18,13 @@ extends SceneTree
 const TEST_DIR := "user://meta_flea_test"
 const SAVE := "user://meta_flea_test/profile.save"
 const _FLEA_FRAME_KEY := "Listing #%d %s %d cr [%s] seller=%s"
+## The locale this harness asserts against. Taken BEFORE anything is built,
+## because a headless run inherits the host's active locale and this harness
+## asserts on translated text: under an `en` host the line renders the English
+## frame and the two checks below fail for a reason that has nothing to do with
+## the flea. Measured, not assumed -- this harness is what made the dependency
+## visible once the rest of the suite had the precondition.
+const TranslationProbe := preload("res://src/meta/translation_probe.gd")
 const BANDAGE := "res://resources/medical/army_bandage.tres"
 
 var v: ValidateUtil
@@ -29,6 +36,13 @@ func _check(cond: bool, msg: String) -> void:
 func _initialize() -> void:
 	v = ValidateUtil.new("validate_meta_flea")
 	v.begin()
+	# Precondition, before anything is built: the locale this harness asserts
+	# against must be the ACTIVE one, not inherited from the host. Asserted, not
+	# assumed -- a harness that silently failed to select would report a missing
+	# translation for a catalogue that is complete.
+	TranslationProbe.select_test_locale()
+	v.check(TranslationProbe.locale_is_selected(),
+		"the harness pins the locale it asserts against (%s)" % TranslationProbe.PROBE_LOCALE)
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	_cleanup()
 
