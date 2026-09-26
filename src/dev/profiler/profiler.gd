@@ -80,6 +80,16 @@ static func maybe_attach(host: Node, capacity: int = RING_DEFAULT) -> Profiler:
 	var p := Profiler.new()
 	p.ring_capacity = capacity
 	p.name = "Profiler"
+	# Publish on ATTACH, not on start(). maybe_attach() is the public entry point
+	# and the instrument's documented primary consumer is a capture harness
+	# running OUTSIDE the scene, whose only supported route to the instrument is
+	# this accessor. Publishing it only in start() left a window in which the
+	# instrument existed and was reachable through the return value but NOT
+	# through the accessor — so a null there did not mean "not opted in", it
+	# meant "attached, but you cannot see it yet". A null that means something
+	# other than what it appears to mean is the defect; a distinct "not attached"
+	# signal is the honest alternative, and returning the instance IS that signal.
+	instance = p
 	host.get_tree().root.call_deferred("add_child", p)
 	return p
 

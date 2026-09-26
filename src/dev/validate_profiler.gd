@@ -27,6 +27,7 @@ extends SceneTree
 const OUT := "user://validate_profiler"
 
 var v: ValidateUtil
+var _deferred = false
 
 func _initialize() -> void:
 	v = ValidateUtil.new("profiler")
@@ -38,6 +39,21 @@ func _initialize() -> void:
 	_d_unmeasurable_reasons()
 	_e_off_by_default()
 	_e2_release_is_off()
+
+	# E3 and everything after it need a host that is actually inside the tree:
+	# maybe_attach() walks host.get_tree().root, and during _initialize the
+	# SceneTree's root Window is not parented yet (measured: `Parameter
+	# "data.tree" is null` at profiler.gd:83). Running it here would produce a
+	# red arm that is red for the wrong reason — a harness error masquerading as
+	# evidence about the accessor — which is worse than no red arm at all.
+	_deferred = true
+
+# Runs once the tree is up. Sections [E3]..[I] need a live tree; [A]..[E2] do not.
+func _process(_delta: float) -> bool:
+	if not _deferred:
+		return true
+	_deferred = false
+	_e3_accessor_published_before_start()
 	_f_ring_buffer()
 	_g_json_dump()
 	_h_instrumentation_faults()
@@ -45,6 +61,7 @@ func _initialize() -> void:
 
 	v.finish()
 	quit(v.failed)
+	return true
 
 # ─── [A] REGISTRY ──────────────────────────────────────────────────────────
 
@@ -187,6 +204,45 @@ func _e2_release_is_off() -> void:
 	# than pretending to test OS.has_feature().
 	v.check(Profiler.release_blocks() == OS.has_feature("release") and not OS.has_feature("profiler"),
 		"release_blocks() is exactly 'release build without the profiler feature'")
+
+# [E3] THE STATIC ACCESSOR MUST BE USABLE THE MOMENT ATTACH RETURNS.
+#
+# Red arm, and the order matters: every assertion here is made BEFORE start() has
+# run. If the only green state of this check were "after start()", the fix would
+# not have been shown to fix anything, because that is the state the instrument
+# was already in.
+#
+# Why it matters: maybe_attach() is the public entry point and the instrument's
+# documented primary consumer is a capture harness running OUTSIDE the scene,
+# whose only supported route to the instrument is the static accessor. A null
+# returned there does not mean "not opted in" — it means "attached, but you
+# cannot see it yet", which is a null that means something other than what it
+# appears to mean.
+func _e3_accessor_published_before_start() -> void:
+	v.section("[E3] accessor published by attach, not by start")
+	# Scope the opt-in to this section: the rest of the gate asserts the OFF
+	# path, and a globally opted-in run would invalidate those.
+	OS.set_environment("FPS_PROFILE", "1")
+	var attached: Profiler = Profiler.maybe_attach(root)
+	var accessor: Profiler = Profiler.instance
+	var recording_had_started: bool = ProfilerRecorder.enabled
+
+	v.check(attached != null, "opted in, maybe_attach() hands back the profiler")
+	v.check(accessor != null,
+		"Profiler.instance is ALREADY non-null before start() ran — a null here would say 'not started' while meaning 'not reachable'")
+	v.check(attached != null and accessor == attached,
+		"the accessor returns the SAME profiler maybe_attach() returned, not a second one")
+	v.check(not recording_had_started,
+		"and this really is BEFORE start(): recording has not begun (so the accessor is not just observing a started profiler)")
+
+	# Put the world back exactly as it was: the opt-in off, no stray instance,
+	# no leaked node. Later sections assert the off path.
+	OS.set_environment("FPS_PROFILE", "")
+	Profiler.instance = null
+	ProfilerRecorder.enabled = false
+	if attached != null and is_instance_valid(attached):
+		attached.queue_free()
+	v.check(Profiler.should_run() == false, "the opt-in is restored, so the off path still holds after this section")
 
 func _f_ring_buffer() -> void:
 	v.section("[F] ring buffer")
