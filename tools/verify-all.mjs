@@ -139,6 +139,7 @@ const HARNESS_SCRIPTS = [
   ['raid1_scenario', 'res://scenes/validate_raid1_scenario.gd'],
   ['gunsmith_preview', 'res://scenes/validate_gunsmith_preview.gd'],
   ['arena_spawn', 'res://scenes/validate_arena_spawn.gd'],
+  ['profiler', 'res://src/dev/validate_profiler.gd'],
 ];
 
 function harnessScript(name) {

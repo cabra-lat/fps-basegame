@@ -456,6 +456,10 @@ func _physics_process(delta: float) -> void:
 	if _dead:
 		_tick_death(delta)
 		return
+	# Profiler scope (src/dev/profiler): begins AFTER the corpse early-return
+	# above, so the dead path simply produces no sample for this frame instead of
+	# leaving a scope open. No-op unless the profiler is switched on.
+	ProfilerRecorder.begin(&"bot_ai")
 	_tick_flash(delta)
 	_attack_t = maxf(0.0, _attack_t - delta)
 	_anim_lock_t = maxf(0.0, _anim_lock_t - delta)
@@ -533,9 +537,13 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, speed * delta)
 		velocity.z = move_toward(velocity.z, 0.0, speed * delta)
 	_moving = move_dir != Vector3.ZERO
+	# Per-frame skeleton/animation work, nested inside the bot_ai scope above.
+	ProfilerRecorder.begin(&"bot_animation_skeleton")
 	_tick_anim()
 	_tick_lod()
+	ProfilerRecorder.end()
 	move_and_slide()
+	ProfilerRecorder.end()
 
 
 func _face(dir: Vector3, _delta: float) -> void:

@@ -40,6 +40,9 @@ func _on_quit() -> void:
 # ─── settings screen ───
 
 func _setup_settings() -> void:
+	# Profiler scope (src/dev/profiler): script-side UI build work. Engine-side
+	# container layout is inside process_total and is not script-scopable.
+	ProfilerRecorder.begin(&"ui_layout")
 	_sliders = {
 		"SliderSens": "sensitivity", "SliderMaster": "vol_master",
 		"SliderSfx": "vol_sfx", "SliderUi": "vol_ui", "SliderAmb": "vol_ambient",
@@ -65,6 +68,7 @@ func _setup_settings() -> void:
 	opt_mode.item_selected.connect(_on_match_mode)
 	($SettingsPanel/Margin/Box/BtnBack as Button).pressed.connect(_on_back)
 	($SettingsPanel/Margin/Box/BtnBack as Button).pressed.connect(audio.play_ui)
+	ProfilerRecorder.end()
 
 func _on_match_mode(idx: int) -> void:
 	settings["match_mode"] = "tdm" if idx == 1 else "ffa"

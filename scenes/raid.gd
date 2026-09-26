@@ -49,7 +49,11 @@ func is_active() -> bool:
 	return state == State.RAID
 
 func _physics_process(delta: float) -> void:
+	# Profiler scope (src/dev/profiler): the raid clock is the whole body, so a
+	# whole-function scope is safe here. No-op unless the profiler is on.
+	ProfilerRecorder.begin(&"world_managers")
 	tick(delta)
+	ProfilerRecorder.end()
 
 ## Advances the countdown; MIA when it reaches zero without extracting.
 func tick(delta: float) -> void:
