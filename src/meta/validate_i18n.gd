@@ -121,10 +121,11 @@ func _initialize() -> void:
 	# it contains `await`; called without it, GDScript runs it as a coroutine,
 	# returns at the first await, and the rest of it executes after _initialize()
 	# has already printed the summary and quit -- so the check silently contributes
-	# NOTHING and the harness passes. Measured: with this line un-awaited the
-	# counter total did not move and a sabotaged hub rendering the raw English key
-	# passed anyway. The tell is that the arithmetic stops matching: 4 new checks
-	# were added and only 2 appeared.
+	# NOTHING and the harness passes. Measured by QA on the commit: with the await
+	# removed the summary drops from 27 checks to 23 and STILL prints RESULT: PASS,
+	# i.e. four checks vanish and none of them complains. The harness prints no
+	# rendered strings on success, so "it printed nothing suspicious" is not
+	# evidence the check ran; the counter total is the only tell.
 	await _check_hub_renders_portuguese_in_both_states()
 	_check_loadout_label_is_one_key_in_both_layers()
 	_check_faction_registry_matches_the_pack()
@@ -172,8 +173,15 @@ func _check_keys_are_declared() -> void:
 	# contract is untouched: an undeclared key at a call site still fails above,
 	# and the rendered checks are what catch a bypass. What this looser half still
 	# catches is the case it exists for: a catalogue entry whose feature is gone.
+	#
+	# COMMENTS ARE STRIPPED FIRST, and that is QA's required narrowing rather than
+	# my own care: matching raw text let a key be declared with no PO entry and no
+	# call site and still count as "used" if it appeared in a COMMENT -- which
+	# defeats the rule in exactly the case it exists for, because a retired feature
+	# leaves its string behind in the comments that explain why it was retired.
+	# Measured by QA: a key declared only inside a comment passed the used check.
 	for path in SOURCE_FILES:
-		for literal in _match_all(_read(path), '"([^"]*)"'):
+		for literal in _match_all(_strip_comments(_read(path)), '"([^"]*)"'):
 			if DECLARED_KEYS.has(literal) and not used.has(literal):
 				used.append(literal)
 	var unused := _keys_in(DECLARED_KEYS, true, used)
@@ -628,6 +636,18 @@ func _data_keys_in(text: String) -> Array[String]:
 		for key in _match_all(text, pattern):
 			out.append(key)
 	return out
+
+## Source text with every `#` comment removed, so a string literal that only
+## appears in prose is not mistaken for a live key. Line-based and deliberately
+## simple: a `#` inside a string literal would be truncated, which costs a match
+## in the loosest half of a contract rather than producing a false PASS.
+func _strip_comments(text: String) -> String:
+	var out: Array[String] = []
+	for line in text.split("\n"):
+		var at := line.find("#")
+		out.append(line if at < 0 else line.substr(0, at))
+	return "\n".join(out)
+
 
 ## Every translation key a single file passes to tr() / translate().
 func _keys_in_text(text: String) -> Array[String]:
