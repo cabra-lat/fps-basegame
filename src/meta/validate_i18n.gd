@@ -73,6 +73,22 @@ func _initialize() -> void:
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
 	var locales := TranslationServer.get_loaded_locales()
+
+	# === CONSTRUCTED PROBE v5 (throwaway, never merge) ===
+	# Which catalogue is actually loaded? For each msgid in the committed PO,
+	# report whether TranslationServer resolves it. A catalogue that resolves
+	# SOME ids and not others is an OLDER catalogue; one that resolves NONE
+	# is a DIFFERENT catalogue entirely.
+	var _po2 = load("res://locale/game.po")
+	var _all: Array[String] = []
+	if _po2 != null:
+		for _m in _po2.get_message_list():
+			_all.append(String(_m))
+	print("PROBE loaded_count=", locales.size(), " po_msg_count=", _all.size())
+	for _k in _all:
+		var _r := TranslationServer.translate(_k)
+		print("PROBE msg |", _k, "| -> ", ("SAME" if _r == _k else "TRANSLATED"))
+	# === END CONSTRUCTED PROBE v5 ===
 	_check(locales.has("pt_BR"), "pt_BR catalogue is registered in project.godot and loaded")
 
 ## Call sites and the declared contract must describe the same key set, in both
