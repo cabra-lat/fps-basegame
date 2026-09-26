@@ -47,9 +47,10 @@
 //
 // Usage:  node tools/lint-repeated-flags.mjs [--strict] [--self-test] [paths…]
 
-import { readFileSync, readdirSync, statSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 
 const SCAN_EXT = new Set(['.sh', '.mjs', '.js', '.py', '.bash']);
 const SCAN_DIRS = ['tools', 'src/dev', 'scenes', '.github'];
@@ -296,19 +297,109 @@ function selfTest() {
   check('a script with ONE argv reader is not reported', single.contested.length === 0 && single.readerCount === 1,
     `readerCount=${single.readerCount}`);
 
-  // The guard against the vacuous pass above. QA asked for the check to be
-  // about the OUTPUT, not an internal field, and she was right: at 40f0372 this
-  // assertion passed while a no-reader file and a clean file rendered
-  // byte-identical text and exited 0 both. The field was distinguishable; the
-  // report was not. So this now compares the rendered lines, which is the thing
-  // a human or CI actually reads.
+  // ── A / B / C: the three cases that were INDISTINGUISHABLE ───────────────
+  // Coordinator extracted 40f0372 and ran this: a script that reads no argv, a
+  // genuinely clean script, and a path that does not exist ALL printed the same
+  // confident headline and ALL exited 0. The third is the finding — a run that
+  // read nothing was certifying "no unremediated shape found in the scripts I
+  // understood", and it had understood nothing at all.
+  //
+  // The guard this replaces was `empty.readerCount === 0 && empty.contested.length
+  // === 0`, and coordinator's diagnosis of why it could not fail is correct and
+  // worth keeping verbatim: `contested.length === 0` is the CLEAN file's own
+  // value, so the assertion was true of a clean analysis and was being applied
+  // to the empty one. It verified a field was zero. It never verified that a
+  // reader or a CI log could tell the two situations apart — a vacuous pass, one
+  // layer up from the vacuous pass it was written to prevent.
+  //
+  // So these assert on RENDERED OUTPUT and on EXIT CODE, through the same
+  // render()/exitCodeFor() the CLI uses, not through a reimplementation.
+  const aFile = write('a.sh', 'echo hello\nls -l\n');
+  const bFile = write('b.sh', 'for a in "$@"; do case "$a" in --clean-tmp) X=1 ;; esac; done\n');
+  const A = analyseFile('a.sh', aFile);
+  const B = analyseFile('b.sh', bFile);
+  const outA = render([A], ['.']).join('\n');
+  const outB = render([B], ['.']).join('\n');
+  const outC = render([], ['no/such/path'], ['no/such/path']).join('\n');
+  const codeA = exitCodeFor([A], [], false);
+  const codeB = exitCodeFor([B], [], false);
+  const codeC = exitCodeFor([], ['no/such/path'], false);
+
+  check('A: a file with NO argv reader says so on its OWN line', /a\.sh[\s\S]*NOTHING TO CLASSIFY/.test(outA));
+  check('A: a CLEAN file does NOT claim it had nothing to classify', !/NOTHING TO CLASSIFY/.test(outB));
+  check('A and B render differently from each other', outA !== outB);
+  check('A and B are distinguishable per-file, not only in a count',
+    /per-file verdict/.test(outA) && /per-file verdict/.test(outB));
+
+  check('C: scanning NOTHING is not reported as a clean result',
+    /NOTHING WAS SCANNED/.test(outC) && !/no unremediated shape/i.test(outC),
+    'the "no unremediated shape found" headline must not appear when no file was read');
+  check('C: the missing root is NAMED, not just counted', /no\/such\/path/.test(outC));
+  check('C: nothing scanned exits NONZERO, so a wrong path cannot pass as clean', codeC !== 0, `exit=${codeC}`);
+  check('C differs from B in BOTH output and exit code', outC !== outB && codeC !== codeB, `codes: C=${codeC} B=${codeB}`);
+
+  // A still exits 0: a script that legitimately reads no argv is not a failure.
+  // What it must not do is be indistinguishable from B, and it is not.
+  check('A still exits 0 (no-argv-reader is not itself a failure)', codeA === 0, `exit=${codeA}`);
+  check('A and B share an exit code but NOT an output', codeA === codeB && outA !== outB);
+
+  // A finding is visible as a FINDING on the file's own line, not only in a
+  // section further down. This is also what makes the pass-through signal
+  // observable, which was the other thing coordinator could not settle.
+  const passFile = analyseFile('f.sh', write('f.sh', 'ARGS+=("$a")\nexec "$BIN" "${ARGS[@]}"\n'));
+  const outF = render([passFile], ['.']).join('\n');
+  check('an unvalidated pass-through is marked FINDING on its own per-file line',
+    /f\.sh[\s\S]*FINDING — unvalidated pass-through/.test(outF));
+
+  const contestedFile = analyseFile('c2.sh', write('c2.sh', [
+    'for a in "$@"; do case "$a" in --path) n=1 ;; esac; done',
+    'for b in "$@"; do case "$b" in --path=*) n=2 ;; esac; done',
+  ].join('\n')));
+  const outC2 = render([contestedFile], ['.']).join('\n');
+  check('a contested flag is marked FINDING on its own per-file line',
+    /c2\.sh[\s\S]*FINDING — --path read by more than one party/.test(outC2));
+  check('and --strict exits 1 on a contested flag', exitCodeFor([contestedFile], [], true) === 1);
+  check('and --strict exits 1 on a pass-through finding too', exitCodeFor([passFile], [], true) === 1);
+
+  // The old field-level assertion, kept as a check so it cannot come back in a
+  // form that cannot fail. It is still true; it is simply no longer load-bearing.
   const empty = analyseFile('empty.sh', write('empty.sh', 'echo hello\n'));
-  const oneReader = analyseFile('one.sh', write('one.sh', 'for a in "$@"; do echo "$a" --path; done\n'));
-  const emptyLines = render([empty], ['.']).join('\n');
-  const oneLines = render([oneReader], ['.']).join('\n');
-  check('a file with NO argv reader renders DIFFERENTLY from a clean one', emptyLines !== oneLines,
-    'the report is identical — "I found nothing" and "I could not look" render the same');
-  check('and the no-reader case says so out loud', /NO argv reader|no argv reader/i.test(emptyLines) && !/NO argv reader|no argv reader/i.test(oneLines));
+  check('the old field-level assertion is still true, and is no longer load-bearing',
+    empty.readerCount === 0 && empty.contested.length === 0);
+
+  // ── THE CLI ITSELF, end to end ───────────────────────────────────────────
+  // Everything above calls analyseFile() directly. That left walk() and main()
+  // untested, which is how an inverted ternary shipped in main that made the
+  // tool scan NOTHING whenever every root was present — including for a plain
+  // file argument — and report it as a clean-looking failure. 24 green checks
+  // did not notice, because none of them went through the entry point a person
+  // actually uses. So these spawn the real CLI and check its real exit codes.
+  const cli = (args, cwd) => spawnSync(process.execPath, [process.argv[1], ...args], { cwd, encoding: 'utf8' });
+  const e2e = mkdtempSync(join(tmpdir(), 'lint-e2e-'));
+  mkdirSync(join(e2e, 'tools'), { recursive: true });
+  writeFileSync(join(e2e, 'tools', 'a.sh'), 'echo hello\nls -l\n');
+  writeFileSync(join(e2e, 'tools', 'b.sh'), 'for a in "$@"; do case "$a" in --clean-tmp) X=1 ;; esac; done\n');
+
+  const runA = cli(['tools/a.sh'], e2e);
+  check('CLI: a file argument IS scanned (the walk path, not just analyseFile)', runA.status === 0 && /per-file verdict/.test(runA.stdout),
+    `status=${runA.status}`);
+  check('CLI: that file with no argv reader is reported as NOTHING TO CLASSIFY',
+    /NOTHING TO CLASSIFY/.test(runA.stdout));
+
+  const runB = cli(['tools/b.sh'], e2e);
+  check('CLI: a clean file exits 0 and is reported as ok', runB.status === 0 && /ok — one argv reader/.test(runB.stdout),
+    `status=${runB.status}`);
+  check('CLI: A and B differ on stdout as well as in the unit checks',
+    runA.stdout !== runB.stdout);
+
+  const runC = cli(['tools/nope'], e2e);
+  check('CLI: a path that does not exist exits 2, not 0', runC.status === 2, `status=${runC.status}`);
+  check('CLI: and says NOTHING WAS SCANNED rather than reporting a verdict',
+    /NOTHING WAS SCANNED/.test(runC.stdout) && !/no contested flag is reported/.test(runC.stdout));
+
+  const runDir = cli(['tools'], e2e);
+  check('CLI: a directory argument is walked', runDir.status === 0 && /scanned 2 file\(s\)/.test(runDir.stdout), `status=${runDir.status}`);
+  rmSync(e2e, { recursive: true, force: true });
 
   // Several readers, disjoint flags: not a disagreement.
   const disjoint = analyseFile('disjoint.sh', write('disjoint.sh', [
@@ -343,26 +434,76 @@ function selfTest() {
   return failures === 0;
 }
 
-// ── MAIN ───────────────────────────────────────────────────────────────────
-const argv = process.argv.slice(2);
-if (argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
+
+// ── PER-FILE VERDICT ───────────────────────────────────────────────────────
+
+// One line per file, stating what happened to THAT file.
+//
+// This exists because the previous report folded the states into aggregate
+// counts. Three real cases — a script with no argv reader, a genuinely clean
+// script, and a path that does not exist — all printed the same confident
+// headline and all exited 0, so "no unremediated shape found in the scripts I
+// understood" was printed by a run that had understood nothing. A per-file line
+// makes each state visible on its own, which is the only level at which the
+// difference is observable to a reader.
+function verdictFor(a) {
+  if (a.readerCount === 0) {
+    return 'NOTHING TO CLASSIFY — no argv reader detected in this file';
+  }
+  if (a.actionable.length) {
+    return `FINDING — ${a.actionable.map((c) => c.flag).join(', ')} read by more than one party`;
+  }
+  if (a.unvalidatedPassthrough) {
+    return 'FINDING — unvalidated pass-through: forwards argv to a consumer it does not control, declaring no flags of its own';
+  }
+  if (a.readerCount === 1) {
+    return 'ok — one argv reader, so no disagreement between parties is possible';
+  }
+  return `ok — ${a.readerCount} argv readers, no flag contested`;
 }
 
-const strict = argv.includes('--strict');
-const explicit = argv.filter((a) => !a.startsWith('--'));
-const roots = explicit.length ? explicit : SCAN_DIRS;
-const files = walk(roots).sort();
+// Exit code, as a function of the run, so the self-test asserts on the SAME
+// logic the CLI uses rather than on a reimplementation of it.
+//
+//   0 — ran, and found nothing actionable
+//   1 — actionable findings, and --strict was asked for
+//   2 — NOTHING WAS SCANNED. Not a clean result: a run that read no file has
+//       certified nothing, and returning 0 for it is the single most dangerous
+//       thing this tool could do. A typo in a path, a moved directory or a wrong
+//       working directory all land here.
+function exitCodeFor(analysed, missingRoots, strict) {
+  if (analysed.length === 0) return 2;
+  if (!strict) return 0;
+  const findings = analysed.flatMap((a) => a.actionable).length
+    + analysed.filter((a) => a.unvalidatedPassthrough).length;
+  return findings ? 1 : 0;
+}
 
 // Render the whole report as an array of lines.
 //
-// It returns lines rather than printing them so the SELF-TEST can assert on the
-// exact text a reader sees. At 40f0372 the report was printed inline and the
-// no-reader case was only distinguishable as an internal field, which meant the
-// one distinction that mattered was invisible to anyone but me — QA read the
-// rendered output, could not find it, and was right to say so.
-function render(analysed, roots) {
+// Returns lines rather than printing them so the SELF-TEST asserts on the exact
+// text a reader sees. This is not tidiness: the bug this file keeps hitting is a
+// check that is true of a field and invisible in the report, and the only way to
+// catch that class is to assert on the report.
+function render(analysed, roots, missingRoots = []) {
   const L = [];
+  L.push('=== repeated single-valued flag lint (advisory) ===');
+
+  // Case C, first and loudest. Before anything else, because a reader who sees a
+  // confident verdict below must not have to notice that nothing was scanned.
+  if (analysed.length === 0) {
+    L.push('');
+    L.push('NOTHING WAS SCANNED — this is NOT a clean result, and no verdict below means anything.');
+    L.push(`  root(s) given: ${roots.join(', ') || '(none)'}`);
+    if (missingRoots.length) {
+      L.push('  root(s) that do not exist:');
+      for (const m of missingRoots) L.push(`    ${m}`);
+    }
+    L.push('  A wrong path, a moved directory or a wrong working directory all land here, and');
+    L.push('  a lint that read nothing must not be able to say it found nothing to fix.');
+    return L;
+  }
+
   const multiReader = analysed.filter((a) => a.readerCount > 1);
   const noReader = analysed.filter((a) => a.readerCount === 0);
   const actionable = multiReader.flatMap((a) => a.actionable.map((c) => ({ file: a.path, ...c })));
@@ -371,18 +512,25 @@ function render(analysed, roots) {
   const exemptions = analysed.flatMap((a) => a.exempted.map((f) => ({ file: a.path, flag: f })));
   const passthrough = analysed.filter((a) => a.unvalidatedPassthrough);
 
-  L.push('=== repeated single-valued flag lint (advisory) ===');
   L.push(`scanned ${analysed.length} file(s) under ${roots.join(', ')}`);
+  if (missingRoots.length) {
+    L.push(`  WARNING: ${missingRoots.length} root(s) did not exist and contributed NOTHING: ${missingRoots.join(', ')}`);
+  }
+
+  L.push('');
+  L.push('per-file verdict — one line per file, so no state is folded into a count:');
+  for (const a of analysed) L.push(`  ${a.path}\n      ${verdictFor(a)}`);
+
+  const byState = (v) => analysed.filter((a) => verdictFor(a).startsWith(v)).length;
+  L.push('');
+  L.push(`  ${byState('ok')} ok, ${byState('FINDING')} FINDING, ${byState('NOTHING')} nothing-to-classify, of ${analysed.length} file(s)`);
   L.push(`  ${multiReader.length} read argv in more than one place (the precondition for the class)`);
   L.push(`  ${declared.length} declare lint:flags-single / lint:flags-list / lint:flags-refused`);
 
   if (actionable.length) {
     L.push('');
-    L.push(`${actionable.length} actionable contested flag(s): a single-valued flag dealt with by`);
-    L.push('more than one reader, with no declared refusal on the ambiguity.');
-    for (const f of actionable) {
-      L.push(`  ${f.file}\n    ${f.flag}  read by: ${f.readers.join(' + ')}`);
-    }
+    L.push(`${actionable.length} contested flag(s) with no declared refusal on the ambiguity:`);
+    for (const f of actionable) L.push(`  ${f.file}\n    ${f.flag}  read by: ${f.readers.join(' + ')}`);
     L.push('\nWhat to do about one: do NOT let a lint pick a winner. Either refuse on the');
     L.push('ambiguity (what tools/godot-lock.sh does for --path, declared lint:flags-refused),');
     L.push('or make every reader agree on which occurrence wins AND record that the choice is');
@@ -390,22 +538,18 @@ function render(analysed, roots) {
     L.push('consumer is undocumented.');
   } else {
     L.push('');
-    L.push('no ACTIONABLE contested flags. Read that as "no unremediated shape found in the');
-    L.push('scripts I understood", not as "no repeated flags exist" — this lint cannot see an');
-    L.push('actual command line, only the structure that makes repetition dangerous.');
+    L.push('no contested flag is reported as a finding. Read that as "no unremediated shape found');
+    L.push('in the scripts I understood", not as "no repeated flags exist" — this lint cannot see');
+    L.push('an actual command line, only the structure that makes repetition dangerous. The');
+    L.push('per-file lines above say which files were understood and which were not.');
   }
 
-  // Pass-through is a FINDING, not a footnote. It was reported as prose between
-  // two sections with no count, so a reviewer running the lint read it as an
-  // explanation of the category rather than as a hit on a named file, and
-  // reported that it could not observe it firing. If a finding is invisible in
-  // the verdict, it is a green that means nothing, which is this session's
-  // whole subject.
   if (passthrough.length) {
     L.push('');
     L.push(`FINDINGS — unvalidated pass-through: ${passthrough.length} script(s) hand argv to a consumer`);
     L.push('they do not control while declaring no flags of their own, so any single-valued flag they');
-    L.push('forward unchecked is unguarded BY CONSTRUCTION rather than by disagreement:');
+    L.push('forward unchecked is unguarded BY CONSTRUCTION rather than by disagreement. Each is also');
+    L.push('marked FINDING on its own per-file line above:');
     for (const p of passthrough) L.push(`  ${p.path}  readers: ${p.readers.join(' + ')}`);
   }
 
@@ -419,21 +563,17 @@ function render(analysed, roots) {
     for (const e of exemptions) L.push(`  ${e.file}  ${e.flag}  (declared lint:flags-list)`);
   }
 
-  // Not reported as "clean": reported as not classified, by name. A script whose
-  // argv reader I failed to detect lands here, and a reader of this output can
-  // then tell "I looked and found nothing" from "there was nothing to look at".
   if (noReader.length) {
     L.push('');
-    L.push(`NO argv reader detected in ${noReader.length} file(s) — the lint had nothing to classify there.`);
-    L.push('Most scripts are in this group legitimately. If one of these DOES read flags, by a form');
-    L.push('this lint does not detect, it is silently clean, and that is a detection gap in me:');
-    for (const n of noReader) L.push(`  ${n.path}`);
+    L.push(`${noReader.length} file(s) had NO argv reader — nothing to classify there. Most scripts are`);
+    L.push('in this group legitimately. If one of these DOES read flags, by a form this lint does not');
+    L.push('detect, it is silently clean, and that is a detection gap in me, not a pass. Each is marked');
+    L.push('NOTHING TO CLASSIFY on its own per-file line above.');
   }
 
-  // Coverage gap for the scripts that DO read argv in several places but
-  // classify nothing. A pass-through file is not repeated here: it is already
-  // listed as a finding above, and printing the same line twice under two
-  // headings made it read as two separate observations.
+  // Coverage gap for scripts that read argv in several places but classify
+  // nothing. A pass-through file is not repeated here: it is already a finding,
+  // and printing the same line twice made one observation read as two.
   const undeclared = analysed.filter((a) => a.readerCount > 1
     && !a.declarations.single.size && !a.declarations.list.size && !a.declarations.refused.size
     && !a.unvalidatedPassthrough);
@@ -447,12 +587,24 @@ function render(analysed, roots) {
   return L;
 }
 
-const analysed = files.map((f) => analyseFile(f, readFileSync(f, 'utf8')));
-const reportLines = render(analysed, roots);
-for (const line of reportLines) console.log(line);
+// ── MAIN ───────────────────────────────────────────────────────────────────
+const argv = process.argv.slice(2);
+if (argv.includes('--self-test')) {
+  process.exit(selfTest() ? 0 : 1);
+}
 
-// --strict fails on the contested flags AND on the pass-through findings: both
-// are things a person must act on. Neither affects the default advisory exit.
-const strictFindings = analysed.flatMap((a) => a.actionable).length
-  + analysed.filter((a) => a.unvalidatedPassthrough).length;
-process.exit(strict && strictFindings ? 1 : 0);
+const strict = argv.includes('--strict');
+const explicit = argv.filter((a) => !a.startsWith('--'));
+const roots = explicit.length ? explicit : SCAN_DIRS;
+const missingRoots = roots.filter((r) => !existsSync(r));
+// Walk the roots that exist. This was `missingRoots.length ? walk(...) : []` —
+// inverted, and it meant the lint scanned NOTHING whenever every root was
+// present, including for a plain file argument, and reported it as
+// "NOTHING WAS SCANNED" with exit 2. The most ordinary invocation of the tool
+// was the one that failed, and the self-test did not catch it because the
+// self-test calls analyseFile() directly and never goes near walk() or main.
+const files = walk(roots.filter((r) => existsSync(r))).sort();
+
+const analysed = files.map((f) => analyseFile(f, readFileSync(f, 'utf8')));
+for (const line of render(analysed, roots, missingRoots)) console.log(line);
+process.exit(exitCodeFor(analysed, missingRoots, strict));
