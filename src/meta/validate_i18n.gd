@@ -81,15 +81,19 @@ func _initialize() -> void:
 
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
-	# The old check here was `get_loaded_locales().has("pt_BR")`, which is true
-	# whether or not the catalogue is present, so it could not fail on the one
-	# condition it existed to detect. These two can: the first fails if the
-	# locale under test is not the active one, the second fails unless a known
-	# msgid actually resolves.
+	# Both checks below can fail, which the pair they replaced could not: a
+	# locale is REGISTERED whether or not it is SELECTED, so the old
+	# `get_loaded_locales().has("pt_BR")` was true in the working case and the
+	# broken case alike.
+	#
+	# On a failure of the second check, read the fixture note first: SENTINEL is
+	# wired to one specific msgid, so if locale/game.po renames it, this is a
+	# fixture break and the fix is to update SENTINEL, not to hunt a missing
+	# translation. See src/meta/translation_probe.gd.
 	_check(TranslationProbe.locale_is_selected(),
 		"the locale under test (%s) is the ACTIVE locale, not inherited from the host" % TranslationProbe.PROBE_LOCALE)
 	_check(TranslationProbe.catalogue_answers(),
-		"a known msgid resolves from the catalogue (sentinel %r came back as %r, i.e. untranslated)" % [TranslationProbe.SENTINEL, TranslationProbe.sentinel_result()])
+		"fixture msgid %r resolves from the catalogue - if it was RENAMED in locale/game.po, update SENTINEL in translation_probe.gd rather than hunting a content defect (came back as %r)" % [TranslationProbe.SENTINEL, TranslationProbe.sentinel_result()])
 
 ## Call sites and the declared contract must describe the same key set, in both
 ## directions: a new tr() call without a declared key fails, and a declared key
