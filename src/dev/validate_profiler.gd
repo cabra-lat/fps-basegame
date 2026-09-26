@@ -12,6 +12,15 @@
 #   [G] JSON dump is parseable, self-describing, and strict mode FAILS loudly
 #   [H] instrumentation faults (unbalanced scopes) are surfaced, not swallowed
 #   [I] the F8 overlay toggle works and the overlay never paints a 0 for a gap
+#   [J] the opt-in shutdown dump: off by default, hooked only when asked, and
+#       schema-identical to the F9 path with the not_sampled rule intact
+#
+# [J] PROVES THE AFFORDANCE'S CONTRACT, NOT THE ENGINE'S DELIVERY. It calls the
+# shutdown handler directly and checks the file it writes. That the engine
+# actually delivers root.tree_exiting at process shutdown — and does NOT on a
+# scene switch — was measured separately with a real engine in both directions;
+# a gate that asserted engine delivery would be asserting something it does not
+# control. Stating the boundary is the point of this comment.
 #
 # WHAT THIS DOES NOT DO, explicitly: it does not profile a playthrough, and it
 # does not claim any number about the game's real performance. It drives the
@@ -58,6 +67,7 @@ func _process(_delta: float) -> bool:
 	_g_json_dump()
 	_h_instrumentation_faults()
 	_i_overlay()
+	_j_dump_on_exit()
 
 	v.finish()
 	quit(v.failed)
@@ -358,6 +368,128 @@ func _scope_count() -> int:
 			n += 1
 	return n
 
+## [J] The opt-in shutdown dump.
+##
+## The bug this closes: maybe_attach() is documented as the entry point for a
+## consumer running OUTSIDE the scene, and that consumer had no supported way to
+## ask for a dump at all — the single F9 keystroke assumed a human at a
+## keyboard. So the instrument was unusable for its own stated primary consumer,
+## which is the same shape as the accessor that used to return null.
+func _j_dump_on_exit() -> void:
+	var saved_env := OS.get_environment(Profiler.ENV_DUMP_ON_EXIT)
+	var saved_optin := OS.get_environment("FPS_PROFILE")
+	var dir_path := "%s/j" % OUT
+	DirAccess.make_dir_recursive_absolute(dir_path)
+
+	# ── the env var's meaning ────────────────────────────────────────────────
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, "")
+	v.check(not Profiler.dump_on_exit_requested(), "with the env var absent, a shutdown dump is not requested")
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, "1")
+	v.check(Profiler.dump_on_exit_requested(), "with the env var set to 1, a shutdown dump is requested")
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, "0")
+	v.check(not Profiler.dump_on_exit_requested(), "any other value is not a request (not '0 means on')")
+
+	# It is not an opt-IN: it says WHEN to dump, not whether the instrument exists.
+	# Asking only for a shutdown dump must not bring up a profiler nobody asked to
+	# profile — otherwise the affordance is a second way to switch the instrument
+	# on, which is the one thing an opt-in must not be.
+	_reset_instrument()
+	OS.set_environment("FPS_PROFILE", "")
+	v.check(Profiler.maybe_attach(root) == null,
+		"the dump env var alone does NOT opt in — it is not a second way to switch the instrument on")
+	_reset_instrument()
+
+	# ── the hook ─────────────────────────────────────────────────────────────
+	# Built in-tree on purpose. maybe_attach() adds its node DEFERRED, so a
+	# profiler it returns is not inside the tree yet and get_tree() is null — the
+	# hook correctly declines to install there and _ready() installs it a frame
+	# later. Asserting the connection on that node would be asserting something
+	# about the deferred add, not about the hook.
+	var quiet: Profiler = Profiler.new()
+	quiet.name = "ProfilerQuiet"
+	root.add_child(quiet)
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, "")
+	quiet._install_exit_hook()
+	v.check(not root.tree_exiting.is_connected(quiet._on_tree_exiting),
+		"with the env var absent, NOTHING is connected to the shutdown signal")
+	quiet.queue_free()
+
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, "1")
+	OS.set_environment("FPS_PROFILE", "1")
+	var p: Profiler = Profiler.new()
+	p.name = "ProfilerExitDump"
+	root.add_child(p)
+	p._install_exit_hook()
+	v.check(root.tree_exiting.is_connected(p._on_tree_exiting),
+		"with the env var set, the shutdown signal is connected")
+	p._install_exit_hook()
+	var conns := root.tree_exiting.get_connections().filter(func(c): return c["callable"] == p._on_tree_exiting)
+	v.check(conns.size() == 1, "installing twice does not double-connect (a shutdown would dump twice)")
+
+	# ── the dump it writes ───────────────────────────────────────────────────
+	# Give it frames with samples, so this is a real dump rather than a shell of
+	# not_sampled entries — an all-not_sampled dump would pass a shape check while
+	# proving nothing about the numbers.
+	p.start()
+	for i in 3:
+		ProfilerRecorder.begin(&"bot_ai")
+		ProfilerRecorder.end()
+		p.record_frame()
+
+	# The reference goes through dump_json() — literally the function the F9
+	# branch calls — so "schema identical" is a comparison against the real thing
+	# rather than against a description of it.
+	var ref_path := "%s/j_f9_reference.json" % dir_path
+	if FileAccess.file_exists(ref_path):
+		DirAccess.remove_absolute(ref_path)
+	p.dump_json(ref_path)
+	var report := p._on_tree_exiting()
+
+	v.check(report.get("ok") != null, "the shutdown handler returns its report, so a consumer learns where the dump went")
+	var exit_path := String(report.get("path", ""))
+	v.check(FileAccess.file_exists(exit_path), "the shutdown handler wrote a file (path=%s)" % exit_path)
+	var ref := _read_json(ref_path)
+	var auto := _read_json(exit_path)
+	v.check(ref.get("schema") == Profiler.SCHEMA, "the F9-path reference dump parses as %s (got %s)" % [Profiler.SCHEMA, str(ref.get("schema"))])
+	v.check(auto.get("schema") == Profiler.SCHEMA, "the shutdown dump parses as %s (got %s)" % [Profiler.SCHEMA, str(auto.get("schema"))])
+	if not auto.is_empty() and not ref.is_empty():
+		var ref_keys: Array = (ref.keys() as Array).map(func(k): return String(k))
+		var auto_keys: Array = (auto.keys() as Array).map(func(k): return String(k))
+		ref_keys.sort()
+		auto_keys.sort()
+		v.check(auto_keys == ref_keys, "the shutdown dump has the SAME top-level keys as the F9 path (auto=%s ref=%s)" % [str(auto_keys), str(ref_keys)])
+
+		# THE NON-NEGOTIABLE, re-asserted on the file this affordance writes, and
+		# on BOTH places a value could leak: the aggregate (built by aggregate())
+		# and the per-frame records (built by _entry_for()). Checking only the
+		# aggregate would have missed a leak in the frame records — which is what
+		# happened when this check was first written and then sabotaged.
+		var leaked: Array = []
+		for e in (auto.get("totals", {}) as Dictionary).values():
+			if (e as Dictionary).get("state") == "not_sampled" and (e as Dictionary).has("value"):
+				leaked.append("totals")
+		for fr in (auto.get("frames", []) as Array):
+			for e in ((fr as Dictionary).get("subsystems", {}) as Dictionary).values():
+				if (e as Dictionary).get("state") == "not_sampled" and (e as Dictionary).has("value"):
+					leaked.append("frames")
+		v.check(leaked.is_empty(), "the shutdown dump leaks NO value next to a never-measured subsystem (leaked in: %s)" % (", ".join(leaked) if leaked.size() else "none"))
+		v.check((auto.get("not_sampled", []) as Array).size() > 0,
+			"the shutdown dump still reports not_sampled rather than defaulting to numbers")
+		var sampled: int = 0
+		for e in (auto.get("totals", {}) as Dictionary).values():
+			if (e as Dictionary).get("state") == "sampled":
+				sampled += 1
+		v.check(sampled > 0, "and it is a real dump: at least one subsystem is genuinely sampled (sampled=%d)" % sampled)
+		v.check((auto.get("ring", {}) as Dictionary).get("frames_retained", 0) > 0,
+			"the dump carries the frames that were recorded, so shutdown did not lose the window")
+
+	OS.set_environment(Profiler.ENV_DUMP_ON_EXIT, saved_env)
+	OS.set_environment("FPS_PROFILE", saved_optin)
+	_reset_instrument()
+	if is_instance_valid(p):
+		p.queue_free()
+	if is_instance_valid(quiet):
+		quiet.queue_free()
 ## Puts the instrument back to how a release build looks: no instance, recorder
 ## inert, no accumulated state.
 func _reset_instrument() -> void:

@@ -34,6 +34,7 @@ const SCHEMA := "fps-basegame.profiler/1"
 const HOTKEY_OVERLAY := KEY_F8
 const HOTKEY_DUMP := KEY_F9
 const DUMP_DIR := "user://profiler"
+const ENV_DUMP_ON_EXIT := "FPS_PROFILE_DUMP_ON_EXIT"
 
 ## Frames retained, oldest dropped.
 var ring_capacity: int = RING_DEFAULT
@@ -109,9 +110,69 @@ func start() -> void:
 		overlay = ProfilerOverlay.new()
 		overlay.name = "ProfilerOverlay"
 		add_child(overlay)
+	_install_exit_hook()
 
 func _ready() -> void:
 	start()
+
+## Connects the shutdown dump, if it was asked for.
+##
+## WHY `root.tree_exiting` AND NOT SOMETHING OBVIOUS. The three candidates are
+## not interchangeable, and I measured which one means "the process is going
+## down" rather than picking the one that reads best:
+##
+##   NOTIFICATION_WM_CLOSE_REQUEST — does NOT fire on a programmatic quit() at
+##     all (measured). A capture harness ends with quit(), so a hook on this
+##     would look correct and never fire.
+##   NOTIFICATION_PREDELETE / _exit_tree — fire at teardown, but ALSO when a
+##     node is freed mid-session, which is what a scene switch does. Worse, the
+##     two cases are INDISTINGUISHABLE from inside the node: at PREDELETE, in
+##     both a quit and a mid-session free, `is_inside_tree()` is false, the tree
+##     is still valid and its root is not queued for deletion. A hook that
+##     cannot tell "shutdown" from "my scene was replaced" would dump at every
+##     scene transition, which is not what DUMP_ON_EXIT says.
+##   root.tree_exiting — fires at process finalize and NOT on a scene switch,
+##     because a scene switch replaces a child of root rather than root itself
+##     (measured, both directions).
+##
+## So: root.tree_exiting, and the dump is written from that signal rather than
+## from the profiler's own teardown, which is also why the frames are still
+## intact when it runs — root.tree_exiting is emitted before children are freed.
+##
+## Idempotent, and a no-op unless the env var asked for it, because a hook that
+## installs itself in a session nobody asked to profile is a behaviour change
+## in exactly the case the opt-in exists to protect.
+func _install_exit_hook() -> void:
+	if not dump_on_exit_requested():
+		return
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		# Reached when start() is called from a headless `--script` run before
+		# the node has entered the tree. _ready() calls _install_exit_hook()
+		# again once it has, and the is_connected() guard makes that safe.
+		return
+	if not tree.root.tree_exiting.is_connected(_on_tree_exiting):
+		tree.root.tree_exiting.connect(_on_tree_exiting)
+
+## The env var is separate from opt_in_requested() on purpose: it says WHEN to
+## dump, not WHETHER the instrument exists. Someone who has already opted in via
+## FPS_PROFILE=1 still has to ask for a shutdown dump explicitly.
+static func dump_on_exit_requested() -> bool:
+	return OS.get_environment(ENV_DUMP_ON_EXIT) == "1"
+
+## Calls the SAME dump_json() the F9 branch calls, with the same schema and the
+## same default path rule. There is deliberately no second dump path: a second
+## serialiser is where a zero would leak in second, next to a subsystem that
+## simply was not measured.
+##
+## Returns dump_json()'s report. Purely additive — a consumer that triggers this
+## has no other way to learn WHERE the file went, since the default path is
+## timestamped inside the instrument, and a trigger whose result is unobservable
+## is a trigger nobody can assert on.
+func _on_tree_exiting() -> Dictionary:
+	var report := dump_json()
+	print("[profiler] shutdown dump -> %s (%s)" % [report["path"], "ok" if report["ok"] else "INCOMPLETE: " + report["reason"]])
+	return report
 
 func _exit_tree() -> void:
 	ProfilerRecorder.enabled = false
