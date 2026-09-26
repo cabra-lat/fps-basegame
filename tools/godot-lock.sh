@@ -18,6 +18,9 @@
 #                      GODOT_LOCK_WAIT seconds, run anyway WITHOUT it. Off by
 #                      default, because running unlocked is exactly the race this
 #                      wrapper exists to prevent. When used, the output says so.
+#   --allow-cross-tree DELIBERATE override: run even though the project Godot
+#                      would touch is NOT this wrapper's repo. Off by default —
+#                      see WHICH TREE below.
 #
 # Environment:
 #   GODOT_LOCK_WAIT    seconds to wait for the lock (default 900). Lowering it
@@ -29,15 +32,20 @@
 #                      every other lane use. The DEFAULT is unchanged and must
 #                      stay byte-identical to verify-all.sh's lock path.
 #
-# EXIT CODES: 0 ran, 69 missing dependency (flock), and 75 EX_TEMPFAIL when the
-# lock could not be taken and --proceed-unlocked was not given. 75 is distinct
-# on purpose: a caller must be able to tell "somebody else holds the lock, retry"
-# apart from "the harness failed", because those two need opposite responses.
+# EXIT CODES: 0 ran, 64 EX_USAGE when invoked against a different tree than the
+# one this wrapper protects, 69 missing dependency (flock), and 75 EX_TEMPFAIL
+# when the lock could not be taken and --proceed-unlocked was not given. 75 is
+# distinct on purpose: a caller must be able to tell "somebody else holds the
+# lock, retry" apart from "the harness failed", because those two need opposite
+# responses.
 #
 # The lock path MUST match verify-all.sh exactly (same resolved .godot cache
 # path), so do not "improve" one side without the other.
 set -u
 
+# Captured BEFORE the cd below: this is the tree the caller was standing in,
+# which is not necessarily the tree this script belongs to.
+CALLER_CWD="$PWD"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 GODOT_BIN="${GODOT_BIN:-godot}"
@@ -45,14 +53,90 @@ GODOT_LOCK_WAIT="${GODOT_LOCK_WAIT:-900}"
 
 CLEAN_TMP=0
 PROCEED_UNLOCKED=0
+ALLOW_CROSS_TREE=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --clean-tmp) CLEAN_TMP=1 ;;
     --proceed-unlocked) PROCEED_UNLOCKED=1 ;;
+    --allow-cross-tree) ALLOW_CROSS_TREE=1 ;;
     *) ARGS+=("$a") ;;
   esac
 done
+
+# ── WHICH TREE WILL GODOT TOUCH, AND IS IT THE ONE THE LOCK PROTECTS? ──────
+# This wrapper locks THIS repo's .godot and then runs Godot with THIS repo as
+# the working directory. Those are the same tree only if the caller meant this
+# repo. They frequently are not the same tree, because the wrapper resolves its
+# own root from its own location: a lane that runs
+#
+#   /path/to/other/worktree/tools/godot-lock.sh --headless --path . --import
+#
+# from its own worktree gets a green that describes the OTHER tree — including,
+# on this machine, the shared base checkout, which is 17 commits behind
+# origin/main and carries another lane's unlanded commit. Nothing in the output
+# says so. That is the worst failure this script can have: a confident,
+# well-formatted result about code the caller never intended to test.
+#
+# So: refuse, and name every tree involved. The lock protects ROOT's cache; if
+# the project Godot would open is anywhere else, the lock is guarding the wrong
+# cache and the run is not the run the caller asked for.
+#
+# `--path` is resolved the way Godot resolves it: relative to the wrapper's
+# ROOT (because of the cd above), not to the caller's directory. With no
+# `--path` at all, Godot uses the working directory, which is ROOT.
+_project_dir() {
+  local want="" a prev=""
+  for a in "$@"; do
+    if [ "$prev" = "--path" ]; then want="$a"; break; fi
+    case "$a" in --path=*) want="${a#--path=}"; break ;; esac
+    prev="$a"
+  done
+  [ -n "$want" ] || { printf '%s' "$ROOT"; return; }
+  case "$want" in /*) printf '%s' "$want" ;; *) printf '%s/%s' "$ROOT" "$want" ;; esac
+}
+PROJECT_DIR="$(readlink -m "$(_project_dir "${ARGS[@]+"${ARGS[@]}"}")")"
+ROOT_RESOLVED="$(readlink -m "$ROOT")"
+CALLER_RESOLVED="$(readlink -m "$CALLER_CWD")"
+# Standing inside the repo is the documented usage (`cd` to the tree, call the
+# wrapper by relative path). Standing OUTSIDE it means any relative `--path` —
+# including the documented `--path .` — silently resolved against ROOT instead
+# of the caller's directory, which is the substitution this guard exists to
+# catch. Comparing PROJECT_DIR to ROOT alone cannot see it: `--path .` DOES
+# resolve to ROOT, so the substitution is invisible unless the caller's own
+# position is checked too.
+case "$CALLER_RESOLVED" in
+  "$ROOT_RESOLVED"|"$ROOT_RESOLVED"/*) CALLER_INSIDE=1 ;;
+  *) CALLER_INSIDE=0 ;;
+esac
+
+_refuse() { # _refuse <headline> <detail lines...>
+  echo "godot-lock: REFUSING: $1" >&2
+  shift
+  for line in "$@"; do echo "godot-lock:        $line" >&2; done
+  echo "godot-lock:        cd into the tree you want to test and call the wrapper by RELATIVE path:" >&2
+  echo "godot-lock:          cd ${PROJECT_DIR} && tools/godot-lock.sh --headless --path . --import" >&2
+  echo "godot-lock:        (pass --allow-cross-tree only if running the two apart is deliberate)" >&2
+  exit 64
+}
+
+if [ "$PROJECT_DIR" != "$ROOT_RESOLVED" ] && [ "$ALLOW_CROSS_TREE" -eq 0 ]; then
+  _refuse "this wrapper protects a DIFFERENT tree than the one you asked Godot to open" \
+    "caller directory: ${CALLER_CWD}" \
+    "wrapper repo:      ${ROOT}" \
+    "project --path:    ${PROJECT_DIR}" \
+    "the lock protects ${ROOT}/.godot, NOT ${PROJECT_DIR}/.godot," \
+    "so a green from this run would describe ${PROJECT_DIR}, not ${ROOT}"
+elif [ "$CALLER_INSIDE" -eq 0 ] && [ "$ALLOW_CROSS_TREE" -eq 0 ]; then
+  _refuse "you are standing outside this repo, so a relative --path resolved to the WRONG tree" \
+    "caller directory: ${CALLER_CWD}   (outside ${ROOT})" \
+    "wrapper repo:      ${ROOT}" \
+    "project --path:    ${PROJECT_DIR}   (relative --path resolves against the wrapper's repo, not your directory)" \
+    "so a green from this run would describe ${ROOT}, not ${CALLER_CWD}"
+fi
+if [ "$PROJECT_DIR" != "$ROOT_RESOLVED" ] || [ "$CALLER_INSIDE" -eq 0 ]; then
+  echo "godot-lock: WARNING: --allow-cross-tree given; the lock protects ${ROOT}/.godot while Godot will open ${PROJECT_DIR} (your cwd was ${CALLER_CWD})" >&2
+fi
 
 if ! command -v flock >/dev/null 2>&1; then
   echo "godot-lock: flock is required to protect the shared .godot cache" >&2

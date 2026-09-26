@@ -73,7 +73,9 @@ trap cleanup EXIT
 
 cat > "$STUB" <<'STUBEOF'
 #!/usr/bin/env bash
-echo "GODOT-RAN args:$*"
+# The pwd is the POINT: it is the print-marker technique, so a test can assert
+# WHICH TREE Godot would have opened, not merely that it ran.
+echo "GODOT-RAN pwd=$PWD args:$*"
 exit 0
 STUBEOF
 chmod +x "$STUB"
@@ -142,6 +144,11 @@ lacks() { ! printf '%s' "$OUT" | grep -qF -- "$1"; }
 echo "=== godot-lock.sh red arm ==="
 echo "wrapper: $WRAPPER"
 echo "lock:    $LOCK (private; the shared gate lock is untouched)"
+
+# Every case below invokes the wrapper the DOCUMENTED way — from inside the repo
+# by absolute path — so the tree guard is satisfied. Case [F] is the one that
+# deliberately steps outside it.
+cd "$ROOT" || { echo "cannot cd to $ROOT" >&2; exit 1; }
 
 # ── A: contended, default flags → refuse loudly, claim nothing ──────────────
 echo "[A] contended lock, no override"
@@ -212,6 +219,35 @@ has "GODOT-RAN";                                     check "executes Godot" $?
 echo "[E] plain uncontended run"
 run_wrapper --headless --path . --import
 [ "$RC" -eq 0 ] && has "GODOT-RAN";                  check "uncontended invocation still works" $?
+
+# ── F: a green must never describe a different tree ───────────────────────
+# The wrapper resolves its own root from its own location, so invoking it BY
+# ABSOLUTE PATH from another worktree used to silently run Godot against the
+# WRONG tree and still exit 0. On this machine the wrong tree is the shared base
+# checkout: 17 commits behind origin/main, carrying another lane's unlanded
+# commit, with 36 dirty paths. Proven with the print marker before the guard
+# existed: a stub Godot reported pwd=<base checkout> while the caller stood in a
+# clean worktree at origin/main, and the run exited 0 with nothing in the output
+# saying so. This is the worst failure a wrapper can have — a confident,
+# well-formatted result about code nobody meant to test.
+echo "[F] invoked from another tree must refuse, not silently substitute"
+OUT="$(cd "$TMP" && GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --headless --path . --import 2>&1)"
+RC=$?
+printf '%s\n' "$OUT" | sed 's/^/    | /'
+[ "$RC" -eq 64 ];                                   check "exits 64 EX_USAGE, distinct from a lock timeout" $? "rc=$RC"
+lacks "GODOT-RAN";                                   check "does NOT run Godot against the wrong tree" $?
+has "REFUSING";                                     check "says it is refusing" $?
+has "$TMP";                                         check "names the caller's directory" $?
+has "$ROOT";                                        check "names the wrapper's repo" $?
+has "cd into the tree you want to test";            check "gives the one-line remedy" $?
+
+echo "[F2] the same call, deliberately overridden"
+OUT="$(cd "$TMP" && GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$WRAPPER" --allow-cross-tree --headless --path . --import 2>&1)"
+RC=$?
+printf '%s\n' "$OUT" | sed 's/^/    | /'
+[ "$RC" -eq 0 ];                                     check "runs when explicitly allowed (exit 0)" $?
+has "WARNING: --allow-cross-tree";                  check "still warns which two trees are involved" $?
+has "pwd=$ROOT";                                     check "print marker: Godot would open the WRAPPER's tree, proving the substitution was real" $?
 
 printf '\n  %d passed, %d failed\n' "$PASS" "$FAIL"
 if [ "$FAIL" -ne 0 ]; then
