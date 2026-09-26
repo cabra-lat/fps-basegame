@@ -67,6 +67,25 @@ Xvfb on `:99` is expected to be already running. If not: `Xvfb :99 &`.
      REVERTS them. So record `base`, redo the `read-tree` if HEAD moved, and confirm with
      `git show --stat HEAD` that only your files entered (a "board" commit listing 3 NPC
      files is how `a403a54` would have been caught in 2 seconds).
+   - **Sign with your LANE HANDLE, never a model or a product name.** A
+     `Co-Authored-By` trailer names an agent lane — `Co-Authored-By: qa <qa@local>`
+     is correct, and 30 trailers in this history already do exactly that. It must
+     never name a model, a product, or a vendor.
+     **Proven, not hypothetical:** `b7ecae3` and `6d7fe55` carried
+     `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>` in a
+     project that has never run Claude. GitHub renders trailers as contributors, so
+     it published a false attribution on the public repo — and it was invisible to
+     `git log --format=%an`, to `%ae`, and to `gh api .../contributors`, so every
+     one of those checks reported "no such contributor" while the web page showed it.
+     **If you did not run under that name, do not sign it.** If a trailer is
+     generated rather than typed, treat that as a finding: it was emitted, not
+     written, and nothing in the environment put it there (no hook, no
+     `commit.template`, no `core.hooksPath`, no Claude config on the host).
+     Trailer formatting tell: a real trailer is separated from the body by a BLANK
+     line. One jammed directly onto the last prose line is generated.
+   - **History rewrite is not a lane's call.** Removing a bad trailer re-SHAs every
+     descendant and forces a push on every ref that carries it — with 44 branches
+     and 12 lanes, that is a coordinator operation. Report it; do not do it.
      Trap: after a throwaway-index commit the REAL index is stale for those paths
      (`git status` shows `D ` staged) — a lane committing without a pathspec would then
      DELETE your files. Always close with **`git reset -q -- <your files>`** (path-scoped,
