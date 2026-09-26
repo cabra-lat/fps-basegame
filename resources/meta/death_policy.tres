@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="DeathPolicy" load_steps=2 format=3 uid="uid://c4policydeath01"]
+
+[ext_resource type="Script" path="res://src/meta/death_policy.gd" id="1_dp"]
+
+[resource]
+script = ExtResource("1_dp")
+loss = 0
+recoverable = true
+preserves_role_kit = true
+safe_pocket = Array[String](["res://resources/raid1/marked_intel.tres", "res://resources/medical/army_bandage.tres", "res://resources/medical/cat_hemostatic_tourniquet.tres", "res://resources/medical/aluminium_splint.tres", "res://resources/medical/bottle_of_water.tres", "res://resources/medical/cms_surgical_kit.tres", "res://resources/medical/salewa_first_aid_kit.tres"])
