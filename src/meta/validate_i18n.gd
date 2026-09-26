@@ -174,12 +174,9 @@ func _check_keys_are_declared() -> void:
 	# and the rendered checks are what catch a bypass. What this looser half still
 	# catches is the case it exists for: a catalogue entry whose feature is gone.
 	#
-	# COMMENTS ARE STRIPPED FIRST, and that is QA's required narrowing rather than
-	# my own care: matching raw text let a key be declared with no PO entry and no
-	# call site and still count as "used" if it appeared in a COMMENT -- which
-	# defeats the rule in exactly the case it exists for, because a retired feature
-	# leaves its string behind in the comments that explain why it was retired.
-	# Measured by QA: a key declared only inside a comment passed the used check.
+	# COMMENTS ARE STRIPPED FIRST, in BOTH halves -- see _keys_used_in_sources for
+	# why the strict half needs it as much as this one, and why that is not a
+	# regression of the detection it is there to provide.
 	for path in SOURCE_FILES:
 		for literal in _match_all(_strip_comments(_read(path)), '"([^"]*)"'):
 			if DECLARED_KEYS.has(literal) and not used.has(literal):
@@ -606,9 +603,20 @@ func _keys_in(subject: Array, missing_only: bool, other: Array) -> Array[String]
 	return out
 
 func _keys_used_in_sources() -> Array[String]:
+	# Comments are stripped here too, not only in the loose half. QA's probe
+	# commented out a tr("KEY") call and the STRICT half still counted it as a
+	# call site, so the gate demanded a declaration for a call that no longer
+	# exists -- the mirror image of the loose-half hole, and louder, because a
+	# false FAIL invites deleting the rule.
+	#
+	# The asymmetry I reasoned about still holds and is why this is safe: the
+	# loose half matches bare literals, so a "#" inside a string can cost a match
+	# there; the patterns below are anchored shapes (tr("..."),
+	# TranslationServer.translate("..."), _t("..."), .translate("...")), so a
+	# "#" inside a quoted key cannot manufacture a match here.
 	var texts: Array[String] = []
 	for path in SOURCE_FILES:
-		texts.append(_read(path))
+		texts.append(_strip_comments(_read(path)))
 	var found: Array[String] = []
 	for text in texts:
 		for key in _keys_in_text(text):
