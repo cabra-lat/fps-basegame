@@ -73,15 +73,15 @@ func _initialize() -> void:
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
 	var locales := TranslationServer.get_loaded_locales()
+
 	# === CONSTRUCTED PROBE (throwaway branch, never merge) ===
-	# Announces itself and scopes itself. Asks one question: is the pt-BR
-	# catalogue LOADED, as distinct from merely present in the tree?
+	# Is the pt-BR catalogue LOADED, as distinct from merely present in the tree?
 	print("PROBE loaded_locales=", locales)
 	print("PROBE po_exists=", ResourceLoader.exists("res://locale/game.po"))
 	print("PROBE po_loaded=", load("res://locale/game.po") != null)
-	print("PROBE tr(Marked Intel)=", TranslationServer.translate("Marked Intel"))
-	print("PROBE tr(marked intel)=", TranslationServer.translate("marked intel"))
-	# === END CONSTRUCTED PROBE
+	print("PROBE tr_caps=", TranslationServer.translate("Marked Intel"))
+	print("PROBE tr_lower=", TranslationServer.translate("marked intel"))
+	# === END CONSTRUCTED PROBE ===
 	_check(locales.has("pt_BR"), "pt_BR catalogue is registered in project.godot and loaded")
 
 ## Call sites and the declared contract must describe the same key set, in both
@@ -127,6 +127,8 @@ func _check_item_registry() -> void:
 	var ids := ItemNames.registered_ids()
 	var unresolved: Array[String] = []
 	for id in ids:
+		var shown := ItemNames.display_name(id)
+		if shown == "" or shown == id or shown == ItemNames.key_for(id):
 			unresolved.append(id)
 	_check(not ids.is_empty() and unresolved.is_empty(), "every registered item id resolves to a translated name (unresolved: %s)" % ", ".join(unresolved))
 	var bad: Array[String] = []
@@ -156,6 +158,7 @@ func _check_gated_reason_is_localized() -> void:
 	point.queue_free()
 	var reason := String(res.get("reason", ""))
 	var closed := not bool(res.get("ok", false))
+	var shows_name := reason.contains(ItemNames.display_name("marked_intel"))
 	var leaks_id := reason.contains("marked_intel")
 	_check(closed and shows_name and not leaks_id, "the gated extraction reason shows the translated name and never the item id")
 
@@ -195,6 +198,7 @@ func _keys_in_text(text: String) -> Array[String]:
 func _registry_keys() -> Array[String]:
 	var keys: Array[String] = []
 	for id in ItemNames.registered_ids():
+		var key := ItemNames.key_for(id)
 		if not keys.has(key):
 			keys.append(key)
 	return keys
