@@ -52,12 +52,18 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WRAPPER="$ROOT/tools/godot-lock.sh"
+# AGENTS: scratch goes to /tmp/shooter. Create it rather than assuming — a
+# fresh CI runner has no such directory, and `mktemp -d` on a missing parent
+# fails, which would look like a test failure rather than a missing directory.
+mkdir -p /tmp/shooter
 TMP="$(mktemp -d /tmp/shooter/godot-lock-test.XXXXXX)"
 LOCK="$TMP/test.lock"
 STUB="$TMP/stub-godot"
 PASS=0
 FAIL=0
 HOLDER_PID=""
+READY=""
+HOLD_SEQ=0
 
 cleanup() {
   release_lock
@@ -72,16 +78,39 @@ exit 0
 STUBEOF
 chmod +x "$STUB"
 
-# Holds the lock for N seconds. Exactly ONE process ends up holding it: bash
-# opens fd 9, flocks, then EXECs sleep, so there is a single killable PID. This
-# matters — `flock -x file -c "sleep N" &` leaves the forked `sleep` holding an
-# inherited descriptor, so killing the flock process does NOT release the lock
-# and the next case runs contended without anyone noticing. Never kills anyone's
-# process but the one this script started.
+# Holds the lock for ${1:-300}s. The test releases it explicitly, so the
+# duration is not "how long the case needs" — it is "long enough that machine
+# load cannot expire it mid-case".
+#
+# That margin is not theoretical. The first version slept 10s and failed 5 runs
+# in 20 under load: godot-lock.sh itself takes 5-10s on a loaded box (measured,
+# load average 23.6 — it forks stat/tr/awk/sed/readlink/pgrep and walks /proc),
+# so a 10s holder could EXPIRE while the wrapper was still running, the lock
+# became genuinely free, and the wrapper correctly acquired it. Every case-A
+# check then failed for a reason that had nothing to do with the wrapper. A
+# holder that expires on its own turns this test into a load meter; make it
+# effectively permanent and let release_lock end it.
+#
+# Exactly ONE process ends up holding it: bash opens fd 9, flocks, then EXECs
+# sleep, so there is a single killable PID. (`flock -x file -c "sleep N" &`
+# would leave the forked `sleep` holding an inherited descriptor, so killing the
+# flock process does NOT release the lock.)
+#
+# It then PROVES it holds the lock (a ready file) instead of sleeping and
+# hoping: a fixed `sleep 0.4` was the original version here, and the wrapper
+# could start before the child had run at all. Never kills anyone's process but
+# the one this script started.
 hold_lock() {
-  bash -c 'exec 9>"$1"; flock -x 9; exec sleep "$2"' _ "$LOCK" "${1:-10}" &
+  READY="$TMP/ready.$HOLD_SEQ"
+  HOLD_SEQ=$((HOLD_SEQ + 1))
+  rm -f "$READY"
+  bash -c 'exec 9>"$1"; flock -x 9; : > "$2"; exec sleep "$3"' _ "$LOCK" "$READY" "${1:-300}" &
   HOLDER_PID=$!
-  sleep 0.4
+  for _ in $(seq 1 100); do
+    [ -e "$READY" ] && return 0
+    sleep 0.1
+  done
+  return 1
 }
 
 release_lock() {
@@ -116,7 +145,8 @@ echo "lock:    $LOCK (private; the shared gate lock is untouched)"
 
 # ── A: contended, default flags → refuse loudly, claim nothing ──────────────
 echo "[A] contended lock, no override"
-hold_lock 10
+hold_lock
+check "setup: the holder really holds the lock" $?
 run_wrapper --headless --path . --import
 printf '%s\n' "$OUT" | sed 's/^/    | /'
 [ "$RC" -ne 0 ];                                    check "exits non-zero" $?
@@ -133,7 +163,8 @@ flock -n "$LOCK" -c true 2>/dev/null; check "the lock is free again after releas
 
 # ── B: contended, --proceed-unlocked → runs, says so, still claims nothing ─
 echo "[B] contended lock with --proceed-unlocked"
-hold_lock 10
+hold_lock
+check "setup: the holder really holds the lock" $?
 run_wrapper --proceed-unlocked --headless --path . --import
 printf '%s\n' "$OUT" | sed 's/^/    | /'
 [ "$RC" -eq 0 ];                                     check "runs (exit 0)" $?
@@ -158,14 +189,18 @@ cat > "$TMP/holder.sh" <<'HOLDEREOF'
 #!/usr/bin/env bash
 # Hold the lock on fd 9 and run the wrapper as a CHILD, so the wrapper's /proc
 # ancestor walk finds this process holding the lock file — which is exactly the
-# situation verify-all creates for anything it spawns.
+# situation verify-all creates for anything it spawns. The ready file is the
+# same handshake hold_lock uses: the wrapper must not start before the lock is
+# actually held, or this case silently tests the non-nested path.
 exec 9>"$1"
 flock -x 9
-shift
+: > "$2"
+shift 2
 "$@"
 HOLDEREOF
 chmod +x "$TMP/holder.sh"
-OUT="$(GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$TMP/holder.sh" "$LOCK" bash "$WRAPPER" --headless --path . --import 2>&1)"
+READY="$TMP/ready.D"
+OUT="$(GODOT_BIN="$STUB" GODOT_LOCK_FILE="$LOCK" GODOT_LOCK_WAIT=2 bash "$TMP/holder.sh" "$LOCK" "$READY" bash "$WRAPPER" --headless --path . --import 2>&1)"
 RC=$?
 printf '%s\n' "$OUT" | sed 's/^/    | /'
 [ "$RC" -eq 0 ];                                     check "runs without self-deadlocking (exit 0)" $?

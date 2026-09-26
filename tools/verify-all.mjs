@@ -366,6 +366,43 @@ function gitOutput(repo, gitArgs) {
   return result.status === 0 ? result.stdout : null;
 }
 
+// LOCK WRAPPER HONESTY. tools/godot-lock.sh is what every lane is told to use
+// instead of running Godot directly, precisely because .godot is shared; a
+// wrapper that times out and then runs anyway reintroduces the race it exists
+// to prevent, and one that logs "lock acquired" when it did not acquire it
+// makes a lane believe the cache is protected. Both defects shipped here once,
+// so the invariant is asserted here rather than trusted.
+//
+// It runs BEFORE the import: it needs no .godot, takes seconds, and a run that
+// learns the lock is lying should not first spend minutes importing. The test
+// uses a private lock file and a stub GODOT_BIN (Godot is never invoked, the
+// shared lock is never touched), so it is safe to run inside the gate's own
+// flock and while other lanes are working.
+function gateLockWrapper() {
+  const script = join(ROOT, 'tools', 'test-godot-lock.sh');
+  if (!existsSync(script)) {
+    // A gate pointing at a path that is not there is a wiring fault, not
+    // evidence about the lock. Same rule as the harness preflight.
+    record('lock_wrapper', 'FAIL', `tools/test-godot-lock.sh is not on disk — the lock wrapper's own red arm is missing (${script})`);
+    return;
+  }
+  const result = spawnSync('bash', [script], { cwd: ROOT, encoding: 'utf8', timeout: 300_000 });
+  const out = `${result.stdout || ''}${result.stderr || ''}`;
+  const logPath = join(logDir, 'lock_wrapper.log');
+  writeFileSync(logPath, out);
+  if (result.error) {
+    record('lock_wrapper', 'FAIL', `could not run the red arm: ${result.error.message} (see ${logPath})`);
+    return;
+  }
+  const passed = out.match(/(\d+) passed, (\d+) failed/);
+  const failedChecks = out.split('\n').filter((l) => /^\s*FAIL\s/.test(l));
+  if (result.status !== 0 || !passed || Number(passed[2]) !== 0) {
+    record('lock_wrapper', 'FAIL', `lock wrapper red arm: ${passed ? `${passed[1]} passed, ${passed[2]} failed` : 'no result line'} — the wrapper must refuse to run unlocked and must never claim a lock it did not take. ${failedChecks.slice(0, 4).join(' | ') || `see ${logPath}`}`);
+    return;
+  }
+  record('lock_wrapper', 'PASS', `lock wrapper refuses on timeout, never claims an unheld lock, and names which path it took (${passed[1]} checks, see ${logPath})`);
+}
+
 function gateUidTracking() {
   const list = join(logDir, 'uid_missing.log');
   writeFileSync(list, '');
@@ -490,6 +527,7 @@ async function gateExport() {
 async function main() {
   console.log(`=== verify-all ===  root=${ROOT}  godot=${spawnSync(godot, ['--version'], { encoding: 'utf8' }).stdout.trim()}`);
   console.log(`logs: ${logDir}\n`);
+  gateLockWrapper();
   const importOk = await importGodot();
   gateUidTracking();
   if (!importOk) {
