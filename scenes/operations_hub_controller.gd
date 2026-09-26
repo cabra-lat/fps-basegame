@@ -15,6 +15,7 @@ signal hub_return_requested
 
 const HUB_SCENE := "res://scenes/operations_hub.tscn"
 const DEFAULT_ARENA_SCENE := "res://scenes/arena_blockout.tscn"
+const STARTER_LOADOUT_PATH := "res://resources/meta/starter_loadout.tres"
 const ACTIVE_LOADOUT_ID := "active"
 const ACTIVE_LOADOUT_LABEL := "Loadout ativo"
 
@@ -150,15 +151,52 @@ func _on_report_ready(summary: String) -> void:
 func _apply_meta_snapshot() -> void:
 	if hub == null or meta_service == null:
 		return
-	var profile_value = meta_service.get("profile")
+	var profile_value = _ensure_playable_profile()
 	if profile_value is PlayerProfile:
 		hub.set_profile(profile_value as PlayerProfile)
 	if profile_value is MetaProfile:
 		hub.set_last_report((profile_value as MetaProfile).last_report)
 	_project_meta_options(profile_value)
+	_refresh_stash_snapshot()
+
+
+## The hub is the playable entry point, so an unarmed profile must not land in
+## an empty dead end. Meta owns the once-per-raid-cost rescue and persistence;
+## the route only supplies the data-driven starter resource.
+func _ensure_playable_profile() -> Variant:
+	if meta_service.has_method("ensure_playable_loadout"):
+		var starter := load(STARTER_LOADOUT_PATH) as StarterLoadout
+		if starter != null:
+			meta_service.call("ensure_playable_loadout", starter)
+	return meta_service.get("profile")
 
 
 func _project_meta_options(profile_value: Variant) -> void:
+	# New Meta API: active kit + every stash weapon as a deployable candidate.
+	# Older Meta keeps the legacy single-projection fallback below.
+	if meta_service != null and meta_service.has_method("hub_deploy_candidates"):
+		var projected_options = meta_service.call("hub_deploy_candidates")
+		if projected_options is Array:
+			selection_registry.clear()
+			var presented: Array[Dictionary] = []
+			for raw in projected_options as Array:
+				if not raw is Dictionary:
+					continue
+				var option := raw as Dictionary
+				var option_id := String(option.get("id", ""))
+				var option_selection = option.get("selection", {})
+				if option_id == "" or not option_selection is Dictionary:
+					continue
+				selection_registry[option_id] = (option_selection as Dictionary).duplicate(true)
+				presented.append({
+					"id": option_id,
+					"label": String(option.get("label", "Loadout %s" % option_id)),
+					"valid": bool(option.get("valid", true)),
+					"summary": String(option.get("summary", "Loadout selecionado")),
+					"items": option.get("items", []),
+				})
+			hub.set_loadouts(presented)
+			return
 	# MetaService.deploy_options() is the read-only projection authority. Keep
 	# the call dynamic so the hub can be imported before Meta's API lands.
 	if meta_service != null and meta_service.has_method("deploy_options"):
@@ -195,6 +233,16 @@ func _project_meta_options(profile_value: Variant) -> void:
 		hub.set_loadouts([])
 		return
 	_project_registry()
+
+
+func _refresh_stash_snapshot() -> void:
+	if hub == null:
+		return
+	if meta_service == null or not meta_service.has_method("hub_stash_snapshot"):
+		hub.set_stash_items([])
+		return
+	var snapshot = meta_service.call("hub_stash_snapshot")
+	hub.set_stash_items(snapshot if snapshot is Array else [])
 
 
 func _project_registry() -> void:

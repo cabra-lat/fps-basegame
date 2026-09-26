@@ -20,6 +20,7 @@ enum LoadoutState {
 @export var title_text := "CENTRAL DE OPERAÇÕES"
 @export var empty_report_text := "Nenhum relatório anterior"
 @export var empty_loadout_text := "Nenhum loadout disponível"
+@export var empty_stash_text := "Reserva vazia"
 @export var invalid_loadout_text := "Loadout inválido ou incompleto"
 @export var valid_loadout_text := "Pronto para iniciar"
 
@@ -28,6 +29,7 @@ enum LoadoutState {
 var profile: PlayerProfile
 var last_report: Variant
 var loadout_options: Array[Dictionary] = []
+var stash_items: Array[Dictionary] = []
 var selected_loadout_id := ""
 var loadout_state: LoadoutState = LoadoutState.EMPTY
 
@@ -37,6 +39,7 @@ var profile_label: Label
 var report_label: Label
 var loadout_picker: OptionButton
 var loadout_details: Label
+var stash_label: Label
 var status_label: Label
 var deploy_button: Button
 var return_button: Button
@@ -109,6 +112,14 @@ func _build_ui() -> void:
 	loadout_details.text = empty_loadout_text
 	loadout_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	loadout_section.add_child(loadout_details)
+
+	var stash_section := _section("ARMAZENAMENTO", column)
+	stash_label = Label.new()
+	stash_label.name = "StashItems"
+	stash_label.text = empty_stash_text
+	stash_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stash_label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.92))
+	stash_section.add_child(stash_label)
 
 	status_label = Label.new()
 	status_label.name = "LoadoutStatus"
@@ -186,6 +197,16 @@ func set_last_report(value: Variant) -> void:
 	_refresh()
 
 
+## Stash entries are presentation dictionaries: name, count and weapon. The
+## shell never receives or mutates the owner's inventory objects.
+func set_stash_items(items: Array) -> void:
+	stash_items.clear()
+	for item in items:
+		if item is Dictionary:
+			stash_items.append((item as Dictionary).duplicate(true))
+	_refresh()
+
+
 ## Options are plain presentation dictionaries. Expected keys are:
 ##   id (required), label, valid, summary, items.
 ## The owner decides validity; this node only represents empty/valid/invalid
@@ -230,6 +251,8 @@ func _refresh() -> void:
 		_rebuild_picker()
 	if loadout_details != null:
 		loadout_details.text = _details_text()
+	if stash_label != null:
+		stash_label.text = _stash_text()
 	if status_label != null:
 		match loadout_state:
 			LoadoutState.VALID:
@@ -294,6 +317,17 @@ func _details_text() -> String:
 			labels.append(String(item.get("name", item)) if item is Dictionary else String(item))
 		return ", ".join(labels)
 	return "Sem detalhes fornecidos"
+
+
+func _stash_text() -> String:
+	if stash_items.is_empty():
+		return empty_stash_text
+	var labels: Array[String] = []
+	for item in stash_items:
+		var count := maxi(int(item.get("count", 1)), 1)
+		var name_text := String(item.get("name", "?"))
+		labels.append("%s ×%d" % [name_text, count] if count > 1 else name_text)
+	return "    ".join(labels)
 
 
 func _report_text() -> String:

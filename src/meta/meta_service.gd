@@ -354,6 +354,23 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 		return 0
 	if bool(profile.role_state().get("starter_granted", false)):
 		return 0
+	return _grant_starter_items(sl)
+
+## Keep the playable loop reachable: a profile that owns no deployable weapon in
+## EITHER its loadout or stash receives the same data-driven starter kit again.
+## Refilling cannot launder items into the shared bank (starter gear is marked
+## non-transferable) and costs a lost raid, so this is a dead-end rescue rather
+## than an infinite faucet. Persisted immediately: the hub is a real entry point.
+func ensure_playable_loadout(sl: StarterLoadout) -> int:
+	if sl == null or profile == null or _owned_weapon_count() > 0:
+		return 0
+	var added := _grant_starter_items(sl)
+	if added > 0:
+		_save()
+	return added
+
+
+func _grant_starter_items(sl: StarterLoadout) -> int:
 	var added := 0
 	for slot_name in sl.slots:
 		var arr: Array = []
@@ -363,7 +380,7 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 				continue
 			# Starter gear is non-transferable: it can be equipped and used, but it must
 			# not be laundered into the shared bank (sold to a trader, bartered or listed
-			# on the flea) — otherwise the once-per-faction grant is an infinite faucet.
+			# on the flea) — otherwise the grant is an infinite faucet.
 			item.set_meta("no_transfer", true)
 			arr.append(ItemCodec.encode_item(item))
 			added += 1
@@ -373,6 +390,23 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 		profile.currency = sl.currency
 	profile.role_state()["starter_granted"] = true
 	return added
+
+
+func _owned_weapon_count() -> int:
+	var count := 0
+	for slot_name in profile.loadout:
+		var raw: Variant = profile.loadout[slot_name]
+		if not (raw is Array):
+			continue
+		for data in raw as Array:
+			var item := ItemCodec.decode_item(data) if data is Dictionary else null
+			if item != null and item.extra is Weapon:
+				count += 1
+	if profile.stash != null:
+		for item in profile.stash.items:
+			if item != null and item.extra is Weapon:
+				count += 1
+	return count
 
 ## Validate a hub selection without mutating the profile. Selection values are
 ## ItemCodec dictionaries keyed by the two weapon sites. Each selected item must
@@ -432,6 +466,72 @@ func deploy_options() -> Dictionary:
 		"label": "Active kit",
 		"selection": selection,
 	}
+
+
+## Hub-facing projection of the active kit plus every weapon the player can move
+## out of the stash. The controller receives only opaque ids plus canonical
+## ItemCodec selections; validation and ownership stay in MetaService.
+func hub_deploy_candidates() -> Array[Dictionary]:
+	var options: Array[Dictionary] = []
+	var active := deploy_options()
+	if not active.is_empty():
+		var active_selection: Dictionary = (active.get("selection", {}) as Dictionary).duplicate(true)
+		options.append({
+			"id": "active",
+			"label": "Kit ativo",
+			"valid": true,
+			"summary": "Loadout selecionado",
+			"items": _loadout_item_names(active_selection),
+			"selection": active_selection,
+		})
+	if profile == null or profile.stash == null:
+		return options
+	for i in profile.stash.items.size():
+		var item: InventoryItem = profile.stash.items[i]
+		if item == null or not item.extra is Weapon:
+			continue
+		var data := ItemCodec.encode_item(item)
+		var selection := {"primary": [data]}
+		if not validate_deploy(selection).get("ok", false):
+			continue
+		options.append({
+			"id": "stash:%d" % i,
+			"label": "Reserva · %s" % item.name,
+			"valid": true,
+			"summary": "Da reserva para primary",
+			"items": [String(item.name)],
+			"selection": selection,
+		})
+	return options
+
+
+## Presentation-only stash summary. The hub never receives resource objects.
+func hub_stash_snapshot() -> Array[Dictionary]:
+	var snapshot: Array[Dictionary] = []
+	if profile == null or profile.stash == null:
+		return snapshot
+	for item in profile.stash.items:
+		if item == null:
+			continue
+		snapshot.append({
+			"name": String(item.name),
+			"count": maxi(item.stack_count, 1),
+			"weapon": item.extra is Weapon,
+		})
+	return snapshot
+
+
+func _loadout_item_names(selection: Dictionary) -> Array[String]:
+	var names: Array[String] = []
+	for slot_name in selection:
+		var raw: Variant = selection[slot_name]
+		if not (raw is Array):
+			continue
+		for data in raw as Array:
+			var item := ItemCodec.decode_item(data) if data is Dictionary else null
+			if item != null:
+				names.append(String(item.name))
+	return names
 
 
 ## Stage the selected kit as the profile's active loadout. Items selected from the

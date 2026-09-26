@@ -28,7 +28,9 @@ func _ready() -> void:
 	_setup_settings()
 
 func _on_play() -> void:
-	get_tree().change_scene_to_file("res://scenes/arena_blockout.tscn")
+	# Play is the between-raid entry point: the hub owns loadout + stash and
+	# only a successful deploy enters the arena.
+	get_tree().change_scene_to_file(HUB_SCENE)
 
 func _on_hub() -> void:
 	get_tree().change_scene_to_file(HUB_SCENE)
