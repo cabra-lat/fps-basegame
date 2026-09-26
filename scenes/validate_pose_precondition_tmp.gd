@@ -50,6 +50,9 @@ var _pass := 0
 ## correct WHATEVER the underlying cause turns out to be.
 var _frame := 0
 const FRAME_BUDGET := 1200
+## The animation LOD radius from the production config, restated here so the
+## fixture asserts the SHIPPED number and not a number I typed from memory.
+const ANIM_LOD_DISTANCE_M := 45.0
 
 
 func _await_frames(n: int, where: String) -> bool:
@@ -76,7 +79,15 @@ func _initialize() -> void:
 	_expect(red["mode"] == "FROZEN_BY_LOD",
 		"a bot at 60 m must read FROZEN_BY_LOD, got %s" % red["mode"])
 	_expect(red["void_reading"] == true, "a frozen subject must mark the reading VOID")
-	_expect(red["message"].contains("60"), "the message must carry the distance, got: %s" % red["message"])
+	# NOT the PLACEMENT distance. This arm once asserted the message contains the
+	# 60 m it placed the subject at, and it failed while the message was RIGHT: the
+	# measured distance was 91.3 m, because the bot had walked. Asserting a number
+	# I typed is the same error as asserting a file path I typed. What matters is
+	# that the message carries a MEASURED distance.
+	var _re := RegEx.new()
+	_re.compile("\\d+\\.\\d+ m from the active camera")
+	_expect(_re.search(str(red["message"])) != null,
+		"the message must carry the MEASURED distance, got: %s" % red["message"])
 	_expect(red["remedy"].contains("45"), "the remedy must name the 45 m distance, got: %s" % red["remedy"])
 
 	print("")
@@ -98,15 +109,32 @@ func _initialize() -> void:
 	rig.queue_free()
 
 	print("")
-	print("=== GREEN ARM: a bot INSIDE 45 m, production-shaped, two-axis ===")
-	var green := await _measure(Vector3(0, 0, 20.0), "green arm, 20 m from the camera")
-	print("  mode         : %s" % green["mode"])
-	print("  speed_scale  : %s" % green["speed_scale"])
-	print("  travel_m     : %s" % green["travel_m"])
-	print("  clip_advance : %s" % green["clip_advance"])
-	print("  message      : %s" % green["message"])
-	_expect(green["mode"] == "VALID_SUBJECT",
-		"a travelling, animating bot at 20 m must be VALID, got %s -- %s" % [green["mode"], green["message"]])
+	print("=== CROSSING ARM: a bot PLACED INSIDE 45 m THAT LEAVES IT MID-WINDOW ===")
+	# The failure is a subject that STARTS in range and LEAVES, so the arm forces
+	# exactly that and asserts VOID rather than a smaller number. A harness that
+	# emits a plausible angle after its subject left the radius is the defect.
+	var green := await _measure(Vector3(0, 0, 20.0), "crossing arm, placed at 20 m from the camera")
+	print("  mode          : %s" % green["mode"])
+	print("  speed_scale   : %s" % green["speed_scale"])
+	print("  travel_m      : %s" % green["travel_m"])
+	print("  clip_advance  : %s" % green["clip_advance"])
+	print("  left_at_sample: %s" % green.get("left_at_sample", "n/a"))
+	print("  message       : %s" % green["message"])
+	_expect(green["mode"] == "VOID_LEFT_LOD_RADIUS",
+		"a subject that leaves the radius mid-window must read VOID_LEFT_LOD_RADIUS, got %s" % green["mode"])
+	_expect(green.get("void_reading", false) == true,
+		"a subject that left the radius must mark the reading void")
+	_expect(str(green.get("left_at_sample", -1)) != "n/a" and int(green.get("left_at_sample", -1)) >= 0,
+		"VOID must name the sample at which the subject left the radius")
+	var msg := str(green["message"])
+	_expect(msg.contains("m from the active camera") and msg.contains("%0.1f m" % ANIM_LOD_DISTANCE_M),
+		"VOID must carry BOTH the distance and the radius, got: %s" % msg)
+	_expect(not msg.contains("deg") and not msg.contains("angle"),
+		"a voided reading must NOT emit an angle, got: %s" % msg)
+	_expect(green["mode"] != "VALID_SUBJECT",
+		"a subject that left the radius must never read VALID_SUBJECT")
+	print("  travel was %s m and clip advance %s s, so the subject DID translate and animate:" % [green["travel_m"], green["clip_advance"]])
+	print("  the reading is void only because it walked out of the radius, which is the whole point of the arm")
 
 	print("")
 	print("=== THE TWO-AXIS RULE, AS ITS OWN ASSERTION ===")
@@ -153,14 +181,46 @@ func _measure(at: Vector3, label: String) -> Dictionary:
 	if skel != null and skel.has_method("play"):
 		skel.call("play", &"walk")
 	var start: Vector3 = (bot as Node3D).global_position
+	# PER-SAMPLE LOD PRECONDITION, not a setup-time check. The failure this exists
+	# for is a subject that STARTS in range and LEAVES partway through: a bot
+	# placed at 20 m walks out past 45 m while it is still being measured, the rig
+	# stops animating, and the reading becomes a measurement of a FROZEN rig that
+	# is indistinguishable from a real result. A once-at-setup assertion cannot
+	# catch that, so the distance is read at EVERY sample and the window is voided
+	# at the sample where it breaks, with no angle emitted at all.
+	var left_at := -1
+	var left_dist := 0.0
+	# Whether the subject was EVER measurable is a setup fact, and it decides
+	# WHICH fault this is. A subject that STARTS outside the radius was never a
+	# valid subject and gets the setup-time mode. Only a subject that STARTS
+	# inside and then leaves is the crossing defect, and only that one is voided
+	# mid-window. Collapsing the two would lose the distinction that lets a reader
+	# act, which is the entire reason the modes are separate strings.
+	var start_in_range := (bot as Node3D).global_position.distance_to(_cam.global_position) < ANIM_LOD_DISTANCE_M
 	for _i in 90:
 		if not await _await_frames(1, "measure loop"): return {}
+		var d_now: float = (bot as Node3D).global_position.distance_to(_cam.global_position)
+		if d_now >= ANIM_LOD_DISTANCE_M and left_at < 0:
+			left_at = _i
+			left_dist = d_now
 	var travel: float = (bot as Node3D).global_position.distance_to(start)
 	var anim := _find_anim(bot)
 	var adv := 0.0
 	if anim != null and anim.current_animation_position > 0.0:
 		adv = anim.current_animation_position
 	var res := _precondition(bot, _cam) as Dictionary
+	if left_at >= 0 and start_in_range:
+		# VOID supersedes every other reading, including a valid-looking one. No
+		# angle and no number is emitted, because a plausible number from a
+		# subject that left the radius is the defect this arm exists to prevent.
+		res = {
+			"mode": "VOID_LEFT_LOD_RADIUS",
+			"message": "subject left the animation LOD radius mid-measurement at sample %d of 90: %0.2f m from the active camera, radius %0.1f m" % [left_at, left_dist, ANIM_LOD_DISTANCE_M],
+			"remedy": "the MEASUREMENT is void, not the rig: a translating subject LEAVES the radius, so hold the subject in range for the whole window",
+			"void_reading": true,
+			"left_at_sample": left_at,
+			"left_at_distance_m": left_dist,
+		}
 	res["travel_m"] = travel
 	res["clip_advance"] = adv
 	res["speed_scale"] = (anim.speed_scale if anim != null else -1.0)
