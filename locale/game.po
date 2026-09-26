@@ -184,3 +184,39 @@ msgstr "Cancelado"
 
 msgid "Listing #%d %s %d cr [%s] seller=%s"
 msgstr "Anúncio #%d %s %d cr [%s] vendedor=%s"
+
+# ── Item descriptions ───────────────────────────────────────────────────────
+# The .tres keeps ENGLISH and the English IS the msgid (src/meta/
+# item_descriptions.gd). Resolution happens at render time, so a second language
+# is a catalogue change and not a data-format change.
+#
+# SCOPE, and it is deliberately narrow: the items the meta loop surfaces. 122
+# shipped resources declare a description and all 122 were untranslated at the
+# time of writing, so an item outside this set renders WITHOUT the optional tail
+# rather than with English in it. That is the honest-absence rule, and the
+# translation sweep for the rest is content work, not a code change.
+#
+# M4_Carbine is absent on purpose: its .tres description is still the scaffold
+# text "This Weapon is the default one." (card task_1790405682020_fa3fc5).
+# Translating a placeholder would make it look handled.
+
+msgid "5.56x45mm SS109 (VPAM PM7)"
+msgstr "Munição 5,56x45mm SS109 (VPAM PM7)"
+
+msgid "Compact 1x red-dot sight."
+msgstr "Mira compacta 1x com ponto vermelho."
+
+msgid "M16A2-style flash hider."
+msgstr "Supressor de boca do tipo M16A2."
+
+msgid "A sterile field bandage. Stops light bleeding."
+msgstr "Bandagem de campanha esterilizada. Estanca hemorragias leves."
+
+msgid "Combat application tourniquet. Stops heavy bleeding; leaves the limb unusable."
+msgstr "Torniqueto de campo. Estanca hemorragias graves e inutiliza o membro."
+
+msgid "Field medkit. Heals up to 85 HP and stops bleeding."
+msgstr "Kit de primeiros socorros de campo. Recupera até 85 PV e estanca hemorragias."
+
+msgid "A marked intel packet. Recover it and reach an extraction point."
+msgstr "Um pacote de intel marcado. Recupere-o e chegue a um ponto de extração."

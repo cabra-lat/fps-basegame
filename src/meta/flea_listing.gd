@@ -55,7 +55,34 @@ func status_name() -> String:
 ## visible string. The frame is a key, not a format string, so a game that ships
 ## another locale changes nothing here.
 func line() -> String:
-	return _t("Listing #%d %s %d cr [%s] seller=%s") % [id, item_name(), price, status_name(), seller]
+	var head := _t("Listing #%d %s %d cr [%s] seller=%s") % [id, item_name(), price, status_name(), seller]
+	var desc := item_description()
+	# The tail is a SEPARATE key, not the same key with an extra %s. One key with
+	# six fields would force a described and an undescribed listing to share a
+	# string, and the only ways to share it are an empty gap or a placeholder --
+	# both of which this deliberately avoids.
+	if desc == "":
+		return head
+	return head + _DESCRIPTION_SEPARATOR + desc
+
+## The separator between the frame and an optional description. A constant rather
+## than part of a msgid because it joins two already-resolved strings; it is
+## punctuation, not prose, and it is deliberately not translatable.
+const _DESCRIPTION_SEPARATOR := " -- "
+
+## The item's description, resolved for display, or "" when there is none.
+##
+## Resolved from `path` through the same authority as item_name() above, so a
+## listing and the item it points at can never disagree about what it says. The
+## tail is OPTIONAL, and that is the whole design: `line()` appends it only when
+## this returns something, so a described item reads
+## `Listing #1 Army Bandage 1125 cr [Active] seller=anon -- <prose>` and an
+## undescribed one reads `Listing #2 <...> seller=anon` with no gap and no
+## invented "no description" text. An empty gap would tell the player something
+## is missing; an absent segment tells them this item simply has none, which is
+## true.
+func item_description() -> String:
+	return ItemDescriptions.display_description_for_path(String(item.get("path", "")))
 
 ## tr() is instance-bound and status_name() is called from contexts that hold no
 ## Node, so the static translation entry point is used here.
