@@ -145,10 +145,16 @@ func _initialize() -> void:
 	print("RESULT: %s" % ("PASS" if _passed == _checks else "FAIL"))
 	quit(0 if _passed == _checks else 1)
 
-## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
-	# Both checks below can fail, which the pair they replaced could not: a
-	# locale is REGISTERED whether or not it is SELECTED, so the old
+	# PRECONDITION, from translation_probe.gd (main, b93618e): is the locale we
+	# are about to assert against actually the ACTIVE one, and does the catalogue
+	# answer at all? Taken first, verbatim, because there is no version of these
+	# two lines and the ones below that disagree about anything -- a precondition
+	# that ran after the verifications would be reporting on a locale the
+	# verifications no longer used.
+	#
+	# Both of these can fail, which the pair they replaced could not: a locale is
+	# REGISTERED whether or not it is SELECTED, so the old
 	# `get_loaded_locales().has("pt_BR")` was true in the working case and the
 	# broken case alike.
 	#
@@ -160,6 +166,26 @@ func _check_catalogue_loaded() -> void:
 		"the locale under test (%s) is the ACTIVE locale, not inherited from the host" % TranslationProbe.PROBE_LOCALE)
 	_check(TranslationProbe.catalogue_answers(),
 		"fixture msgid %r resolves from the catalogue - if it was RENAMED in locale/game.po, update SENTINEL in translation_probe.gd rather than hunting a content defect (came back as %r)" % [TranslationProbe.SENTINEL, TranslationProbe.sentinel_result()])
+
+	# VERIFICATION, and this is the part the precondition cannot do. "The
+	# catalogue answers" and "the catalogue is THIS project's catalogue" are
+	# different questions: a locale can be selected and answered by a catalogue
+	# that is not ours, which is a defect no precondition would notice and no
+	# per-defect verdict would let a reader guess at. Each verdict is checked
+	# separately so a failure NAMES which defect is present.
+	var v: Dictionary = I18nCatalogue.verify(TranslationProbe.PROBE_LOCALE, PO_PATH)
+	_check(bool(v.get("locale_loaded", false)), "pt_BR catalogue is registered in project.godot and loaded")
+	_check(bool(v.get("object_held", false)), "TranslationServer holds a pt_BR object, not only a locale name")
+	if not bool(v.get("object_held", false)):
+		return
+	var missing: Array = v.get("missing", [])
+	var differ: Array = v.get("differ", [])
+	_check(missing.is_empty(), "the LOADED pt_BR catalogue carries every msgid in locale/game.po (missing %d: %s)" % [missing.size(), str(missing.slice(0, 3))])
+	_check(differ.is_empty(), "no msgid resolves to a different string than the catalogue declares (differs: %s)" % str(differ.slice(0, 3)))
+	# The expected string is read from the catalogue and never written here: this
+	# file is scanned for msgstr values, so a hardcoded expectation would be both a
+	# leak and a second thing to keep in sync.
+	_check(bool(v.get("resolves", false)), "a msgid resolves end to end through TranslationServer, not just by membership")
 
 ## Call sites and the declared contract must describe the same key set, in both
 ## directions: a new tr() call without a declared key fails, and a declared key
@@ -749,17 +775,10 @@ func _registry_keys() -> Array[String]:
 			keys.append(key)
 	return keys
 
-## Every non-header msgstr in the catalogue.
+## Every non-header msgstr in the catalogue. PO reading lives in I18nCatalogue;
+## this stays a one-line delegate so the leak check's call site reads the same.
 func _po_msgstrs() -> Array[String]:
-	var out: Array[String] = []
-	var in_header := true
-	for raw in _read(PO_PATH).split("\n"):
-		var line := raw.strip_edges()
-		if line.begins_with("msgid "):
-			in_header = line == 'msgid ""'
-		elif line.begins_with("msgstr ") and not in_header:
-			out.append(_unquote(line.trim_prefix("msgstr").strip_edges()))
-	return out
+	return I18nCatalogue.msgstrs(PO_PATH)
 
 func _match_all(text: String, pattern: String) -> Array[String]:
 	var out: Array[String] = []
@@ -770,15 +789,8 @@ func _match_all(text: String, pattern: String) -> Array[String]:
 		out.append(m.get_string(1))
 	return out
 
-func _unquote(value: String) -> String:
-	if value.length() < 2:
-		return value
-	return value.substr(1, value.length() - 2)
-
 func _read(path: String) -> String:
-	if not FileAccess.file_exists(path):
-		return ""
-	return FileAccess.get_file_as_string(path)
+	return I18nCatalogue.read(path)
 
 func _check(condition: bool, label: String) -> void:
 	_checks += 1
@@ -786,3 +798,4 @@ func _check(condition: bool, label: String) -> void:
 		_passed += 1
 	else:
 		push_error("FAIL: " + label)
+
