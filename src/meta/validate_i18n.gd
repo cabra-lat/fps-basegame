@@ -73,6 +73,18 @@ func _initialize() -> void:
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
 	var locales := TranslationServer.get_loaded_locales()
+		# === CONSTRUCTED PROBE (throwaway branch, never merge) ===
+		# Announces itself and scopes itself. Asks one question: is the pt-BR
+		# catalogue LOADED, as distinct from merely present in the tree?
+		print("PROBE loaded_locales=", locales)
+		print("PROBE po_exists=", ResourceLoader.exists("res://locale/game.po"))
+		var _po = load("res://locale/game.po")
+		print("PROBE po_loaded=", _po != null)
+		print("PROBE tr(Marked Intel)=", TranslationServer.translate("Marked Intel"))
+		print("PROBE tr(marked intel)=", TranslationServer.translate("marked intel"))
+		print("PROBE key_for=", ItemNames.key_for("marked_intel"))
+		print("PROBE display_name=", ItemNames.display_name("marked_intel"))
+		# === END CONSTRUCTED PROBE ===
 	_check(locales.has("pt_BR"), "pt_BR catalogue is registered in project.godot and loaded")
 
 ## Call sites and the declared contract must describe the same key set, in both
