@@ -59,15 +59,10 @@ func _scenario_clear_and_reload() -> void:
 	_check(service.profile.currency == int(report.currency_delta) + _starting_currency(service.profile), "in-memory currency matches report delta")
 	_check(service.profile.last_report == report.to_dict(), "persisted last_report equals resolved report figures")
 
-	var persisted := ProfileStore.load_profile(path)
-	_check(persisted.raids == service.profile.raids, "reloaded raid count matches in-memory result")
-	_check(persisted.survived == service.profile.survived, "reloaded survival count matches in-memory result")
-	_check(persisted.kia == service.profile.kia, "reloaded loss count matches in-memory result")
-	_check(persisted.currency == service.profile.currency, "reloaded currency matches in-memory result")
-	_check(persisted.total_exp == service.profile.total_exp, "reloaded EXP matches in-memory result")
-	var persisted_report: Dictionary = persisted.last_report
-	_check(persisted_report.get("outcome") == report.outcome and bool(persisted_report.get("survived")) == report.survived and persisted_report.get("currency_delta") == report.currency_delta and persisted_report.get("exp") == report.exp and persisted_report.get("gained", []).size() == report.gained.size() and persisted_report.get("loot_discarded") == report.loot_discarded, "restart/reload preserves the resolved result figures")
-	_check(persisted.stash.count_items() == 1, "scenario objective is persisted in the stash")
+	# CAUGHT BY the dead-end probe for task_1790377289975_a7fc59 (2026-09-26):
+	# see _check_survived_raid_stays_replayable, which holds the reasoning.
+	_check_survived_raid_stays_replayable(service)
+	var persisted := _check_reload_preserves_result(service, report, path)
 
 	# A second notification on the same resolved raid must be harmless. Keep
 	# this before starting the next raid, because start_raid opens a fresh latch.
@@ -161,6 +156,55 @@ func _set_feed(weapon: Weapon, rounds: int) -> void:
 	for _i in range(rounds):
 		weapon.ammo_feed.insert(load(AMMO))
 	weapon.chambered_round = null
+
+## Restart/reload half of the clear scenario, split out only so the scenario
+## function stays inside the 60-line audit limit once the replayable-loop
+## assertion was added. Pure extraction: same checks, same order, same messages.
+## Returns the reloaded profile, which the caller goes on to use.
+func _check_reload_preserves_result(service: MetaService, report: RaidReport, path: String) -> MetaProfile:
+	var persisted := ProfileStore.load_profile(path)
+	_check(persisted.raids == service.profile.raids, "reloaded raid count matches in-memory result")
+	_check(persisted.survived == service.profile.survived, "reloaded survival count matches in-memory result")
+	_check(persisted.kia == service.profile.kia, "reloaded loss count matches in-memory result")
+	_check(persisted.currency == service.profile.currency, "reloaded currency matches in-memory result")
+	_check(persisted.total_exp == service.profile.total_exp, "reloaded EXP matches in-memory result")
+	var persisted_report: Dictionary = persisted.last_report
+	_check(persisted_report.get("outcome") == report.outcome and bool(persisted_report.get("survived")) == report.survived and persisted_report.get("currency_delta") == report.currency_delta and persisted_report.get("exp") == report.exp and persisted_report.get("gained", []).size() == report.gained.size() and persisted_report.get("loot_discarded") == report.loot_discarded, "restart/reload preserves the resolved result figures")
+	_check(persisted.stash.count_items() == 1, "scenario objective is persisted in the stash")
+	return persisted
+
+
+## CAUGHT BY the dead-end probe for task_1790377289975_a7fc59 (2026-09-26).
+##
+## The board's mechanism for that card read "after a clear the deployed kit is
+## consumed as loot, so the kit the hub still has selected can no longer be
+## satisfied". Measured, that is backwards: MetaService._resolve_survival()
+## RESTORES the kit ("the equipped kit stays available for the next raid") and
+## sets report.loadout_restored. Probing both arms on the real services and the
+## real hub node:
+##
+##   after a CLEAR  loadout_restored=true, loadout slots ["primary","secondary"],
+##                   validate_deploy ok, hub state VALID, can_deploy() TRUE
+##   after a DEATH  report.lost=2, loadout_restored=false, profile.loadout=[],
+##                   deploy_options()={}, validate_deploy "selecao vazia",
+##                   hub state EMPTY, can_deploy() FALSE
+##
+## So the loop-breaking state is real and it is the DEATH branch
+## (meta_service.gd:286), not the clear. The assertion below pins the half that
+## every open option on the card shares, so a future change that breaks the
+## replayable loop cannot land quietly -- and it deliberately says nothing about
+## the KIA branch, which is the pending product decision and whose current
+## behaviour is an accident rather than a choice.
+##
+## Robust across all four options under consideration: re-granting a starter kit
+## also leaves the player deployable, and "re-acquire by other means" also does,
+## as long as the means exist and the hub shows them.
+func _check_survived_raid_stays_replayable(service: MetaService) -> void:
+	_check(not service.profile.loadout.is_empty(),
+		"a SURVIVED raid leaves the kit in the profile (the loop stays replayable)")
+	_check(service.deploy_options().get("id", "") == "active",
+		"after a survived raid the hub is still offered a deployable kit")
+
 
 func _add_loot(container: InventoryContainer, path: String, stack: int) -> void:
 	var resource := load(path)
