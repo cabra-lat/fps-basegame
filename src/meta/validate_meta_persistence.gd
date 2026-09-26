@@ -17,6 +17,11 @@ extends SceneTree
 
 const TEST_DIR := "user://meta_test"
 const SAVE := "user://meta_test/profile.save"
+# Precondition: select the locale under test. Without it this harness inherits
+# the host's active locale, and every translated name resolves to its English
+# source string, which is indistinguishable from an untranslated catalogue.
+# See src/meta/translation_probe.gd.
+const TranslationProbe := preload("res://src/meta/translation_probe.gd")
 const STARTER := "res://resources/meta/starter_loadout.tres"
 const BANDAGE := "res://resources/medical/army_bandage.tres"
 const AMMO_9MM := "res://resources/ammo/9_19mm_VPAM_PM2.tres"
@@ -27,6 +32,7 @@ func _check(cond: bool, msg: String) -> void:
 	v.check(cond, msg)
 
 func _initialize() -> void:
+	TranslationProbe.select_test_locale()
 	v = ValidateUtil.new("validate_meta_persistence")
 	v.begin()
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)

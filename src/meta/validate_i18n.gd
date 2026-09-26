@@ -51,10 +51,19 @@ const MISSING_PROBE := "__i18n_missing_probe__"
 ## inside the static display helpers, because tr() is instance-bound.
 const KEY_PATTERNS := ['tr\\("([^"]*)"\\)', 'TranslationServer\\.translate\\("([^"]*)"\\)']
 
+# Preloaded, not referenced by its global class_name: a `--script` runner must
+# not name a global class, or it is compiled before autoloads register.
+const TranslationProbe := preload("res://src/meta/translation_probe.gd")
+
 var _checks := 0
 var _passed := 0
 
 func _initialize() -> void:
+	# Precondition: the locale under test must be SELECTED, not merely
+	# registered. See translation_probe.gd for why inheriting the host's active
+	# locale made this harness report missing translations for a catalogue that
+	# was complete.
+	TranslationProbe.select_test_locale()
 	_check_catalogue_loaded()
 	_check_keys_are_declared()
 	_check_every_key_is_translated()
@@ -72,8 +81,15 @@ func _initialize() -> void:
 
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
-	var locales := TranslationServer.get_loaded_locales()
-	_check(locales.has("pt_BR"), "pt_BR catalogue is registered in project.godot and loaded")
+	# The old check here was `get_loaded_locales().has("pt_BR")`, which is true
+	# whether or not the catalogue is present, so it could not fail on the one
+	# condition it existed to detect. These two can: the first fails if the
+	# locale under test is not the active one, the second fails unless a known
+	# msgid actually resolves.
+	_check(TranslationProbe.locale_is_selected(),
+		"the locale under test (%s) is the ACTIVE locale, not inherited from the host" % TranslationProbe.PROBE_LOCALE)
+	_check(TranslationProbe.catalogue_answers(),
+		"a known msgid resolves from the catalogue (sentinel %r came back as %r, i.e. untranslated)" % [TranslationProbe.SENTINEL, TranslationProbe.sentinel_result()])
 
 ## Call sites and the declared contract must describe the same key set, in both
 ## directions: a new tr() call without a declared key fails, and a declared key

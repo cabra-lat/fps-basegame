@@ -3,11 +3,17 @@ extends SceneTree
 
 const Raid1ScenarioScript = preload("res://scenes/raid1_scenario.gd")
 const ArenaManagerScript = preload("res://scenes/arena_manager.gd")
+# Precondition: select the locale under test. This harness compares localised
+# outcome names; under the host's locale those resolve to English source text
+# and the comparison fails for a reason that has nothing to do with the
+# scenario. See src/meta/translation_probe.gd.
+const TranslationProbe := preload("res://src/meta/translation_probe.gd")
 
 var _checks := 0
 var _passed := 0
 
 func _initialize() -> void:
+	TranslationProbe.select_test_locale()
 	var raid := Raid.new()
 	var profile := PlayerProfile.new()
 	var fallback := ExtractionPoint.new()
