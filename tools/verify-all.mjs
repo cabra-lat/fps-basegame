@@ -331,16 +331,7 @@ async function importGodot() {
     }
     if (result.code !== 124) {
       const errors = countMatches(text, /SCRIPT ERROR|Parse Error|Failed to load|Cannot open|Failed to compile/g);
-      const scripts = await runLogged('check_scripts', godot, ['--headless', '--path', '.', '--script', harnessScript('check_scripts')], 600_000, { raiseQuietMs: 20_000 });
-      if (scripts.raised) {
-        // Same shape as the gateHarness case, and for the same reason: check_scripts is a
-        // GDScript harness, so a raise in its own top-level function skips quit(), it never
-        // returns, and without this the 600s budget expires and the reader is told to suspect
-        // the import cache -- which is exactly the misdirection the raise-watch exists to stop.
-        const raiseErrors = countMatches(readLog(scripts.log), /^SCRIPT ERROR/gm);
-        record('import/parse', 'FAIL', `check_scripts raised and stopped reporting — ${raiseErrors} script error(s) and no summary. A raise in the harness's OWN top-level function aborts it before quit(), so it never returns; the cause is in its own output, NOT in .godot and NOT in a scene that failed to boot (see ${scripts.log})`);
-        return false;
-      }
+      const scripts = await runLogged('check_scripts', godot, ['--headless', '--path', '.', '--script', harnessScript('check_scripts')], 600_000);
       const scriptText = readLog(scripts.log);
       const compiled = scriptText.match(/scripts compiled:\s*([0-9]+)/i)?.[1] || '?';
       const failures = scriptText.match(/failures:\s*([0-9]+)/i)?.[1] || '?';
@@ -416,7 +407,7 @@ async function reimportAfterHarness(name) {
 async function gateHarness(name, script) {
   const budgetMs = 600_000;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const result = await runLogged(name, godot, ['--headless', '--path', '.', '--script', script], budgetMs, { raiseQuietMs: 20_000 });
+    const result = await runLogged(name, godot, ['--headless', '--path', '.', '--script', script], budgetMs);
     const raisedErrors = result.raised ? countMatches(readLog(result.log), /^SCRIPT ERROR/gm) : 0;
     if (result.raised) {
       record(name, 'FAIL', `harness raised and stopped reporting — ${raisedErrors} script error(s) and no RESULT line. A raise in the harness's OWN top-level function aborts it before quit(), so it never returns; the cause is in its own output, NOT in .godot and NOT in a scene that failed to boot (see ${result.log})`);
