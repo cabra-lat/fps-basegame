@@ -296,12 +296,19 @@ function selfTest() {
   check('a script with ONE argv reader is not reported', single.contested.length === 0 && single.readerCount === 1,
     `readerCount=${single.readerCount}`);
 
-  // The guard against the vacuous pass above: an analysis that found NO readers
-  // must be distinguishable from a clean one, so "nothing reported" can never
-  // again be satisfied by a lint that simply saw nothing.
+  // The guard against the vacuous pass above. QA asked for the check to be
+  // about the OUTPUT, not an internal field, and she was right: at 40f0372 this
+  // assertion passed while a no-reader file and a clean file rendered
+  // byte-identical text and exited 0 both. The field was distinguishable; the
+  // report was not. So this now compares the rendered lines, which is the thing
+  // a human or CI actually reads.
   const empty = analyseFile('empty.sh', write('empty.sh', 'echo hello\n'));
-  check('an analysis with NO readers is distinguishable from a clean one', empty.readerCount === 0 && empty.contested.length === 0,
-    `readerCount=${empty.readerCount}`);
+  const oneReader = analyseFile('one.sh', write('one.sh', 'for a in "$@"; do echo "$a" --path; done\n'));
+  const emptyLines = render([empty], ['.']).join('\n');
+  const oneLines = render([oneReader], ['.']).join('\n');
+  check('a file with NO argv reader renders DIFFERENTLY from a clean one', emptyLines !== oneLines,
+    'the report is identical — "I found nothing" and "I could not look" render the same');
+  check('and the no-reader case says so out loud', /NO argv reader|no argv reader/i.test(emptyLines) && !/NO argv reader|no argv reader/i.test(oneLines));
 
   // Several readers, disjoint flags: not a disagreement.
   const disjoint = analyseFile('disjoint.sh', write('disjoint.sh', [
@@ -347,58 +354,105 @@ const explicit = argv.filter((a) => !a.startsWith('--'));
 const roots = explicit.length ? explicit : SCAN_DIRS;
 const files = walk(roots).sort();
 
-const analysed = files.map((f) => analyseFile(f, readFileSync(f, 'utf8')));
-const multiReader = analysed.filter((a) => a.readerCount > 1);
-const actionable = multiReader.flatMap((a) => a.actionable.map((c) => ({ file: a.path, ...c })));
-const acknowledged = multiReader.flatMap((a) => a.acknowledged.map((c) => ({ file: a.path, ...c })));
-const declared = analysed.filter((a) => a.declarations.single.size || a.declarations.list.size || a.declarations.refused.size);
-const exemptions = analysed.flatMap((a) => a.exempted.map((f) => ({ file: a.path, flag: f })));
-const passthrough = analysed.filter((a) => a.unvalidatedPassthrough);
+// Render the whole report as an array of lines.
+//
+// It returns lines rather than printing them so the SELF-TEST can assert on the
+// exact text a reader sees. At 40f0372 the report was printed inline and the
+// no-reader case was only distinguishable as an internal field, which meant the
+// one distinction that mattered was invisible to anyone but me — QA read the
+// rendered output, could not find it, and was right to say so.
+function render(analysed, roots) {
+  const L = [];
+  const multiReader = analysed.filter((a) => a.readerCount > 1);
+  const noReader = analysed.filter((a) => a.readerCount === 0);
+  const actionable = multiReader.flatMap((a) => a.actionable.map((c) => ({ file: a.path, ...c })));
+  const acknowledged = multiReader.flatMap((a) => a.acknowledged.map((c) => ({ file: a.path, ...c })));
+  const declared = analysed.filter((a) => a.declarations.single.size || a.declarations.list.size || a.declarations.refused.size);
+  const exemptions = analysed.flatMap((a) => a.exempted.map((f) => ({ file: a.path, flag: f })));
+  const passthrough = analysed.filter((a) => a.unvalidatedPassthrough);
 
-console.log('=== repeated single-valued flag lint (advisory) ===');
-console.log(`scanned ${files.length} file(s) under ${roots.join(', ')}`);
-console.log(`  ${multiReader.length} read argv in more than one place (the precondition for the class)`);
-console.log(`  ${declared.length} declare lint:flags-single / lint:flags-list / lint:flags-refused`);
+  L.push('=== repeated single-valued flag lint (advisory) ===');
+  L.push(`scanned ${analysed.length} file(s) under ${roots.join(', ')}`);
+  L.push(`  ${multiReader.length} read argv in more than one place (the precondition for the class)`);
+  L.push(`  ${declared.length} declare lint:flags-single / lint:flags-list / lint:flags-refused`);
 
-if (!actionable.length) {
-  console.log('\nno ACTIONABLE contested flags. Read that as "no unremediated shape found in the');
-  console.log('scripts I understood", not as "no repeated flags exist" — this lint cannot see an');
-  console.log('actual command line, only the structure that makes repetition dangerous.');
-} else {
-  console.log(`\n${actionable.length} actionable contested flag(s): a single-valued flag dealt with by`);
-  console.log('more than one reader, with no declared refusal on the ambiguity.');
-  for (const f of actionable) {
-    console.log(`  ${f.file}\n    ${f.flag}  read by: ${f.readers.join(' + ')}`);
+  if (actionable.length) {
+    L.push('');
+    L.push(`${actionable.length} actionable contested flag(s): a single-valued flag dealt with by`);
+    L.push('more than one reader, with no declared refusal on the ambiguity.');
+    for (const f of actionable) {
+      L.push(`  ${f.file}\n    ${f.flag}  read by: ${f.readers.join(' + ')}`);
+    }
+    L.push('\nWhat to do about one: do NOT let a lint pick a winner. Either refuse on the');
+    L.push('ambiguity (what tools/godot-lock.sh does for --path, declared lint:flags-refused),');
+    L.push('or make every reader agree on which occurrence wins AND record that the choice is');
+    L.push('a contract, not an accident of the current consumer. Refusing is safer when the');
+    L.push('consumer is undocumented.');
+  } else {
+    L.push('');
+    L.push('no ACTIONABLE contested flags. Read that as "no unremediated shape found in the');
+    L.push('scripts I understood", not as "no repeated flags exist" — this lint cannot see an');
+    L.push('actual command line, only the structure that makes repetition dangerous.');
   }
-  console.log('\nWhat to do about one: do NOT let a lint pick a winner. Either refuse on the');
-  console.log('ambiguity (what tools/godot-lock.sh does for --path, declared lint:flags-refused),');
-  console.log('or make every reader agree on which occurrence wins AND record that the choice is');
-  console.log('a contract, not an accident of the current consumer. Refusing is safer when the');
-  console.log('consumer is undocumented.');
+
+  // Pass-through is a FINDING, not a footnote. It was reported as prose between
+  // two sections with no count, so a reviewer running the lint read it as an
+  // explanation of the category rather than as a hit on a named file, and
+  // reported that it could not observe it firing. If a finding is invisible in
+  // the verdict, it is a green that means nothing, which is this session's
+  // whole subject.
+  if (passthrough.length) {
+    L.push('');
+    L.push(`FINDINGS — unvalidated pass-through: ${passthrough.length} script(s) hand argv to a consumer`);
+    L.push('they do not control while declaring no flags of their own, so any single-valued flag they');
+    L.push('forward unchecked is unguarded BY CONSTRUCTION rather than by disagreement:');
+    for (const p of passthrough) L.push(`  ${p.path}  readers: ${p.readers.join(' + ')}`);
+  }
+
+  if (acknowledged.length) {
+    L.push('\nacknowledged (shape present, refusal declared — visible, not silent):');
+    for (const a of acknowledged) L.push(`  ${a.file}  ${a.flag}  read by: ${a.readers.join(' + ')}`);
+  }
+
+  if (exemptions.length) {
+    L.push('\nexemptions in force (visible on purpose):');
+    for (const e of exemptions) L.push(`  ${e.file}  ${e.flag}  (declared lint:flags-list)`);
+  }
+
+  // Not reported as "clean": reported as not classified, by name. A script whose
+  // argv reader I failed to detect lands here, and a reader of this output can
+  // then tell "I looked and found nothing" from "there was nothing to look at".
+  if (noReader.length) {
+    L.push('');
+    L.push(`NO argv reader detected in ${noReader.length} file(s) — the lint had nothing to classify there.`);
+    L.push('Most scripts are in this group legitimately. If one of these DOES read flags, by a form');
+    L.push('this lint does not detect, it is silently clean, and that is a detection gap in me:');
+    for (const n of noReader) L.push(`  ${n.path}`);
+  }
+
+  // Coverage gap for the scripts that DO read argv in several places but
+  // classify nothing. A pass-through file is not repeated here: it is already
+  // listed as a finding above, and printing the same line twice under two
+  // headings made it read as two separate observations.
+  const undeclared = analysed.filter((a) => a.readerCount > 1
+    && !a.declarations.single.size && !a.declarations.list.size && !a.declarations.refused.size
+    && !a.unvalidatedPassthrough);
+  if (undeclared.length) {
+    L.push('');
+    L.push(`coverage gap, stated rather than implied: ${undeclared.length} multi-reader script(s) declare nothing,`);
+    L.push('so their flags cannot be classified as single-valued, list-valued or refused:');
+    for (const a of undeclared) L.push(`  ${a.path}  readers: ${a.readers.join(' + ')}`);
+  }
+
+  return L;
 }
 
-if (acknowledged.length) {
-  console.log('\nacknowledged (shape present, refusal declared — visible, not silent):');
-  for (const a of acknowledged) console.log(`  ${a.file}  ${a.flag}  read by: ${a.readers.join(' + ')}`);
-}
+const analysed = files.map((f) => analyseFile(f, readFileSync(f, 'utf8')));
+const reportLines = render(analysed, roots);
+for (const line of reportLines) console.log(line);
 
-if (exemptions.length) {
-  console.log('\nexemptions in force (visible on purpose):');
-  for (const e of exemptions) console.log(`  ${e.file}  ${e.flag}  (declared lint:flags-list)`);
-}
-
-if (passthrough.length) {
-  console.log('\nunvalidated pass-through (weaker signal, advisory): these hand argv to a consumer');
-  console.log('they do not control and declare no flags of their own, so any single-valued flag they');
-  console.log('forward unchecked is unguarded BY CONSTRUCTION rather than by disagreement:');
-  for (const p of passthrough) console.log(`  ${p.path}  readers: ${p.readers.join(' + ')}`);
-}
-
-const undeclared = analysed.filter((a) => a.readerCount > 1 && !a.declarations.single.size && !a.declarations.list.size && !a.declarations.refused.size);
-if (undeclared.length) {
-  console.log(`\ncoverage gap, stated rather than implied: ${undeclared.length} multi-reader script(s) declare nothing,`);
-  console.log('so their flags cannot be classified as single-valued, list-valued or refused:');
-  for (const a of undeclared) console.log(`  ${a.path}  readers: ${a.readers.join(' + ')}`);
-}
-
-process.exit(strict && actionable.length ? 1 : 0);
+// --strict fails on the contested flags AND on the pass-through findings: both
+// are things a person must act on. Neither affects the default advisory exit.
+const strictFindings = analysed.flatMap((a) => a.actionable).length
+  + analysed.filter((a) => a.unvalidatedPassthrough).length;
+process.exit(strict && strictFindings ? 1 : 0);
