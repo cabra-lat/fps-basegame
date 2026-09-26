@@ -260,4 +260,4 @@ precision_multiplier={
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://locale/game.po")
+locale/translations=PackedStringArray()
