@@ -12,8 +12,27 @@
 #   tools/godot-lock.sh --headless --path . --import
 #   tools/godot-lock.sh --headless --path . --script res://some/harness.gd
 #
-# Extra flag (consumed here, not passed to Godot):
-#   --clean-tmp   delete leftover 0-byte .godot/imported/*.tmp before running.
+# Extra flags (consumed here, not passed to Godot):
+#   --clean-tmp        delete leftover 0-byte .godot/imported/*.tmp before running.
+#   --proceed-unlocked DELIBERATE override: if the lock cannot be taken within
+#                      GODOT_LOCK_WAIT seconds, run anyway WITHOUT it. Off by
+#                      default, because running unlocked is exactly the race this
+#                      wrapper exists to prevent. When used, the output says so.
+#
+# Environment:
+#   GODOT_LOCK_WAIT    seconds to wait for the lock (default 900). Lowering it
+#                      only makes this wrapper refuse MORE often, never less
+#                      safe, which is why it is overridable for tests.
+#   GODOT_LOCK_FILE    TEST ONLY: use a different lock file, so
+#                      tools/test-godot-lock.sh can hold a lock and be
+#                      contended without touching the shared one the gate and
+#                      every other lane use. The DEFAULT is unchanged and must
+#                      stay byte-identical to verify-all.sh's lock path.
+#
+# EXIT CODES: 0 ran, 69 missing dependency (flock), and 75 EX_TEMPFAIL when the
+# lock could not be taken and --proceed-unlocked was not given. 75 is distinct
+# on purpose: a caller must be able to tell "somebody else holds the lock, retry"
+# apart from "the harness failed", because those two need opposite responses.
 #
 # The lock path MUST match verify-all.sh exactly (same resolved .godot cache
 # path), so do not "improve" one side without the other.
@@ -22,12 +41,15 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 GODOT_BIN="${GODOT_BIN:-godot}"
+GODOT_LOCK_WAIT="${GODOT_LOCK_WAIT:-900}"
 
 CLEAN_TMP=0
+PROCEED_UNLOCKED=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --clean-tmp) CLEAN_TMP=1 ;;
+    --proceed-unlocked) PROCEED_UNLOCKED=1 ;;
     *) ARGS+=("$a") ;;
   esac
 done
@@ -39,7 +61,7 @@ fi
 
 mkdir -p /tmp/shooter
 GODOT_CACHE="$(realpath .godot 2>/dev/null || printf '%s' "$ROOT/.godot")"
-LOCK_FILE="/tmp/shooter/verify-all.${GODOT_CACHE//\//_}.lock"
+LOCK_FILE="${GODOT_LOCK_FILE:-/tmp/shooter/verify-all.${GODOT_CACHE//\//_}.lock}"
 
 # A Node/timeout intermediary can sit between verify-all.sh and this wrapper,
 # so argv-based ancestor detection alone is not sufficient.  If any ancestor
@@ -117,12 +139,21 @@ if [ -n "$_gate_script" ] && [ -d /proc/self ]; then
     _n=$((_n + 1))
   done
 fi
-if [ "$_in_gate" -eq 1 ] || _lock_held_by_ancestor "$LOCK_FILE"; then
-  echo "godot-lock: nested inside verify-all ($ROOT) — gate already holds the lock, skipping re-lock" >&2
+if [ "$_in_gate" -eq 1 ]; then
+  echo "godot-lock: path=NESTED-IN-GATE ($ROOT) — verify-all already holds the lock, skipping re-lock" >&2
+elif _lock_held_by_ancestor "$LOCK_FILE"; then
+  # Same effect, different reason: an ancestor (Node/timeout intermediary)
+  # holds the lock file open. Say WHICH path, because there are now three ways
+  # out of this script and only two of them hold the lock.
+  echo "godot-lock: path=ANCESTOR-HOLDS-LOCK — an ancestor process already holds ${LOCK_FILE}, skipping re-lock" >&2
 else
   exec 9>"$LOCK_FILE"
   if flock -n 9; then
     # Lock was FREE -> any `godot` already running is NOT holding it (bypass).
+    # Same "lock acquired" wording as the waiting branch below, deliberately:
+    # one phrase means one state, so a grep for it can never match a run that
+    # did not have the lock.
+    echo "godot-lock: lock acquired immediately (${LOCK_FILE}) — path=LOCKED" >&2
     if command -v pgrep >/dev/null 2>&1; then
       # NOTE: `pgrep -c` prints 0 AND exits 1 on no match, so `|| echo 0`
       # would append a second line ("0\n0") and break the integer test.
@@ -132,10 +163,25 @@ else
   else
     # Say so BEFORE blocking: a caller that wraps us in a short `timeout` then sees
     # exit 124 and may think the harness broke — it is just the lock wait.
-    echo "godot-lock: waiting for the gate lock (${LOCK_FILE})..." >&2
+    echo "godot-lock: waiting up to ${GODOT_LOCK_WAIT}s for the gate lock (${LOCK_FILE})..." >&2
     _t0="$(date +%s)"
-    flock -w 900 9 || echo "godot-lock: WARNING: lock not acquired in 900s; proceeding (may race the gate)" >&2
-    echo "godot-lock: lock acquired after $(( $(date +%s) - _t0 ))s" >&2
+    if flock -w "$GODOT_LOCK_WAIT" 9; then
+      # ONLY HERE. The acquired line is printed if and only if flock returned 0.
+      # An earlier version printed it unconditionally, so a run that timed out
+      # and continued UNLOCKED logged that it had acquired the lock — the one
+      # piece of information this wrapper exists to report, reported falsely.
+      echo "godot-lock: lock acquired after $(( $(date +%s) - _t0 ))s (${LOCK_FILE})" >&2
+    elif [ "$PROCEED_UNLOCKED" -eq 1 ]; then
+      echo "godot-lock: WARNING: lock NOT acquired in ${GODOT_LOCK_WAIT}s; --proceed-unlocked was given, continuing WITHOUT the lock — .godot WILL race the gate" >&2
+      echo "godot-lock:          holder is UNKNOWN; flock cannot report which process owns ${LOCK_FILE}" >&2
+    else
+      echo "godot-lock: ERROR: lock NOT acquired in ${GODOT_LOCK_WAIT}s; refusing to run unlocked" >&2
+      echo "godot-lock:        lock file: ${LOCK_FILE}" >&2
+      echo "godot-lock:        holder is UNKNOWN — flock does not report the owning process, so this says nothing about why it is held" >&2
+      echo "godot-lock:        retry when the gate is free, or pass --proceed-unlocked to override deliberately" >&2
+      echo "godot-lock:        (a genuinely hung godot process is a DIFFERENT fault; this wrapper will not kill the holder)" >&2
+      exit 75
+    fi
   fi
 fi
 
