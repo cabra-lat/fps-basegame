@@ -53,6 +53,13 @@ var _resolved := false
 ## Encoded entries that could not be equipped. The selected loadout itself stays
 ## in the profile as a crash-recovery manifest until the raid resolves.
 var _deploy_leftovers: Dictionary = {}
+## What a death costs. DATA, not a branch: the shipped default reproduces the
+## behaviour that existed before this policy did (the deployed kit is lost, with
+## a safe pocket), and a game replaces it by assigning a DeathPolicy -- see
+## `resources/meta/death_policy.tres` and `set_death_policy`. Read at the
+## settlement boundary, which is the only place a death is decided; the UI is a
+## consumer of the outcome and never a second opinion on it.
+var death_policy: DeathPolicy = DeathPolicy.new()
 
 func _ready() -> void:
 	if profile == null:
@@ -278,12 +285,22 @@ func _resolve_survival(report: RaidReport, carried_loadout: Dictionary, carried_
 
 func _resolve_loss(report: RaidReport, carried_loadout: Dictionary, carried_loot: Array) -> void:
 	profile.kia += 1
-	for data in ItemCodec.flatten_equipment(carried_loadout):
+	# The policy decides what is destroyed. Split first, then report the loss, so
+	# `report.lost` cannot disagree with what the profile actually kept: before
+	# this, the two were computed separately and a safe-pocket item would be
+	# reported lost while still being in the player's hands.
+	var split := death_policy.partition(carried_loadout)
+	var destroyed: Array = split.get("lost", [])
+	var pocket: Dictionary = split.get("kept", {})
+	for data in destroyed:
 		report.lost.append(_brief(data))
 	report.loot_discarded = carried_loot.size()
 	# A prepared manifest is the deployed kit, not an unowned stash copy. On
-	# failure, only entries that never equipped remain recoverable.
-	profile.loadout = _deploy_leftovers.duplicate(true) if _prepared else {}
+	# failure, only entries that never equipped remain recoverable -- plus
+	# whatever the policy's safe pocket returns, and those WERE deployed, so they
+	# have to be merged with the leftovers rather than replacing them.
+	profile.loadout = _merge_loadout(pocket, _deploy_leftovers) if _prepared else pocket
+	_apply_regrant()
 	if not report.lost.is_empty():
 		insurance_claim_available.emit(report.lost.duplicate(true))
 	# Insurance: the manifest composed at raid entry is what can come back.
@@ -295,6 +312,22 @@ func _resolve_loss(report: RaidReport, carried_loadout: Dictionary, carried_loot
 	var insured_count := profile.insurance.register_loss(
 		ItemCodec.flatten_equipment(manifest), profile, no_return, enemy_looted_paths)
 	report.insured = insured_count
+
+## The REGRANT half of the policy, kept out of `_resolve_loss` so the settlement
+## stays a straight line: settle, split, report, grant. The nested `if` it used
+## to be pushed the function to the audit's deep-nesting limit, which is a real
+## cost for a branch that is four lines long.
+func _apply_regrant() -> void:
+	if death_policy.loss != DeathPolicy.Loss.REGRANT or death_policy.starter == null:
+		return
+	if grant_starter_loadout(death_policy.starter) <= 0:
+		return
+	# 0 means "inherit the starter's own value", so the two numbers can never
+	# disagree silently; an explicit non-zero value is the game overriding it.
+	if death_policy.grant_currency_on_regrant != 0:
+		profile.earn_currency(death_policy.grant_currency_on_regrant)
+	elif profile.currency <= 0:
+		profile.earn_currency(death_policy.starter.currency)
 
 func _finalize_raid(report: RaidReport) -> void:
 	# Due insurance claims are delivered on the NEXT resolved raid (register_loss
@@ -584,3 +617,14 @@ func _brief(data: Dictionary) -> Dictionary:
 ## language. The int outcome remains the machine-readable key.
 func _outcome_name(outcome: int) -> String:
 	return Raid.outcome_display_name(outcome)
+
+## Replace the death policy. A game ships its own DeathPolicy resource; the hub
+## and the raid flow never learn what it says. Returns the policy's own
+## configuration problems so a bad `.tres` is loud at the call site rather than
+## silently forgiving at the next settlement.
+func set_death_policy(policy: DeathPolicy) -> Array[String]:
+	if policy == null:
+		death_policy = DeathPolicy.new()
+		return []
+	death_policy = policy
+	return policy.validate()
