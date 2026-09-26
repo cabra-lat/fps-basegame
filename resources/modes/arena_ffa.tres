@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="FFAMode" load_steps=2 format=3]
+
+; Match rules as DATA. A server that wants a different pacing copies this file
+; and edits values only; no script changes, no constants to hunt.
+;   respawn_delay       = the PLAYER's respawn, unchanged by bot pacing
+;   bot_respawn_delay   = replacement bot timing. 0.0 = a reinforcement enters
+;                          the fight immediately (the arena testbed's choice: bot
+;                          count never dips, matching "you join a raid already in
+;                          progress"). -1.0 = follow respawn_delay.
+[ext_resource type="Script" uid="uid://d01xyna51x0iq" path="res://scenes/game_modes/ffa.gd" id="1_ffa"]
+
+[resource]
+script = ExtResource("1_ffa")
+mode_name = "FFA"
+team_count = 1
+score_limit = 25
+time_limit = 0.0
+respawn_delay = 3.0
+bot_respawn_delay = 0.0
+friendly_fire = false

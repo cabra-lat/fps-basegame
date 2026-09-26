@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="TDMMode" load_steps=2 format=3]
+
+; TDM keeps the conservative pacing: bot replacements follow the 4 s match
+; breather. This is the "other branch" of the same decision, and switching is a
+; value edit in this file.
+[ext_resource type="Script" uid="uid://73khruoo0yne" path="res://scenes/game_modes/tdm.gd" id="1_tdm"]
+
+[resource]
+script = ExtResource("1_tdm")
+mode_name = "TDM"
+team_count = 2
+score_limit = 30
+time_limit = 0.0
+respawn_delay = 4.0
+bot_respawn_delay = -1.0
+friendly_fire = false

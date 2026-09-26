@@ -23,6 +23,9 @@ const RAID_DURATION := 600.0 # RAID-1 bounded first-clear run (10 minutes)
 
 const SLOT_ORDER: Array[String] = ["primary", "secondary"]
 const INVENTORY_PANEL_CHROME := 64.0
+## Per-server match rules live in resources/modes/<mode>.tres, so pacing and
+## rules are data a server ships rather than constants this scene hardcodes.
+const MODE_TRES_DIR := "res://resources/modes/"
 const BotScene: PackedScene = preload("res://src/npcs/bot/bot.tscn")
 
 const ArenaSpawnSolverScript = preload("./arena_spawn_solver.gd")
@@ -35,8 +38,9 @@ const Raid1ScenarioScript = preload("./raid1_scenario.gd")
 @onready var sec_weapon_template: Weapon = preload("res://resources/weapons/AK_47.tres")
 @onready var player: PlayerController = $Player
 
-## Match rules. Leave null to use the SettingsStore choice (default FFA);
-## assign in the inspector or via code to test another mode.
+## Match rules. Leave null to use resources/modes/<mode>.tres, then the
+## SettingsStore choice (default FFA); assign in the inspector or via code to
+## test another mode.
 @export var game_mode: GameMode
 
 var weapon: Weapon # active weapon (mirrors controller.current_weapon)
@@ -165,14 +169,33 @@ func _exit_tree() -> void:
 		if node is TraderPoint:
 			_disconnect_signal((node as TraderPoint).requested, "_open_market")
 
-## Pick the mode (exported wins; else SettingsStore) and inject spawn points.
+## Pick the mode (exported wins; else resources/modes/<mode>.tres; else code
+# defaults) and inject spawn points.
 func _setup_game_mode() -> void:
 	if game_mode == null:
-		var choice := String(SettingsStore.load_all().get("match_mode", "ffa"))
-		game_mode = TDMMode.new() if choice == "tdm" else FFAMode.new()
+		# Explicit null check, NOT `a or b`: GDScript's `or` is a boolean
+		# operator, not a coalesce, so `tres or default` is a parse error.
+		game_mode = _mode_from_tres()
+		if game_mode == null:
+			game_mode = _default_mode()
 	game_mode.setup(call("_spawn_points", ))
 	_spawn_solver.begin_round()
 	_player_team = game_mode.assign_team(PLAYER_ID)
+
+## Match rules are DATA: a server ships its own resources/modes/<mode>.tres
+## (respawn pacing, score limit, friendly fire) and no script is edited. Returns
+## null when the file is absent or unreadable, so a bare checkout still boots on
+## the code defaults instead of crashing on a missing resource.
+func _mode_from_tres() -> GameMode:
+	var choice := String(SettingsStore.load_all().get("match_mode", "ffa"))
+	var path := "%s%s.tres" % [MODE_TRES_DIR, choice]
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as GameMode
+
+func _default_mode() -> GameMode:
+	var choice := String(SettingsStore.load_all().get("match_mode", "ffa"))
+	return TDMMode.new() if choice == "tdm" else FFAMode.new()
 
 ## World medical loot (Fase: medical items). Player-rig's kit covers the
 ## starter; these are real world pickups proving the medical loot path.
