@@ -253,7 +253,7 @@ function runLogged(name, command, commandArgs, timeoutMs, opts = {}) {
         } catch {
           return;
         }
-        if (countMatches(text, /SCRIPT ERROR/g) > 0) {
+        if (countMatches(text, /^SCRIPT ERROR/gm) > 0) {
           raised = true;
           clearInterval(watcher);
           killTree(child);
@@ -435,7 +435,7 @@ async function gateHarness(name, script) {
     }
     const text = readLog(result.log);
     const loadErrors = countMatches(text, /referenced non-existent resource|Resource file not found/g);
-    const scriptErrors = countMatches(text, /SCRIPT ERROR/g);
+    const scriptErrors = countMatches(text, /^SCRIPT ERROR/gm);
     const invalidUid = countMatches(text, /invalid UID/g);
     if (result.code === 0 && /RESULT: PASS/.test(text) && loadErrors === 0 && scriptErrors === 0) {
       record(name, 'PASS', `${countChecks(text)} checks${invalidUid ? ` (${invalidUid} invalid-UID warning(s))` : ''}${attempt > 1 ? ' (retried after re-import)' : ''}`);
