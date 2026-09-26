@@ -386,21 +386,52 @@ function gateLockWrapper() {
     record('lock_wrapper', 'FAIL', `tools/test-godot-lock.sh is not on disk — the lock wrapper's own red arm is missing (${script})`);
     return;
   }
-  const result = spawnSync('bash', [script], { cwd: ROOT, encoding: 'utf8', timeout: 300_000 });
-  const out = `${result.stdout || ''}${result.stderr || ''}`;
   const logPath = join(logDir, 'lock_wrapper.log');
-  writeFileSync(logPath, out);
-  if (result.error) {
-    record('lock_wrapper', 'FAIL', `could not run the red arm: ${result.error.message} (see ${logPath})`);
+  // ONE retry, and it is insurance rather than tolerance. The red arm removes
+  // its own races by construction, so a failure means either a real defect or
+  // an unrelated transient (a slow fork, an fs hiccup, a scheduling spike) —
+  // and this gate sits before the import on a box that is the fleet's
+  // bottleneck, where one transient would otherwise block every lane. A retry
+  // cannot hide a deterministic failure: a real defect fails twice. The retry
+  // is reported either way, so a recovered run is never silently green.
+  //
+  // `ok` is a boolean and nothing else decides pass or fail. The first version
+  // of this loop stored the check COUNT in the same field it used for the
+  // failure description and branched on `typeof === 'string'` — which is true
+  // for "32" just as much as for a failure, so a fully green run was reported
+  // as FAIL with the count as its message. A gate that cannot tell green from
+  // red is worse than no gate: it is confidently wrong, in the one place where
+  // the whole session's argument has been that a diagnostic must never report
+  // something other than what happened.
+  let outcome = null;
+  for (let attempt = 1; attempt <= 2 && !outcome; attempt += 1) {
+    const result = spawnSync('bash', [script], { cwd: ROOT, encoding: 'utf8', timeout: 300_000 });
+    const out = `${result.stdout || ''}${result.stderr || ''}`;
+    writeFileSync(logPath, out);
+    if (result.error) {
+      outcome = { attempt, ok: false, count: '', detail: `could not run the red arm: ${result.error.message}`, failedChecks: [] };
+      continue;
+    }
+    const counts = out.match(/(\d+) passed, (\d+) failed/);
+    const failedChecks = out.split('\n').filter((l) => /^\s*FAIL\s/.test(l));
+    if (result.status === 0 && counts && Number(counts[2]) === 0) {
+      outcome = { attempt, ok: true, count: counts[1], detail: '', failedChecks: [] };
+    } else if (attempt === 2) {
+      outcome = {
+        attempt,
+        ok: false,
+        count: '',
+        detail: counts ? `${counts[1]} passed, ${counts[2]} failed` : 'no result line (the red arm did not finish)',
+        failedChecks,
+      };
+    }
+  }
+  if (outcome.ok) {
+    const retried = outcome.attempt > 1 ? ' (failed once, passed on retry — not silently green)' : '';
+    record('lock_wrapper', 'PASS', `lock wrapper refuses on timeout and cross-tree, never claims an unheld lock, and names which path it took (${outcome.count} checks${retried}, see ${logPath})`);
     return;
   }
-  const passed = out.match(/(\d+) passed, (\d+) failed/);
-  const failedChecks = out.split('\n').filter((l) => /^\s*FAIL\s/.test(l));
-  if (result.status !== 0 || !passed || Number(passed[2]) !== 0) {
-    record('lock_wrapper', 'FAIL', `lock wrapper red arm: ${passed ? `${passed[1]} passed, ${passed[2]} failed` : 'no result line'} — the wrapper must refuse to run unlocked and must never claim a lock it did not take. ${failedChecks.slice(0, 4).join(' | ') || `see ${logPath}`}`);
-    return;
-  }
-  record('lock_wrapper', 'PASS', `lock wrapper refuses on timeout, never claims an unheld lock, and names which path it took (${passed[1]} checks, see ${logPath})`);
+  record('lock_wrapper', 'FAIL', `lock wrapper red arm: ${outcome.detail} — the wrapper must refuse to run unlocked, must never claim a lock it did not take, and must not run against a tree other than its own. ${outcome.failedChecks.slice(0, 4).join(' | ') || `see ${logPath}`}`);
 }
 
 function gateUidTracking() {

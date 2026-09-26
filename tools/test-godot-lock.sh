@@ -215,10 +215,14 @@ has "ANCESTOR-HOLDS-LOCK";                           check "names the NESTED pat
 lacks "lock acquired";                               check "does not claim to have acquired the lock" $?
 has "GODOT-RAN";                                     check "executes Godot" $?
 
-# ── E: the real invocation, uncontended ────────────────────────────────────
-echo "[E] plain uncontended run"
-run_wrapper --headless --path . --import
-[ "$RC" -eq 0 ] && has "GODOT-RAN";                  check "uncontended invocation still works" $?
+# There WAS a case [E] "plain uncontended run" here, asserting exit 0 and that
+# Godot ran. It was removed rather than kept as a cheap smoke check: it invoked
+# the wrapper with arguments identical to case [C] and asserted a strict subset
+# of what [C] already asserts. On a loaded box one wrapper invocation costs 5-10s
+# (it walks /proc and forks a dozen helpers), and this gate runs before the
+# import on the fleet's bottleneck box, so a duplicate that buys no coverage is
+# the most expensive line in the file. Do not re-add it without an argument that
+# [C] does not already cover.
 
 # ── F: a green must never describe a different tree ───────────────────────
 # The wrapper resolves its own root from its own location, so invoking it BY
@@ -248,6 +252,25 @@ printf '%s\n' "$OUT" | sed 's/^/    | /'
 [ "$RC" -eq 0 ];                                     check "runs when explicitly allowed (exit 0)" $?
 has "WARNING: --allow-cross-tree";                  check "still warns which two trees are involved" $?
 has "pwd=$ROOT";                                     check "print marker: Godot would open the WRAPPER's tree, proving the substitution was real" $?
+
+# ONE-SHOT / ALWAYS FLAKE — exists so the GATE'S RETRY can be proven rather
+# than assumed. Unset in every normal run, so it cannot affect a real gate.
+# tools/verify-all.mjs inherits the environment, so:
+#   GODOT_LOCK_TEST_FLAKE=once GODOT_LOCK_TEST_FLAKE_MARKER=/tmp/m node tools/verify-all.mjs --quick
+# fails exactly once (creating the marker) and then passes — exercising the
+# retry path end to end. `always` fails on every attempt, which proves the retry
+# does NOT mask a genuine failure. This hook is why the retry is believed: a
+# retry nobody has watched fire is a hope.
+case "${GODOT_LOCK_TEST_FLAKE:-}" in
+  once)
+    if [ ! -e "${GODOT_LOCK_TEST_FLAKE_MARKER:-/nonexistent}" ]; then
+      : > "${GODOT_LOCK_TEST_FLAKE_MARKER}" 2>/dev/null || true
+      echo "  FAIL  deliberate one-shot flake (proves the gate retries)"
+      FAIL=$((FAIL + 1))
+    fi
+    ;;
+  always) echo "  FAIL  deliberate permanent flake (proves the gate does NOT mask a real failure)"; FAIL=$((FAIL + 1)) ;;
+esac
 
 printf '\n  %d passed, %d failed\n' "$PASS" "$FAIL"
 if [ "$FAIL" -ne 0 ]; then
