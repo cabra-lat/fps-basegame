@@ -73,6 +73,20 @@ func _initialize() -> void:
 ## The catalogue must be registered in project.godot, not just present on disk.
 func _check_catalogue_loaded() -> void:
 	var locales := TranslationServer.get_loaded_locales()
+
+	# === CONSTRUCTED PROBE v6 (throwaway, never merge) ===
+	# The catalogue loads with all its messages and pt_BR is a loaded locale,
+	# yet translate() resolves none of them. Hypothesis: the ACTIVE locale is not
+	# pt_BR, so translate() returns source text while the catalogue sits unused.
+	print("PROBE active_locale=", TranslationServer.get_locale())
+	print("PROBE loaded=", locales)
+	print("PROBE before_set=", TranslationServer.translate("Marked Intel"))
+	TranslationServer.set_locale("pt_BR")
+	print("PROBE after_set_locale=", TranslationServer.get_locale())
+	print("PROBE after_set=", TranslationServer.translate("Marked Intel"))
+	print("PROBE after_set_survived=", TranslationServer.translate("SURVIVED"))
+	print("PROBE after_set_reason=", TranslationServer.translate("requires %s"))
+	# === END CONSTRUCTED PROBE v6 ===
 	_check(locales.has("pt_BR"), "pt_BR catalogue is registered in project.godot and loaded")
 
 ## Call sites and the declared contract must describe the same key set, in both
