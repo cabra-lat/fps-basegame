@@ -137,6 +137,43 @@ func _initialize() -> void:
 	print("  the reading is void only because it walked out of the radius, which is the whole point of the arm")
 
 	print("")
+	print("=== VALID ARM: a subject that TRAVELS AND STAYS INSIDE 45 m, no production change ===")
+	# Spotter's ruling: travel that stays inside the radius, by starting at 40 m
+	# and using a short window. This touches NO production parameter, the arena
+	# camera stays real, and the production LOD code runs unmodified. The two
+	# rejected alternatives each answer a different question: a camera that
+	# follows the subject makes the LOD distance unreal, and a longer fixture-only
+	# anim_lod_distance forces the clip and so measures a FORCED clip.
+	var valid := await _measure(Vector3(0, 0, 40.0), "valid arm, placed at 40 m, short window", 30)
+	print("  mode          : %s" % valid["mode"])
+	print("  speed_scale   : %s" % valid["speed_scale"])
+	print("  travel_m      : %s" % valid["travel_m"])
+	print("  clip_advance  : %s" % valid["clip_advance"])
+	print("  max_distance_m: %s" % valid.get("max_distance_m", "n/a"))
+	print("  message       : %s" % valid["message"])
+	# The VALID verdict is the CONJUNCTION, not one mode string. The setup-time
+	# precondition only reports SPEED_SCALE_OK, because it is the only thing it
+	# checks. My first arm asserted mode == VALID_SUBJECT and it failed while the
+	# subject was genuinely valid: I asserted a string the code never emits, which
+	# is the same error as asserting a number I typed.
+	var valid_axes := _axes_ok(float(valid["speed_scale"]), float(valid["travel_m"]), float(valid["clip_advance"]))
+	print("  axes_ok      : %s  (speed_scale>0 AND travel>%0.2f m AND clip>%0.2f s)" % [valid_axes, MIN_TRAVEL, MIN_CLIP_ADVANCE])
+	_expect(valid_axes,
+		"a subject inside the radius that translates and animates must satisfy all three axes, got %s" % valid_axes)
+	_expect(valid["mode"] != "FROZEN_BY_LOD" and valid["mode"] != "VOID_LEFT_LOD_RADIUS" and valid["mode"] != "NO_ANIMATION_PLAYER",
+		"a valid subject must not carry a void mode, got %s" % valid["mode"])
+	print("  VALID_SUBJECT = inside the radius AND axes_ok AND no void mode. The first arm asserted a single")
+	print("  mode string and failed against a genuinely valid subject, so the verdict is now the conjunction.")
+	_expect(float(valid.get("max_distance_m", 99.0)) < ANIM_LOD_DISTANCE_M,
+		"the subject must never leave the radius, max distance was %s m" % valid.get("max_distance_m", "n/a"))
+	_expect(float(valid["travel_m"]) > 0.5,
+		"a VALID subject must actually translate, got %s m" % valid["travel_m"])
+	_expect(float(valid["speed_scale"]) > 0.0,
+		"a VALID subject must actually animate, speed_scale was %s" % valid["speed_scale"])
+	_expect(float(valid["clip_advance"]) > 0.05,
+		"a VALID subject must actually advance its clip, got %s s" % valid["clip_advance"])
+	print("  the subject translated %s m, advanced its clip %s s, and peaked at %s m of a %0.1f m radius" % [valid["travel_m"], valid["clip_advance"], valid.get("max_distance_m"), ANIM_LOD_DISTANCE_M])
+	print("")
 	print("=== THE TWO-AXIS RULE, AS ITS OWN ASSERTION ===")
 	# speed_scale > 0 alone is NOT sufficient: a frozen-clock, stationary bot
 	# would pass it. Assert the stationary case is rejected on travel.
@@ -158,7 +195,7 @@ var _cam: Camera3D = null
 
 ## Instantiate bot.tscn, place it, drive it, and measure. The subject is the
 ## production scene, so the guard is exercised on the shape production builds.
-func _measure(at: Vector3, label: String) -> Dictionary:
+func _measure(at: Vector3, label: String, window: int = 90) -> Dictionary:
 	var packed := load(BOT_SCENE) as PackedScene
 	if packed == null:
 		return {"mode": "FIXTURE_BROKEN", "message": "bot.tscn did not load", "remedy": "check the path", "void_reading": true}
@@ -168,9 +205,14 @@ func _measure(at: Vector3, label: String) -> Dictionary:
 	if bot is Node3D:
 		(bot as Node3D).global_position = at
 
+	# Order matters and the engine says so: setting global_position on a node that
+	# is NOT yet in the tree prints 'Condition "!is_inside_tree()" is true' and
+	# silently uses an identity transform. So the camera enters the tree FIRST and
+	# is positioned after. An error printed inside a PASSING harness is the noise
+	# that hides a real failure, so it is removed rather than ignored.
 	_cam = Camera3D.new()
-	_cam.global_position = Vector3.ZERO
 	root.add_child(_cam)
+	_cam.global_position = Vector3.ZERO
 	_cam.current = true
 
 	# Let the bot settle, then give the rig a clip and drive the root, so travel
@@ -190,6 +232,7 @@ func _measure(at: Vector3, label: String) -> Dictionary:
 	# at the sample where it breaks, with no angle emitted at all.
 	var left_at := -1
 	var left_dist := 0.0
+	var max_dist := 0.0
 	# Whether the subject was EVER measurable is a setup fact, and it decides
 	# WHICH fault this is. A subject that STARTS outside the radius was never a
 	# valid subject and gets the setup-time mode. Only a subject that STARTS
@@ -197,9 +240,10 @@ func _measure(at: Vector3, label: String) -> Dictionary:
 	# mid-window. Collapsing the two would lose the distinction that lets a reader
 	# act, which is the entire reason the modes are separate strings.
 	var start_in_range := (bot as Node3D).global_position.distance_to(_cam.global_position) < ANIM_LOD_DISTANCE_M
-	for _i in 90:
+	for _i in window:
 		if not await _await_frames(1, "measure loop"): return {}
 		var d_now: float = (bot as Node3D).global_position.distance_to(_cam.global_position)
+		max_dist = maxf(max_dist, d_now)
 		if d_now >= ANIM_LOD_DISTANCE_M and left_at < 0:
 			left_at = _i
 			left_dist = d_now
@@ -215,13 +259,15 @@ func _measure(at: Vector3, label: String) -> Dictionary:
 		# subject that left the radius is the defect this arm exists to prevent.
 		res = {
 			"mode": "VOID_LEFT_LOD_RADIUS",
-			"message": "subject left the animation LOD radius mid-measurement at sample %d of 90: %0.2f m from the active camera, radius %0.1f m" % [left_at, left_dist, ANIM_LOD_DISTANCE_M],
+			"message": "subject left the animation LOD radius mid-measurement at sample %d of %d: %0.2f m from the active camera, radius %0.1f m" % [left_at, window, left_dist, ANIM_LOD_DISTANCE_M],
 			"remedy": "the MEASUREMENT is void, not the rig: a translating subject LEAVES the radius, so hold the subject in range for the whole window",
 			"void_reading": true,
 			"left_at_sample": left_at,
 			"left_at_distance_m": left_dist,
 		}
 	res["travel_m"] = travel
+	res["max_distance_m"] = max_dist
+	res["window"] = window
 	res["clip_advance"] = adv
 	res["speed_scale"] = (anim.speed_scale if anim != null else -1.0)
 	res["label"] = label
