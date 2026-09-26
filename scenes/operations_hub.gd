@@ -195,17 +195,20 @@ func set_loadouts(options: Array) -> void:
 	for option in options:
 		if option is Dictionary and String(option.get("id", "")) != "":
 			loadout_options.append((option as Dictionary).duplicate(true))
-	if selected_loadout_id == "" and not loadout_options.is_empty():
-		selected_loadout_id = String(loadout_options[0].get("id", ""))
-	elif _find_option(selected_loadout_id) == null:
+	if not loadout_options.is_empty():
+		if _find_option(selected_loadout_id).is_empty():
+			selected_loadout_id = String(loadout_options[0].get("id", ""))
+	elif selected_loadout_id != "":
 		selected_loadout_id = ""
 	_recompute_state()
 	_refresh()
 
 
 func set_selected_loadout(loadout_id: String) -> void:
-	if loadout_id != "" and _find_option(loadout_id) == null:
+	if loadout_id != "" and _find_option(loadout_id).is_empty():
 		selected_loadout_id = ""
+		_recompute_state()
+		_refresh()
 		return
 	selected_loadout_id = loadout_id
 	_recompute_state()
