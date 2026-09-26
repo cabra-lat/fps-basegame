@@ -31,6 +31,13 @@ static func encode_item(item: InventoryItem) -> Dictionary:
 		# Starter gear is marked non-transferable so it cannot be laundered into the
 		# shared bank through a trader or the flea (it can still be equipped and used).
 		d["no_transfer"] = true
+	# `keep_on_death` is carried for the same reason `no_transfer` is: an item
+	# that declares itself death-safe must still be recognisable as declaring it
+	# after it has been encoded, or a policy loaded from a profile cannot see it.
+	# Note the policy does NOT read this to decide a death -- DeathPolicy's pocket
+	# is the only authority -- so the flag here is information, not a second path.
+	if item.has_meta(&"keep_on_death") or (content != null and content.has_meta(&"keep_on_death")):
+		d["keep_on_death"] = true
 	if content is Weapon:
 		_encode_weapon(d, content as Weapon)
 	elif content is AmmoFeed:

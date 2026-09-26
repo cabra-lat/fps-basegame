@@ -305,6 +305,7 @@ func _policy_value_arms() -> void:
 		"an armed item in the safe pocket is NOT reported lost (lost=%s)" % str(pocketed.get("lost_paths", [])))
 	_check(pocketed.get("lost_paths", []).has(AK) and not pocketed.get("kept_paths", []).has(AK),
 		"an armed item NOT in the safe pocket is still lost -- the pocket is a subset, not an amnesty")
+	_keep_on_death_arms(armed)
 
 	# The switch the original request called "probably a setting".
 	var no_recovery := DeathPolicy.new()
@@ -386,3 +387,61 @@ func _death_with_policy(policy: DeathPolicy) -> Dictionary:
 	for brief in report.lost:
 		lost.append(String((brief as Dictionary).get("path", "")))
 	return {"kept_paths": kept, "lost_paths": lost}
+
+## The per-item death-safe flag, and the claim that made it into fe42546's commit
+## message: "the day the addon's export lands, the population moves to per-item
+## flags with no code change here". QA vetoed that sentence and was right, for
+## three reasons -- the encoded dictionary never carried the key, a GDScript
+## export is a property rather than metadata so get_meta() could not see it, and
+## the meta was consulted OUTSIDE any pocket-membership test, so the item rather
+## than the policy decided who survives a death.
+##
+## Rather than delete the claim, these arms make it true:
+##   - the flag is read (metadata, from the resource or its content)
+##   - it is carried through encode_item, the way no_transfer already is
+##   - and an item that declares itself safe WITHOUT the policy agreeing is
+##     reported, not honoured -- a declared item is not a second authority.
+##
+## The missing arm QA named is the last one, and it is the only case where the
+## policy's derivation could be wrong.
+func _keep_on_death_arms(shaped: DeathPolicy) -> void:
+	var declaring: Resource = load(M4)
+	declaring.set_meta(DeathPolicy.KEEP_ON_DEATH_META, true)
+
+	_check(shaped.keep_on_death_declared(M4),
+		"an item that declares keep_on_death is READ as declaring it")
+	_check(shaped.pocket_entries_from_items([M4]).is_empty(),
+		"a declaring item that the policy also lists is already ratified, not pending")
+
+	# An empty pocket plus a declaring item: the exact shape QA said nothing
+	# tested. The flag must NOT be a way to survive a death on its own.
+	var lone := DeathPolicy.new()
+	lone.recoverable = true
+	var reported := lone.pocket_entries_from_items([M4])
+	_check(reported.size() == 1 and String(reported[0]) == M4,
+		"a declaring item the policy does NOT list is REPORTED as awaiting ratification (got %s)" % str(reported))
+	_check(not lone.keeps(M4, declaring),
+		"a declaring item the policy does NOT list does not survive a death -- the pocket is the only authority")
+	var lone_death := _death_with_policy(lone)
+	_check(lone_death.get("lost_paths", []).has(M4) and not lone_death.get("kept_paths", []).has(M4),
+		"a death under a policy that never ratified the flag still loses the item (kept=%s)" % str(lone_death.get("kept_paths", [])))
+	_check(lone.validate().is_empty(),
+		"validate() does not complain about a policy that simply lists nothing (%s)" % str(lone.validate()))
+
+	# And the flag survives encoding, which is what makes the migration to
+	# per-item authoring possible at all. These two arms encode a real
+	# InventoryItem: the first version passed `load(M4)`, a Weapon, into a
+	# parameter typed InventoryItem, which is a RUNTIME error -- so both arms
+	# below the call never executed and the harness still reported a green. Six
+	# of eight checks ran and the two that were skipped were exactly the ones
+	# covering the copy. Nothing in a counter distinguishes "passed" from "never
+	# reached".
+	var carrying: InventoryItem = ItemCodec.item_from_path(M4)
+	carrying.set_meta(DeathPolicy.KEEP_ON_DEATH_META, true)
+	var encoded: Dictionary = ItemCodec.encode_item(carrying)
+	_check(bool(encoded.get("keep_on_death", false)),
+		"encode_item carries keep_on_death, as it already carries no_transfer")
+	var plain: InventoryItem = ItemCodec.item_from_path(AK)
+	var plain_encoded: Dictionary = ItemCodec.encode_item(plain)
+	_check(not plain_encoded.has("keep_on_death"),
+		"encode_item does not invent the flag for an item that never declared it (keys=%s)" % str(plain_encoded.keys()))

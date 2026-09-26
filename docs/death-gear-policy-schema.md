@@ -91,6 +91,24 @@ existing `no_transfer` meta flag rather than replacing it — `no_transfer` stop
 laundering, `keep_on_death` stops loss; they are different questions and merging
 them would make one of them wrong.
 
+**Corrected after QA's review of `fe42546` (2026-09-26).** Two properties of
+GDScript decide how this lands, and neither is optional knowledge:
+
+1. `@export var` is a **property**, not metadata. `item.get_meta("keep_on_death")`
+   cannot see it; the read is `item.keep_on_death`. So the flag cannot arrive
+   through the meta path the current code already uses.
+2. An encoded item is a plain `Dictionary` built from an explicit key list in
+   `ItemCodec.encode_item`. A key that is not copied there cannot survive
+   encoding — which is how `no_transfer` works today, copied deliberately.
+
+So the per-item flag is a **declaration the policy must ratify**, never an
+authority of its own. The shipped contract: `DeathPolicy.safe_pocket` decides
+who survives a death, `keep_on_death_declared()` reads the flags, and
+`pocket_entries_from_items()` reports every item that declares itself safe
+without the policy listing it. When the addon export lands, the population is
+authored as flags and `validate()` names each one the policy has not adopted —
+the settlement code does not change, and nothing needs to.
+
 ### 2.3 `RoleDefinition` — the free-entry role, declared not coded
 
 `StarterLoadout` already exists; the role is the thing that names it.

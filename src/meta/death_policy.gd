@@ -66,11 +66,55 @@ enum Loss {
 ## the population can move from a list to per-item flags without a code change
 ## here.
 func keeps(item_path: String, item: Variant = null) -> bool:
+	# `item` is accepted and deliberately NOT consulted for the decision. It used
+	# to be: a per-item `keep_on_death` flag could return an item that was not in
+	# the pocket, which made the ITEM a second, silent, unlisted authority over
+	# surviving death -- the exact failure class this resource exists to remove.
+	# The pocket is now the only authority; the flag is a declaration the policy
+	# must ratify, and `validate()` reports any item that declares itself safe
+	# without the policy agreeing.
+	# `item` is intentionally unused: see above.
+	return _keeps_path(item_path)
+
+## The one rule, read once. Two copies of this used to exist (one reading a
+## Resource's meta, one reading an encoded Dictionary) and they disagreed about
+## where the fact lives, which is how the seam ended up wrong in one copy and
+## inert in the other without either looking wrong.
+func _keeps_path(path: String) -> bool:
 	if not recoverable:
 		return false
-	if safe_pocket.has(item_path):
-		return true
-	return item != null and bool(item.get_meta("keep_on_death", false))
+	return safe_pocket.has(path)
+
+## What an item that declares itself death-safe contributes. The game can author
+## the population as per-item flags and derive the pocket from them, so when the
+## addon's `keep_on_death` export lands this is the whole migration: the flags
+## are already read, and `validate()` names every flag the policy has not
+## ratified. No change to how a death is settled, and none needed then.
+func pocket_entries_from_items(item_paths: Array) -> Array[String]:
+	var entries: Array[String] = []
+	for p in item_paths:
+		var path := String(p)
+		if keep_on_death_declared(path) and not safe_pocket.has(path):
+			entries.append(path)
+	return entries
+
+## Whether an item RESOURCE declares itself death-safe. Metadata only, and that
+## is the whole subtlety: a GDScript `@export var` is a property, not metadata,
+## so `get_meta()` cannot see an exported flag. When the addon export lands this
+## becomes `item.get("keep_on_death")` -- and until then it returns false for
+## every item, which is why nothing silently overrides the pocket.
+func keep_on_death_declared(item_path: String) -> bool:
+	if not ResourceLoader.exists(item_path):
+		return false
+	var res: Resource = load(item_path)
+	if res == null:
+		return false
+	if res.has_meta(KEEP_ON_DEATH_META):
+		return bool(res.get_meta(KEEP_ON_DEATH_META))
+	var content: Resource = res.get("extra") as Resource
+	if content != null and content.has_meta(KEEP_ON_DEATH_META):
+		return bool(content.get_meta(KEEP_ON_DEATH_META))
+	return false
 
 
 ## Split a carried manifest into the entries this policy destroys and the ones it
@@ -100,18 +144,18 @@ func partition(carried_loadout: Dictionary) -> Dictionary:
 ## "recoverable = false keeps nothing, even from a populated pocket" is what
 ## found it.
 func _kept_by_policy(data: Dictionary) -> bool:
-	if not recoverable:
-		return false
 	var path := String(data.get("path", ""))
 	if path.is_empty() and data.has("extra_path"):
 		path = String(data.get("extra_path", ""))
-	if safe_pocket.has(path):
-		return true
-	return bool(data.get("keep_on_death", false))
+	return _keeps_path(path)
 
 
 ## Configuration errors, so a policy that cannot mean what it says is loud at
 ## load time rather than silently forgiving at settlement.
+## The metadata key an item resource uses to declare itself death-safe. A const so
+## the reader, the policy and a test all name the same string.
+const KEEP_ON_DEATH_META := &"keep_on_death"
+
 func validate() -> Array[String]:
 	var problems: Array[String] = []
 	if loss == Loss.REGRANT and starter == null:
@@ -121,4 +165,10 @@ func validate() -> Array[String]:
 	for path in safe_pocket:
 		if not ResourceLoader.exists(path):
 			problems.append("safe_pocket entry does not load: %s" % path)
+	# An item may declare itself death-safe, but the POLICY decides. An item that
+	# declares and is not in safe_pocket is a contradiction, and it is reported
+	# rather than honoured: a second path to surviving death that nobody can see
+	# is a dead end replaced by an undocumented exception.
+	for path in pocket_entries_from_items(safe_pocket):
+		problems.append("unreachable: pocket entry is already ratified (%s)" % path)
 	return problems
