@@ -17,6 +17,7 @@ extends SceneTree
 
 const TEST_DIR := "user://meta_flea_test"
 const SAVE := "user://meta_flea_test/profile.save"
+const _FLEA_FRAME_KEY := "Listing #%d %s %d cr [%s] seller=%s"
 const BANDAGE := "res://resources/medical/army_bandage.tres"
 
 var v: ValidateUtil
@@ -153,7 +154,23 @@ func _scenario_service_api() -> void:
 	_check(lr.get("ok", false), "Meta.list_on_flea ok (%s)" % lr.get("reason", ""))
 	_check(service.flea_listing_fee(1000) == profile.flea.listing_fee(1000), "Meta.flea_listing_fee matches (%d)" % service.flea_listing_fee(1000))
 	var listing: FleaListing = lr.get("listing")
-	_check(service.flea_report_lines().size() > 0, "Meta.flea_report_lines() non-empty")
+	var flea_lines := service.flea_report_lines()
+	# A CONTENT check, not `.size() > 0`. QA's review of 19a3043 is the reason:
+	# the market's report line is verified for language
+	# (validate_meta_market.gd asserts it contains "Comprar") while this one only
+	# asserted that some string existed, so a line could be entirely English and
+	# still pass. Two sibling report paths, two different standards, is how a
+	# display line stays untranslated through a stack that is otherwise green.
+	_check(not flea_lines.is_empty(), "Meta.flea_report_lines() non-empty")
+	_check(flea_lines.size() > 0 and str(flea_lines[0]).contains(_flea_frame_word()),
+		"Meta.flea_report_lines() renders in the catalogue language (line 0: %s, expected the frame word %s)" % [str(flea_lines[0] if not flea_lines.is_empty() else ""), _flea_frame_word()])
+	# The negative half is what makes the positive half honest: with no catalogue
+	# loaded, translate() returns the msgid, so the first word of the pattern is
+	# the same in both languages and a contains() check would happily pass on the
+	# raw English frame. Requiring the English word to be ABSENT is the check
+	# that cannot be satisfied by an untranslated line.
+	_check(flea_lines.size() > 0 and not str(flea_lines[0]).contains(_flea_key_word()),
+		"Meta.flea_report_lines() does not leak the raw English frame (line 0: %s)" % str(flea_lines[0] if not flea_lines.is_empty() else ""))
 	_check(service.cancel_flea(listing.id).get("ok", false), "Meta.cancel_flea ok")
 	var target: FleaListing = null
 	for l in profile.flea.active_listings():
@@ -183,3 +200,14 @@ func _cleanup() -> void:
 		return
 	for f in d.get_files():
 		d.remove(f)
+
+## The first space-delimited word of the flea frame, taken from whichever
+## language the catalogue resolved to. A word rather than the whole pattern,
+## because "%d" and "%s" are substituted away by the time the line is rendered
+## and the pattern itself can never appear inside its own output.
+func _flea_frame_word() -> String:
+	return TranslationServer.translate(_FLEA_FRAME_KEY).split(" ")[0]
+
+## The same word as the catalogue leaves it when NOTHING is translated.
+func _flea_key_word() -> String:
+	return _FLEA_FRAME_KEY.split(" ")[0]

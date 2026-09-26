@@ -169,3 +169,18 @@ msgstr "Andarilho"
 
 msgid "Raider"
 msgstr "Saqueador"
+
+msgid "Active"
+msgstr "Ativo"
+
+msgid "Sold"
+msgstr "Vendido"
+
+msgid "Expired"
+msgstr "Expirado"
+
+msgid "Cancelled"
+msgstr "Cancelado"
+
+msgid "Listing #%d %s %d cr [%s] seller=%s"
+msgstr "Anúncio #%d %s %d cr [%s] vendedor=%s"

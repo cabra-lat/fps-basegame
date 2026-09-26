@@ -54,6 +54,12 @@ const DECLARED_KEYS := [
 	"Bought %s",
 	"Rejected: %s",
 	"Sold for %d cr",
+	# FleaListing.status_name() -- the Status ENUM is machine identity, these
+	# four are the words a player reads, so they are keys like any other.
+	"Active",
+	"Sold",
+	"Expired",
+	"Cancelled",
 	"Sold %d cr",
 	"an item",
 	"5.56x45mm Ammo",
