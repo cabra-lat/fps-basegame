@@ -129,6 +129,8 @@ const HARNESS_SCRIPTS = [
   ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
   ['weapon_requests_runtime', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
   ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
+  ['fixture_isolation', 'res://src/meta/validate_fixture_isolation.gd'],
+  ['item_codec_paths', 'res://src/meta/validate_item_codec_paths.gd'],
   ['meta_progression', 'res://src/meta/validate_meta_progression.gd'],
   ['meta_market', 'res://src/meta/validate_meta_market.gd'],
   ['meta_flea', 'res://src/meta/validate_meta_flea.gd'],
@@ -176,6 +178,8 @@ function harnessScript(name) {
 // what the COMMITTED harness does, so it is not a reason for a red gate on
 // every other lane's checkout while that patch waits to land.
 const MIN_CHECKS = {
+  fixture_isolation: 30,
+  item_codec_paths: 17,
   profiler: 120,
   assets: 123,
   ballistics: 52,
@@ -750,8 +754,6 @@ async function gateHarness(name, script) {
 
 async function gateQa() {
   const qaArgs = ['tools/qa/audit.mjs', '--check', '--no-import'
-  ['fixture_isolation', 'res://src/meta/validate_fixture_isolation.gd'],
-  ['item_codec_paths', 'res://src/meta/validate_item_codec_paths.gd'],
 ];
   if (qaFast) qaArgs.push('--no-verify');
   const result = await runLogged('qa_audit', process.execPath, qaArgs, 900_000);
