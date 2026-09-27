@@ -77,7 +77,13 @@ func _on_resolve_requested() -> void:
 
 
 func return_to_menu() -> void:
-	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+	# Cached and null-checked rather than a chained get_tree() deref: INV-38a
+	# ratchets chained get_tree() call sites, and this file added one. The fix is
+	# the pattern operations_hub_controller already uses, not a loosened baseline.
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	tree.change_scene_to_file(MAIN_MENU_SCENE)
 
 
 func _bind_existing_ui() -> void:

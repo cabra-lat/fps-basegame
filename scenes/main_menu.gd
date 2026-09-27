@@ -40,7 +40,13 @@ func _on_hub() -> void:
 ## no way in is the same failure as the unconnected gunsmith request signals, and
 ## the acceptance for that card is the route rather than the screen internals.
 func _on_hideout() -> void:
-	get_tree().change_scene_to_file(HIDEOUT_SCENE)
+	# Cached and null-checked rather than chained: INV-38a ratchets chained
+	# get_tree() call sites and this handler added one. Same pattern as the hub
+	# controller's return_to_hub.
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	tree.change_scene_to_file(HIDEOUT_SCENE)
 
 
 func _on_quit() -> void:
