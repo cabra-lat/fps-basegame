@@ -749,7 +749,10 @@ async function gateHarness(name, script) {
 }
 
 async function gateQa() {
-  const qaArgs = ['tools/qa/audit.mjs', '--check', '--no-import'];
+  const qaArgs = ['tools/qa/audit.mjs', '--check', '--no-import'
+  ['fixture_isolation', 'res://src/meta/validate_fixture_isolation.gd'],
+  ['item_codec_paths', 'res://src/meta/validate_item_codec_paths.gd'],
+];
   if (qaFast) qaArgs.push('--no-verify');
   const result = await runLogged('qa_audit', process.execPath, qaArgs, 900_000);
   const text = readLog(result.log);
