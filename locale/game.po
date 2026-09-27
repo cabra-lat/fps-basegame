@@ -190,15 +190,20 @@ msgstr "Anúncio #%d %s %d cr [%s] vendedor=%s"
 # item_descriptions.gd). Resolution happens at render time, so a second language
 # is a catalogue change and not a data-format change.
 #
-# SCOPE, and it is deliberately narrow: the items the meta loop surfaces. 122
-# shipped resources declare a description and all 122 were untranslated at the
-# time of writing, so an item outside this set renders WITHOUT the optional tail
-# rather than with English in it. That is the honest-absence rule, and the
-# translation sweep for the rest is content work, not a code change.
+# SCOPE, measured by the build rather than asserted here. The two debt notes in
+# validate_i18n.gd print the live numbers on every run: 117 item descriptions
+# carry a top-level description and 26 of them are untranslated, which is the
+# floor and not zero -- see the RESIDUE block at the end of this file for the 26,
+# and for why none of them can honestly be translated. An earlier version of this
+# comment claimed "122 shipped resources declare a description and all 122 were
+# untranslated"; both numbers were wrong (122 counted sub_resource AmmoFeed
+# descriptions that are not item descriptions, and 0 ignored the six that were
+# already here), and the notes replaced the claim.
 #
-# M4_Carbine is absent on purpose: its .tres description is still the scaffold
-# text "This Weapon is the default one." (card task_1790405682020_fa3fc5).
-# Translating a placeholder would make it look handled.
+# PEQ-15 is absent on purpose: its .tres description is still the scaffold text
+# "This Attachment is the default one." (and this card previously named M4_Carbine
+# for that, which was wrong -- M4 has no description at all). Translating a
+# placeholder would make it look handled.
 
 msgid "5.56x45mm SS109 (VPAM PM7)"
 msgstr "Munição 5,56x45mm SS109 (VPAM PM7)"
@@ -224,22 +229,627 @@ msgstr "Um pacote de intel marcado. Recupere-o e chegue a um ponto de extração
 msgid "Field scout"
 msgstr "Batedor de campo"
 
+
+# ── Item descriptions, pt-BR sweep (2026-09-27) ─────────────────────────────
+# AUTHORED BY HAND, not generated. The user chose "author them" over
+# visibly-marked debt, and a script that filled 111 strings is how this project
+# ended up with a hardcoded Portuguese catalogue in the first place.
+#
+# CONVENTIONS, taken from the entries already in this file rather than invented:
+#   * calibre decimals take the pt-BR COMMA, because the existing
+#     "5,56x45mm SS109 (VPAM PM7)" already established it: 7.62x51mm -> 7,62x51mm
+#   * "HP" is "PV" ("Recupera até 85 PV"), matching salewa_first_aid_kit
+#   * descriptions are sentences ending in a full stop, as the existing six are
+#   * UI chips stay UPPERCASE, as SURVIVED -> SOBREVIVEU does
+#
+# THE RESIDUE IS RECORDED, NOT HIDDEN. Further down, the DESIGNATIONS block lists
+# every msgid that is deliberately left with an EMPTY msgstr, with the reason
+# spelled out per key. An empty msgstr there is a decision, not an oversight, and
+# the debt counter keeps counting those keys on purpose: it measures CHANGE, so a
+# key that reads the same in Portuguese can never clear it, and pretending
+# otherwise would be the mechanically-filled catalogue this block exists to avoid.
+
+# ── Weapons ────────────────────────────────────────────────────────────────
+
+msgid "9x19mm blowback submachine gun, 32-round magazine."
+msgstr "Submetralhadora 9x19mm de ferrolho deslocado, carregador de 32 tiros."
+
+msgid "12-gauge semi-automatic shotgun, 8-round magazine."
+msgstr "Escopeta calibre 12 semiautomática, carregador de 8 tiros."
+
+msgid "7.62x51mm battle rifle, 20-round magazine."
+msgstr "Fuzil de combate 7,62x51mm, carregador de 20 tiros."
+
+msgid "Gas-operated .50 AE magnum pistol."
+msgstr "Pistola magnum .50 AE de ação por gás."
+
+msgid "7.62x51mm bolt-action sniper rifle, 5-round magazine."
+msgstr "Fuzil de precisão 7,62x51mm de ferrolho, carregador de 5 tiros."
+
+msgid "5.56x45mm assault rifle, 30-round magazine."
+msgstr "Fuzil de assalto 5,56x45mm, carregador de 30 tiros."
+
+msgid ".45 Auto single-action pistol, 7-round magazine."
+msgstr "Pistola .45 Auto de ação simples, carregador de 7 tiros."
+
+msgid "12-gauge pump-action shotgun, 6-round tube."
+msgstr "Escopeta calibre 12 de bombeamento, tubo de 6 tiros."
+
+msgid "Polymer-framed 9x19mm service pistol, 17-round magazine."
+msgstr "Pistola de serviço 9x19mm com coronha de polímero, carregador de 17 tiros."
+
+msgid "12.7x99mm anti-materiel rifle, 10-round magazine."
+msgstr "Fuzil antimaterial 12,7x99mm, carregador de 10 tiros."
+
+msgid "9x19mm roller-delayed blowback submachine gun."
+msgstr "Submetralhadora 9x19mm de ferrolho com atraso de rolete."
+
+# ── Attachments ────────────────────────────────────────────────────────────
+
+msgid "Ambidextrous charging handle."
+msgstr "Manípulo de recarga ambidestro."
+
+msgid "IR laser/illuminator box."
+msgstr "Caixa de laser/iluminador infravermelho."
+
+msgid "1x holographic sight."
+msgstr "Mira holográfica 1x."
+
+msgid "60-round drum magazine."
+msgstr "Carregador tambor de 60 tiros."
+
+msgid "40-round polymer magazine."
+msgstr "Carregador de polímero de 40 tiros."
+
+msgid "Tactical weapon light."
+msgstr "Lanterna tática de arma."
+
+msgid "4x32 prismatic scope."
+msgstr "Luneta prismática 4x32."
+
+msgid "5.56mm suppressor."
+msgstr "Supressor 5,56mm."
+
+msgid "Foldable bipod."
+msgstr "Bipé dobrável."
+
+msgid "Muzzle compensator."
+msgstr "Compensador de boca."
+
+msgid "Angled foregrip."
+msgstr "Punho de tiro inclinado."
+
+msgid "1-6x variable low-power scope."
+msgstr "Luneta de aumento variável 1-6x."
+
+msgid "Light Alloy AK-47 magazines"
+msgstr "Carregadores AK-47 de liga leve"
+
+msgid "Plastic ABS modern 30 round magazine"
+msgstr "Carregador moderno de plástico ABS para 30 tiros"
+
+# ── Consumables and medical ────────────────────────────────────────────────
+
+msgid "Drinking water. +60 hydration."
+msgstr "Água potável. +60 hidratação."
+
+msgid "Combat application tourniquet. Stops heavy bleeding; leaves a fresh wound."
+msgstr "Torniqueto de combate. Estanca hemorragias graves; deixa uma ferida aberta."
+
+msgid "Field surgery: restores one destroyed limb at reduced health."
+msgstr "Cirurgia de campo: restaura um membro destruído com saúde reduzida."
+
+msgid "Sweet and filling. +75 energy, -65 hydration."
+msgstr "Doce e nutritivo. +75 energia, -65 hidratação."
+
+msgid "Immobilises a fractured limb."
+msgstr "Imobiliza um membro fraturado."
+
+msgid "Analgesic pills. Removes pain for a while."
+msgstr "Comprimidos analgésicos. Alivia a dor por um tempo."
+
+msgid "Small automatic injector. Heals up to 50 HP."
+msgstr "Injetor automático pequeno. Recupera até 50 PV."
+
+# ── Armour plates ──────────────────────────────────────────────────────────
+# One family, one verb. "Detém" rather than "Interrompe" because a plate is the
+# subject of the sentence and the terse form keeps the row the same length as
+# its English source.
+
+msgid "Stops .357 Magnum and .44 Magnum"
+msgstr "Detém .357 Magnum e .44 Magnum"
+
+msgid "Stops 9x21mm"
+msgstr "Detém 9x21mm"
+
+msgid "Stops 9x19mm 7N21"
+msgstr "Detém 9x19mm 7N21"
+
+msgid "Stops M855 green tip"
+msgstr "Detém M855 de ponta verde"
+
+msgid "Stops 9mm, .40 Auto, .45 Auto"
+msgstr "Detém 9mm, .40 Auto, .45 Auto"
+
+msgid "Stops .357 Auto and .44 Magnum"
+msgstr "Detém .357 Auto e .44 Magnum"
+
+msgid "Stops 12.7mm B32 API"
+msgstr "Detém 12,7mm B32 API"
+
+msgid "Stops 9mm FMJ at 415 m/s"
+msgstr "Detém 9mm FMJ a 415 m/s"
+
+msgid "Stops 7.62x51mm P80 AP"
+msgstr "Detém 7,62x51mm P80 AP"
+
+msgid "Stops 5.56mm SS109 and 7.62x51mm DM111"
+msgstr "Detém 5,56mm SS109 e 7,62x51mm DM111"
+
+msgid "Stops .30-06 M2 AP"
+msgstr "Detém .30-06 M2 AP"
+
+msgid "Stops 7.62x39mm PS steel core"
+msgstr "Detém 7,62x39mm PS de núcleo de aço"
+
+msgid "Stops M855 and 7.62x51mm"
+msgstr "Detém M855 e 7,62x51mm"
+
+msgid "Stops 7.62x51mm M80"
+msgstr "Detém 7,62x51mm M80"
+
+msgid "Stops 5.45mm and 7.62x39mm"
+msgstr "Detém 5,45mm e 7,62x39mm"
+
+msgid "Stops 7.62x39mm BZ API"
+msgstr "Detém 7,62x39mm BZ API"
+
+msgid "Stops .357 Magnum FMJ at 580 m/s"
+msgstr "Detém .357 Magnum FMJ a 580 m/s"
+
+msgid "Stops 9mm FMJ at 360 m/s"
+msgstr "Detém 9mm FMJ a 360 m/s"
+
+msgid "Stops M995 AP and .30-06 AP"
+msgstr "Detém M995 AP e .30-06 AP"
+
+msgid "Stops 7.62x54mmR 7N13"
+msgstr "Detém 7,62x54mmR 7N13"
+
+msgid "Stops 9mm +P and .357 Magnum"
+msgstr "Detém 9mm +P e .357 Magnum"
+
+msgid "Stops .22 LR and similar low-energy rounds"
+msgstr "Detém .22 LR e projéteis de baixa energia semelhantes"
+
+msgid "Stops 9x18mm"
+msgstr "Detém 9x18mm"
+
+# ── Ammunition, designation-plus-calibre ────────────────────────────────────
+# The comma rule applies to every calibre that has a decimal point in English.
+# The entries with no decimal point are in the DESIGNATIONS block below, because
+# for those a Portuguese string would be identical to the English one and the
+# honest entry is an empty msgstr rather than a translation that changes nothing.
+
+msgid "12/70 lead slug"
+msgstr "Balote de chumbo 12/70"
+
+msgid "12/70 flechette (8 projectiles)"
+msgstr "12/70 flechette (8 projéteis)"
+
+msgid "12/70 AP-20 armor-piercing slug"
+msgstr "Balote perfurante AP-20 12/70"
+
+msgid "12/70 8.5mm Magnum buckshot (8 pellets)"
+msgstr "12/70 chumbo Magnum 8,5mm (8 balins)"
+
+msgid "7.62x51mm M993 AP (VPAM PM11)"
+msgstr "7,62x51mm M993 AP (VPAM PM11)"
+
+msgid "7.62x51mm AP (VPAM PM12)"
+msgstr "7,62x51mm AP (VPAM PM12)"
+
+msgid "7.62x51mm DM111 (VPAM PM7)"
+msgstr "7,62x51mm DM111 (VPAM PM7)"
+
+msgid "7.62x51mm M80 (NIJ III)"
+msgstr "7,62x51mm M80 (NIJ III)"
+
+msgid "7.62x54mmR 7N13 (GOST BR5)"
+msgstr "7,62x54mmR 7N13 (GOST BR5)"
+
+msgid "12.7x99mm (VPAM PM13)"
+msgstr "12,7x99mm (VPAM PM13)"
+
+msgid "5.56x45mm M855 (MIL SAPI)"
+msgstr "5,56x45mm M855 (MIL SAPI)"
+
+msgid "7.62x54mmR 7N1 (MIL ESAPI Rev G)"
+msgstr "7,62x54mmR 7N1 (MIL ESAPI Rev G)"
+
+msgid "7.62x39mm BZ API (MIL ISAPI)"
+msgstr "7,62x39mm BZ API (MIL ISAPI)"
+
+msgid "5.45x39mm 7N10 (GOST BR4)"
+msgstr "5,45x39mm 7N10 (GOST BR4)"
+
+msgid "5.56x45mm M995 AP (MIL ESAPI Rev G)"
+msgstr "5,56x45mm M995 AP (MIL ESAPI Rev G)"
+
+msgid "7.62x51mm P80 AP (VPAM PM9)"
+msgstr "7,62x51mm P80 AP (VPAM PM9)"
+
+msgid "7.62x54mmR B32 API (VPAM PM10)"
+msgstr "7,62x54mmR B32 API (VPAM PM10)"
+
+msgid "7.62x39mm PS (VPAM PM6)"
+msgstr "7,62x39mm PS (VPAM PM6)"
+
+msgid "7.62x54mmR B32 API (GOST BR6)"
+msgstr "7,62x54mmR B32 API (GOST BR6)"
+
+msgid "7.62x39mm PS (GOST BR4)"
+msgstr "7,62x39mm PS (GOST BR4)"
+
+msgid "12.7×108mm 57-BZ-542 API (GOST BR6)"
+msgstr "12,7×108mm 57-BZ-542 API (GOST BR6)"
+
+msgid "5.56x45mm M855 (NIJ RF2)"
+msgstr "5,56x45mm M855 (NIJ RF2)"
+
+msgid "14.5x114mm B32 API (VPAM PM14)"
+msgstr "14,5x114mm B32 API (VPAM PM14)"
+
+msgid "7.62x39mm BZ API (VPAM PM8)"
+msgstr "7,62x39mm BZ API (VPAM PM8)"
+
+# ── Scenario and trader descriptions: the msgid is the ENGLISH source ───────
+# These six .tres files used to carry pt-BR text in the description field, with
+# accents missing, which is the source-language rule inverted. The msgids below
+# are the ENGLISH now in those .tres files, verbatim, and the msgstrs are
+# authored from that English rather than patched onto the old Portuguese.
+#
+# "Ponte" stays as it is in BOTH columns on purpose: it is a machine key. The
+# extraction point is addressed as _point("Ponte") in validate_meta_progression.gd,
+# so translating the word would break the correspondence with the id and invite a
+# future author to helpfully translate a lookup key. The same reasoning keeps
+# RUN_THROUGH in caps.
+#
+# "barters" IS the English here, deliberately, and it is still the one phrase in
+# this block I would not defend as natural English prose: it is the game own
+# mechanic (TraderOffer.barter_required), so a trader description may legitimately
+# name it. It was previously Portuguese text with an English fragment inside it,
+# which was worse in both languages. A native reader should still look at these six.
+
+msgid "Eliminate 3 enemies in the arena."
+msgstr "Elimine 3 inimigos na arena."
+
+msgid "Extract via Ponte with 2 medical items in your backpack."
+msgstr "Extraia via Ponte com 2 itens médicos na mochila."
+
+msgid "Survive an entire raid and extract. RUN_THROUGH does not count."
+msgstr "Sobreviva a uma raid inteira e extraia. RUN_THROUGH não conta."
+
+msgid "Treats wounds: medical items, and accepts barters for supplies."
+msgstr "Trata ferimentos: itens médicos e aceita barganhas por suprimentos."
+
+msgid "Military supplies: ammunition and field items."
+msgstr "Suprimentos militares: munição e itens de campo."
+
+msgid "Weapons and attachments. Accepts barters for accessories."
+msgstr "Armas e acessórios. Aceita barganhas por acessórios."
+
+# ── Item display names: the registry entries that can carry Portuguese ──────
+
+msgid "Brazil 556"
+msgstr "Brasil 556"
+
+msgid "NIJ Level II"
+msgstr "NIJ Nível II"
+
+msgid "NIJ Level IIA"
+msgstr "NIJ Nível IIA"
+
+msgid "NIJ Level III"
+msgstr "NIJ Nível III"
+
+msgid "NIJ Level IIIA"
+msgstr "NIJ Nível IIIA"
+
+msgid "NIJ Level IV"
+msgstr "NIJ Nível IV"
+
+msgid "Military ESAPI"
+msgstr "ESAPI militar"
+
+msgid "Military SAPI"
+msgstr "SAPI militar"
+
+msgid "VPAM PM1 Armor"
+msgstr "Colete VPAM PM1"
+
+msgid "VPAM PM2 Armor"
+msgstr "Colete VPAM PM2"
+
+msgid "VPAM PM3 Armor"
+msgstr "Colete VPAM PM3"
+
+msgid "VPAM PM4 Armor"
+msgstr "Colete VPAM PM4"
+
+msgid "VPAM PM5 Armor"
+msgstr "Colete VPAM PM5"
+
+msgid "VPAM PM6 Armor"
+msgstr "Colete VPAM PM6"
+
+msgid "VPAM PM7 Armor"
+msgstr "Colete VPAM PM7"
+
+msgid "VPAM PM8 Armor"
+msgstr "Colete VPAM PM8"
+
+msgid "VPAM PM9 Armor"
+msgstr "Colete VPAM PM9"
+
+msgid "AI-2 medkit"
+msgstr "Kit médico AI-2"
+
+msgid "Aluminium splint"
+msgstr "Tala de alumínio"
+
+msgid "Analgin painkillers"
+msgstr "Analgésicos de analgina"
+
+msgid "Bottle of water (0.6L)"
+msgstr "Garrafa de água (0,6 L)"
+
+msgid "Can of condensed milk"
+msgstr "Lata de leite condensado"
+
+msgid "CMS surgical kit"
+msgstr "Kit cirúrgico CMS"
+
+# ── Loadout deploy reasons ─────────────────────────────────────────────────
+# These five were absent from the catalogue entirely, which is why the loadout
+# screen could not assert them: an assertion against a key with no msgstr passes
+# vacuously, because the key translates to ITSELF. They rendered as the raw
+# constant. UPPERCASE, as the outcome chips are.
+
 # --- loadout refusal reasons ---
 # Keys referenced as constants by src/meta/loadout_view.gd (REASON_KEYS).
-# msgids present, msgstr EMPTY = untranslated. Previously these keys were
-# absent from the catalog entirely, which the tooling could not distinguish
-# from translated (translate(key)==key is true for both).
+#
+# HISTORY, kept because the three states are indistinguishable from the outside and
+# that is the whole point of recording them. These keys were ABSENT from the
+# catalogue entirely, existing only as GDScript constants, so no translation tool
+# could see them. ea589a8 added the msgids with EMPTY msgstrs, which is the state
+# the tooling is designed to report on. They are FILLED as of this commit. All
+# three states return the key itself from translate(key) == key, so a count that
+# measures CHANGE could not tell them apart -- and reported "0 untranslated" while
+# the keys were missing. validate_i18n now reports PRESENCE separately from absence
+# for exactly this reason; see _check_every_key_is_translated.
+# ── Loadout refusal reasons, player-facing pt-BR ─────────────────────────
+# The view (loadout_view.gd) carries each reason as a KEY and never as a composed
+# literal -- its own rule, "a blocking reason as a KEY and never a composed
+# literal", exists so the sentence belongs to the catalogue. It also builds no UI:
+# it is the authority layer, and the reason reaches the player through whatever
+# renders rows(). So these five msgstrs ARE the whole player-facing text, and a
+# player reads them as a label on the offending item or slot, not as a sentence
+# inside a longer sentence.
+#
+# SENTENCE CASE, and that is a decision with evidence rather than taste. The
+# catalogue already has 18 ALL-CAPS msgstrs, but every one of them is a raid-feed
+# STATUS STAMP (SOBREVIVEU, MORT0 EM ACAO, CENARIO CONCLUIDO, PAGA, SINALIZADOR),
+# where the genre convention is a terse stamped token. The two nearest precedents
+# for a UI LABEL are sentence case: "Active kit" -> "Equipamento ativo" and
+# "Loadout selected" -> "Equipamento selecionado". All caps here would have been
+# the wrong register: it would read as a status stamp in a feed, on a screen that
+# is not a feed, and it is the shape a developer identifier takes -- which is
+# exactly the failure the card names.
+#
+# Past participles, not imperatives or diagnoses. The screen says WHICH ITEM is
+# the reason, next to that item, so the text names the condition and lets the
+# player act; it does not order the player about or diagnose their save.
+
 msgid "LOADOUT_REASON_OVER_MASS"
-msgstr ""
+msgstr "Massa acima do limite"
 
 msgid "LOADOUT_REASON_CONTAINER_CYCLE"
-msgstr ""
+msgstr "Contêiner cíclico"
 
 msgid "LOADOUT_REASON_SLOT_NOT_COMPATIBLE"
-msgstr ""
+msgstr "Espaço incompatível"
 
 msgid "LOADOUT_REASON_GRID_OVERLAP"
-msgstr ""
+msgstr "Sobreposição na grade"
 
 msgid "LOADOUT_REASON_OUT_OF_BOUNDS"
+msgstr "Fora dos limites"
+msgid "5.56x45mm M193 (NIJ RF1)"
+msgstr "5,56x45mm M193 (NIJ RF1)"
+
+
+# ── RESIDUE: DESIGNATIONS, AND THE ONE PLACEHOLDER ──────────────────────────
+# Every msgid below has an EMPTY msgstr ON PURPOSE, and the debt counters keep
+# counting them on purpose. Both halves of that are deliberate, so here is the
+# reasoning in one place.
+#
+# WHY THEY STAY EMPTY. The debt check is `translate(key) == key` -- it measures
+# CHANGE, not presence. These keys are proper nouns: "GOST BR1", "USA AF", "9x18mm
+# (GOST BR1)". There is no Portuguese string for them, because in pt-BR they are
+# already the right string. Writing an identity msgstr would look like progress in
+# the catalogue and change nothing for a player, and writing a paraphrase --
+# "GOST BR1 (russo)", "9x18mm (padrão russo)" -- would put words in an item name
+# that the game does not have behind them, which is a worse lie than the debt.
+#
+# WHY THE ENTRY EXISTS AT ALL. Without a block like this the residue reads as 43
+# forgotten strings, and the next person to sweep translations will re-derive the
+# same conclusion about them that I did: that they were missed. An explicit empty
+# msgstr with a comment above it is the record the card asked for ("an explicit
+# marker for that key, recorded"), and it is greppable, so the next audit can
+# count it instead of re-arguing it.
+#
+# THE CONSEQUENCE, stated plainly rather than left for someone to discover: the
+# DESCRIPTION DEBT note cannot reach 0 and the REGISTRY DEBT note cannot reach 0.
+# The reachable floors are 26 of 117 and 19 of 50 as of 2026-09-27, and a
+# future run that reports lower is a run that translated a designation.
+
+# ── Designations with a decimal point: these DO take the comma ─────────────
+# Listed with a real msgstr above; this section is the ones without one.
+
+msgid "22 LR (NIJ I)"
+msgstr ""
+
+msgid ".44 Magnum (VPAM PM4)"
+msgstr ""
+
+msgid ".40 Auto (NIJ IIA)"
+msgstr ""
+
+msgid ".357 Magnum (NIJ II)"
+msgstr ""
+
+msgid "9x18mm (GOST BR1)"
+msgstr ""
+
+msgid ".357 Magnum FMs (VPAM PM5)"
+msgstr ""
+
+msgid ".380 Auto (NIJ I)"
+msgstr ""
+
+msgid "2gr FSP (MIL FSP)"
+msgstr ""
+
+msgid "9x19mm (VPAM PM2)"
+msgstr ""
+
+msgid ".357 Auto (NIJ IIIA)"
+msgstr ""
+
+msgid "9x19mm (VPAM PM3)"
+msgstr ""
+
+msgid "9x19mm (NIJ IIA)"
+msgstr ""
+
+msgid ".44 Magnum (NIJ IIIA)"
+msgstr ""
+
+msgid ".22 LR (VPAM PM1)"
+msgstr ""
+
+msgid "16gr FSP (MIL FSP)"
+msgstr ""
+
+msgid ".30-06 M2 AP (MIL ESAPI Rev G)"
+msgstr ""
+
+msgid "9x21mm (GOST BR2)"
+msgstr ""
+
+msgid "64gr FSP (MIL FSP)"
+msgstr ""
+
+msgid "4gr FSP (MIL FSP)"
+msgstr ""
+
+msgid "9mm +P (NIJ II)"
+msgstr ""
+
+msgid ".30-06 M2 AP (NIJ IV)"
+msgstr ""
+
+msgid ".45 Auto (NIJ IIA)"
+msgstr ""
+
+msgid ".357 Magnum (VPAM PM4)"
+msgstr ""
+
+msgid "9x19mm 7N21 (GOST BR3)"
+msgstr ""
+
+# ── Registry designations: standards-body and model names ──────────────────
+
+msgid "GOST BR1"
+msgstr ""
+
+msgid "GOST BR2"
+msgstr ""
+
+msgid "GOST BR3"
+msgstr ""
+
+msgid "GOST BR4"
+msgstr ""
+
+msgid "GOST BR5"
+msgstr ""
+
+msgid "GOST BR6"
+msgstr ""
+
+msgid "Germany D2"
+msgstr ""
+
+msgid "NIJ RF2"
+msgstr ""
+
+msgid "USA AF"
+msgstr ""
+
+msgid "USA B2"
+msgstr ""
+
+msgid "USA C1"
+msgstr ""
+
+msgid "USA CH"
+msgstr ""
+
+msgid "USA D60"
+msgstr ""
+
+msgid "USA H3"
+msgstr ""
+
+msgid "USA L6"
+msgstr ""
+
+msgid "USA P4"
+msgstr ""
+
+msgid "USA P40"
+msgstr ""
+
+msgid "USA S556"
+msgstr ""
+
+msgid "USA V6"
+msgstr ""
+
+# ── Already Portuguese in the source -- RESOLVED 2026-09-27 ────────────────
+# hunter_3.tres used to carry "Elimine 3 hostis na arena." as its description,
+# which is why the entry below was recorded as a residue: already-correct pt-BR
+# in the SOURCE field, with nothing to translate and nothing for the measurement
+# to see. The .tres now carries "Eliminate 3 enemies in the arena.", the msgid
+# above matches it verbatim, and that pair is a real translation.
+#
+# The empty msgstr is KEPT below rather than deleted, because deleting it is the
+# tidier diff and it would also have lost the record of why the residue list had
+# an entry with no translation in it. Six files, one mechanical cause.
+msgid "Elimine 3 hostis na arena."
+msgstr ""
+
+# ── The placeholder, which must NOT be translated ──────────────────────────
+# PEQ_15.tres still carries the scaffold text "This Attachment is the default
+# one." The catalogue already set the precedent for this: "Translating a
+# placeholder would make it look handled." Translating this one would put
+# Portuguese in a row whose English is a developer artefact, and would make the
+# debt count look smaller without any text having been written. The fix is the
+# 16 scaffold deletions on agent/meta-i18n-count (ef41d68), not a translation.
+# Recorded here so the residue is accounted for rather than hunted for.
+
+msgid "This Attachment is the default one."
+
 msgstr ""

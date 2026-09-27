@@ -22,6 +22,15 @@ const SOURCE_FILES := [
 	"res://src/meta/flea_listing.gd",
 	"res://scenes/operations_hub.gd",
 	"res://scenes/operations_hub_controller.gd",
+	# src/meta/loadout_view.gd: the loadout screen's authority layer. It is here
+	# because its REASON_KEYS dict holds five catalogue keys as string literals and
+	# nothing else in the tree names them at a call site, so without this file the
+	# "declared but unused" half of the contract fires on all five and the
+	# "declared but absent" half cannot see them at all. Listing the file is what
+	# makes the five visible to BOTH halves; the leak check also gains coverage of
+	# this file's literals, which is a second reason to want it listed rather than
+	# special-cased.
+	"res://src/meta/loadout_view.gd",
 ]
 ## Every key those files use, plus the ItemNames registry. This is the
 ## catalogue contract: a new call site without an entry here fails, and an entry
@@ -84,6 +93,20 @@ const DECLARED_KEYS := [
 	"Contractor",
 	"Drifter",
 	"Raider",
+	# Loadout refusal reasons: loadout_view.gd's REASON_KEYS. These were MISSING
+	# from this list, and that absence is the whole reason the five keys went
+	# missing: the "no key is untranslated" check only walks DECLARED_KEYS, so a
+	# key nobody declared was never counted, never reported, and could not fail.
+	# It was invisible in BOTH directions -- the contract check ("a call site
+	# without an entry here fails") did not fire either, because the key is not
+	# named at a call site at all: it is carried as DATA and translated wherever
+	# rows() is rendered. The keys reached the catalogue by hand, which is how they
+	# arrived present-but-untranslated.
+	"LOADOUT_REASON_OVER_MASS",
+	"LOADOUT_REASON_CONTAINER_CYCLE",
+	"LOADOUT_REASON_SLOT_NOT_COMPATIBLE",
+	"LOADOUT_REASON_GRID_OVERLAP",
+	"LOADOUT_REASON_OUT_OF_BOUNDS",
 ]
 ## A key that is deliberately absent, used to prove the invariant has teeth.
 const MISSING_PROBE := "__i18n_missing_probe__"
@@ -128,6 +151,9 @@ func _initialize() -> void:
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
+
+	_check_source_language_invariant()
+
 	_check_untranslated_description_count()
 	# AWAITED, and that word is load-bearing. This check renders a live scene, so
 	# it contains `await`; called without it, GDScript runs it as a coroutine,
@@ -221,14 +247,156 @@ func _check_keys_are_declared() -> void:
 				used.append(literal)
 	var unused := _keys_in(DECLARED_KEYS, true, used)
 	_check(unused.is_empty(), "every declared key is used by a call site, a registry or a payload (unused: %s)" % ", ".join(unused))
+## THE SOURCE-LANGUAGE RULE, and the guard for the defect that broke it.
+##
+## CAUGHT 2026-09-27 while authoring the pt-BR descriptions: six .tres files
+## carried PORTUGUESE in the description field, five of them with accents missing
+## ("itens medicos", "extracao", "nao", "barters"), which inverts the rule that the
+## .tres holds the source-language string and the pt-BR rendering is a msgstr here.
+## It was invisible from the running game, because a msgstr existed for each of
+## them, so the player saw correct Portuguese while the DATA was in the wrong
+## language. The next person to add a key for one of these items would reasonably
+## assume the source was English and write an English msgid against a Portuguese
+## one, and the pipeline would then silently do nothing for that row.
+##
+## TWO CHECKS, because the two halves fail differently, and the first one was
+## WRONG when first written, which is worth recording because it is the failure
+## mode of a check that is only ever run against your own branch.
+##
+## 1. NO .tres description APPEARS AS A msgstr in the catalogue. This is the
+##    source/target INVERSION tell: a description that is also somebody else
+##    translation means the two columns were swapped, because a source string
+##    and a translation of it are not the same sentence in two languages.
+##
+##    The first version of this check was "every shipped .tres description IS a
+##    catalogue msgid, verbatim", and it is WRONG. It asserts the translation debt
+##    away: an untranslated description is by definition not a msgid, so the check
+##    demanded that the debt this repo has been measuring be zero, in a harness
+##    whose sibling check _check_untranslated_description_count exists precisely to
+##    REPORT that debt instead of failing on it. The two would have contradicted
+##    each other in the same run.
+##
+##    I only found out by running it against main rather than against my own
+##    branch, where I had just authored a translation for almost every description
+##    and it passed: 41/41 green on agent/inventory-ux, and on 06f0f25 it named 100+
+##    legitimately-untranslated descriptions as failures. A check that passes only
+##    because of the work in the same branch is not a check.
+##
+##    What survives of the pipeline guard is the inversion tell above plus a
+##    NON-VACUITY floor: the catalogue and the shipped descriptions must overlap at
+##    all, so an empty or renamed catalogue cannot pass quietly. The overlap is
+##    printed, because a number that only asserts its own absence is not evidence.
+##
+## 2. NO .tres description contains a Portuguese-only marker. This is the DETECTION
+##    guard for the real defect, and it is a DENYLIST, which is a heuristic and says
+##    so: the markers are Portuguese words that do not occur in the English source
+##    strings ("itens", "extraia", "municao", "acessorios"). It will not catch a
+##    Portuguese sentence built from words shared with English, and a language
+##    detector in a headless gate would be a dependency and a false-positive risk
+##    for a defect that is greppable.
+##
+## The honest limit, stated because a reader will otherwise assume more: NEITHER
+## check proves a source string is good ENGLISH. Only a human or a reviewer can say
+## that, and the six strings they fixed were authored rather than machine reversed
+## precisely because reversing the words was not available.
+func _check_source_language_invariant() -> void:
+	var po_ids := _po_msgids()
+	var po_targets := _po_msgstrs()
+	var inverted: Array[String] = []
+	var portuguese: Array[String] = []
+	var declared := 0
+	for path in _resources_with_top_level_description():
+		var source := ItemDescriptions.source_text(load(path))
+		if source.strip_edges().is_empty():
+			continue
+		if po_ids.has(source):
+			declared += 1
+		if po_targets.has(source):
+			inverted.append("%s: %s" % [path.get_file(), source])
+		var lowered := source.to_lower()
+		for marker in PORTUGUESE_SOURCE_MARKERS:
+			if lowered.contains(marker):
+				portuguese.append("%s: %s (marker '%s')" % [path.get_file(), source, marker])
+				break
+	print("[desc] SOURCE LANGUAGE: %d of the shipped descriptions are declared as msgids, so the source/target pipeline is live; the rest is the reported debt, not a failure" % declared)
+	_check(inverted.is_empty(),
+		"no shipped .tres description appears as a translation TARGET in the catalogue (inverted: %s)"
+			% ", ".join(inverted))
+	_check(portuguese.is_empty(),
+		"no shipped .tres description carries Portuguese source text (pt-BR in the data: %s)"
+			% ", ".join(portuguese))
+	_check(declared > 0,
+		"the catalogue and the shipped descriptions overlap at all (non-vacuity: 0 declared means the source-language pipeline is not being exercised)")
+## Portuguese-only tokens that must never appear in a SOURCE field. Kept as a
+## const beside the check that uses them so extending the list is a one-line edit
+## that cannot drift away from its own explanation.
+##
+## "barters" was ON this list and was removed from it BY ITS OWN CHECK, one run
+## after it was added: the new English trader descriptions say "accepts barters
+## for supplies" and "accepts barters for accessories", because TraderOffer's
+## field is barter_required and a trader may legitimately name the mechanic. A
+## marker that fires on correct data is worse than a missing marker, because it
+## teaches the next reader to ignore the check rather than to extend it. The
+## original defect is still caught without it -- "Medica: itens medicos e barters
+## de suprimentos." trips on "itens" and "medicos", and "Armas e anexos. Aceita
+## barters de acessorios." trips on "acessorios" and "anexos" -- which is the real
+## argument for several markers per phrase over one clever marker.
+const PORTUGUESE_SOURCE_MARKERS: Array[String] = [
+	"itens", "item ", "extraia", "sobreviva", "inimigos", "barganhas",
+	"municao", "munição", "acessorios", "acessórios", "anexos", "suprimentos",
+	"medicos", "médicos", "extracao", "extração", " nao ", " não ", "pela ponte",
+	"trata ferimentos", "elimine ",
+]
 
-## THE invariant: a key with no catalogue entry must fail, not fall back.
+## Every msgid in locale/game.po, so the source-language check can compare a
+## shipped string against the catalogue rather than against a list typed here.
+## The msgstr side is I18nCatalogue.msgstrs(), already used by the debt check.
+func _po_msgids() -> Array[String]:
+	var out: Array[String] = []
+	var regex := RegEx.new()
+	regex.compile("^msgid\\s+\"(.*)\"$")
+	for line in I18nCatalogue.read(PO_PATH).split("\n"):
+		var m := regex.search(line.strip_edges())
+		if m != null:
+			out.append(m.get_string(1))
+	return out
+
+## PRESENCE IS NOT CHANGE, and conflating the two is what made this metric lie.
+##
+## The check below asks whether a key is "untranslated" with
+## `TranslationServer.translate(key) == key`. That expression measures CHANGE, not
+## PRESENCE, and the difference is invisible from the outside:
+##
+##     absent from the catalogue          -> translate() returns the key -> "untranslated"
+##     present with an EMPTY msgstr       -> translate() returns the key -> "untranslated"
+##
+## Both look identical, so a report of "0 untranslated loadout reasons" was true and
+## useless: the five keys had been counted as translated while they were in fact
+## ABSENT from game.po entirely, existing only as GDScript constants in
+## loadout_view.gd's REASON_KEYS, where no translation tool could see them. That cost
+## an extra handoff, and it is the reason this function now separates the two.
+##
+## ABSENT is strictly worse than empty: an absent key is a hole the tooling cannot
+## even enumerate, so nothing reports it and nothing can go looking for it. An empty
+## msgstr is visible in the catalogue and in this report. Both are reported, by name,
+## every run, because a count that cannot distinguish them cannot supervise the work.
 func _check_every_key_is_translated() -> void:
-	var missing: Array[String] = []
+	var declared_ids := _po_msgids()
+	var untranslated: Array[String] = []
+	var absent: Array[String] = []
 	for key in DECLARED_KEYS:
 		if TranslationServer.translate(key) == key:
-			missing.append(key)
-	_check(missing.is_empty(), "no key is untranslated (missing entries: %s)" % ", ".join(missing))
+			untranslated.append(key)
+			if not declared_ids.has(key):
+				absent.append(key)
+	print("[i18n] KEYS: %d declared, %d change (untranslated), %d of those ABSENT from the catalogue entirely"
+		% [DECLARED_KEYS.size(), untranslated.size(), absent.size()])
+	if not absent.is_empty():
+		print("[i18n] ABSENT (worse than empty: invisible to the tooling, so nothing can go looking for it): %s"
+			% ", ".join(absent))
+	_check(untranslated.is_empty(),
+		"no key is untranslated (untranslated: %s | of those, ABSENT from the catalogue: %s)"
+			% [", ".join(untranslated), ", ".join(absent)])
 
 ## A check that cannot fail is decoration. This proves an absent entry really
 ## does come back as the English key, which is what the check above looks for.
