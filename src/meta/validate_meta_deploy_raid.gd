@@ -337,6 +337,74 @@ func _policy_value_arms() -> void:
 	_check(not broken.validate().is_empty(),
 		"a REGRANT policy with no starter is reported as a configuration error")
 
+	_death_policy_entry_points_agree()
+
+## ONE POLICY, ONE ANSWER. Added 2026-09-27 after inventory-ux found that
+## `keeps()` and `partition()` disagreed under CONSUME_KEEP_ALL: the death sweep
+## returned a carried item while a "would this be spared?" query said no, so a
+## screen delegating to `keeps()` would have told a player the opposite of what
+## the settlement did to them.
+##
+## The two entry points are a CONTRACT, not two conveniences, so this asserts they
+## agree for EVERY loss mode and BOTH values of `recoverable` -- not just the
+## shipped default, which is the combination under which they already agreed and
+## the combination that hid the bug. A cross-entry-point invariant that only
+## covers the default is a check that cannot fail.
+##
+## It also covers `report.lost`, not just the profile, because `_resolve_loss`
+## builds the player-facing loss report and the insurance claim from the SAME
+## `partition()` split. A policy whose two answers disagreed would also disagree
+## with the number the player is shown and the number insurance pays on, which is
+## the part that would actually cost someone gear.
+func _death_policy_entry_points_agree() -> void:
+	# A carried item that is in NEITHER the safe pocket nor flagged, which is
+	# exactly the case the two entry points used to disagree about.
+	var carried := "res://resources/weapons/M4_Carbine.tres"
+	var modes := [
+		DeathPolicy.Loss.CONSUME,
+		DeathPolicy.Loss.CONSUME_KEEP_ALL,
+		DeathPolicy.Loss.REGRANT,
+	]
+	for loss_mode in modes:
+		for recoverable in [true, false]:
+			var policy := DeathPolicy.new()
+			policy.loss = loss_mode
+			policy.recoverable = recoverable
+			if loss_mode == DeathPolicy.Loss.REGRANT:
+				policy.starter = load("res://resources/meta/starter_loadout.tres")
+			# What the screen would ask.
+			var asked := policy.keeps(carried)
+			# What the settlement would do, for the same item.
+			var split := policy.partition({"primary": [{"path": carried}]})
+			var swept: Array = split.get("kept", {}).get("primary", [])
+			var done := swept.size() == 1
+			_check(asked == done,
+				"loss=%d recoverable=%s: keeps() and partition() agree about a carried, unflagged, unpocketed item (keeps=%s partition_kept=%s)"
+					% [int(loss_mode), str(recoverable), str(asked), str(done)])
+			# And the report the player is shown must not disagree with either.
+			var lost: Array = split.get("lost", [])
+			_check(lost.is_empty() == done,
+				"loss=%d recoverable=%s: an item is either kept or reported lost, never both and never neither"
+					% [int(loss_mode), str(recoverable)])
+	# The shipped default is CONSUME, and the specific configuration inventory-ux
+	# named is the one that must now agree: KEEP_ALL spares a carried item, so
+	# both answers are true.
+	var keep_all := DeathPolicy.new()
+	keep_all.loss = DeathPolicy.Loss.CONSUME_KEEP_ALL
+	_check(keep_all.keeps(carried),
+		"under CONSUME_KEEP_ALL a carried, unpocketed item is spared by keeps() as well as by partition() (the pinned divergence)")
+
+	# CONSTRUCTED BREAK: the assertion above has to be able to go red, or it is a
+	# sentence. `recoverable = false` is a policy that spares nothing, so it is the
+	# one configuration where a keeps() that forgot the switch would still look
+	# plausible, and asserting the opposite direction here proves the comparison
+	# is real.
+	var strict := DeathPolicy.new()
+	strict.loss = DeathPolicy.Loss.CONSUME
+	strict.recoverable = false
+	_check(not strict.keeps(carried) and strict.partition({"primary": [{"path": carried}]}).get("lost", []).size() == 1,
+		"CONSTRUCTED BREAK: a policy that spares nothing is spared by neither entry point, so the agreement check is comparing real answers")
+
 	_role_declaration_arms()
 
 ## The role arms. Split out for the same reason as _policy_value_arms.
