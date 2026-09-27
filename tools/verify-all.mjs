@@ -37,7 +37,7 @@
 // tree: initialising submodules does not stage it.
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -289,7 +289,56 @@ function preflightHarnessPaths() {
   return false;
 }
 
+// COVERAGE PREFLIGHT, the other direction. preflightHarnessPaths() asks "is every
+// REGISTERED path on disk"; this asks "is every harness ON DISK registered" — and the
+// second question is the one that has actually bitten. A harness written and never
+// wired does not fail, does not warn, and does not appear in the per-gate output, so
+// the failure mode of a MISSING TEST is indistinguishable from the success mode of a
+// PASSING ONE. That happened to me here: a sed anchor that did not match left the edit
+// a no-op, the run printed RESULT: PASS, and "the gate is green" — the signal that is
+// supposed to mean the gate ran — was true, and meant nothing.
+//
+// The discriminator is BEHAVIOURAL, not a hand-kept list: a harness extends SceneTree
+// and owns _initialize(); a helper like validate_util.gd extends RefCounted and is
+// never a gate. A declared list of "files that are exempt" would go stale the first
+// time someone adds a library, and would then be reporting on itself rather than on the
+// tree. Distinct exit code 3, so "you have an unwired harness" cannot be mistaken for
+// either a missing path (2) or a content failure (1).
+const HARNESS_ROOTS = ['scenes', 'src/meta', 'addons/cabra.lat_shooters/test'];
+function preflightHarnessCoverage() {
+  const registered = new Set(HARNESS_SCRIPTS.map(([name, script]) =>
+    resToPath(script).slice(ROOT.length + 1)));
+  const orphans = [];
+  for (const root of HARNESS_ROOTS) {
+    const dir = join(ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of readdirSync(dir)) {
+      if (!/^(validate_|check_scripts)/.test(file) || !file.endsWith('.gd')) continue;
+      const rel = join(root, file);
+      if (registered.has(rel)) continue;
+      // A library is not a gate. Read the file and decide from what it declares
+      // rather than from its name, so `validate_util.gd` is exempt for the reason it
+      // is exempt instead of because someone typed its name into an allowlist.
+      const head = readFileSync(join(dir, file), 'utf8').slice(0, 400);
+      const isHarness = /^\s*extends\s+SceneTree\b/m.test(head);
+      if (isHarness) orphans.push(rel);
+    }
+  }
+  if (orphans.length === 0) {
+    record('harness_coverage', 'PASS',
+      `${registered.size} registered, every SceneTree harness on disk is wired`);
+    return true;
+  }
+  console.error(`verify-all: FATAL: ${orphans.length} harness script(s) extend SceneTree but are not in HARNESS_SCRIPTS:`);
+  for (const rel of orphans) console.error(`  ${rel}`);
+  console.error('  These run nothing. The gate reports PASS without ever executing them, and a');
+  console.error('  green gate is not evidence that they exist. Add a [name, res://path] entry to');
+  console.error('  HARNESS_SCRIPTS, or delete the file if it was scratch.');
+  return false;
+}
+
 if (!preflightHarnessPaths()) process.exit(2);
+if (!preflightHarnessCoverage()) process.exit(3);
 
 function killTree(child) {
   if (!child?.pid) return;
