@@ -224,6 +224,48 @@ for (const arm of ARMS) {
   note('');
 }
 
+// ── behaviour arm: --help must NOT check ──────────────────────────────────
+// This is not a mutation arm. It asserts a property of the SHIPPED tool: a
+// help request prints usage and exits without checking anything.
+//
+// The discriminator is DELIBERATELY not the string 'COULD NOT RUN'. The usage
+// text documents exit code 2 and therefore CONTAINS that phrase, so a naive
+// substring assertion would false-positive against the tool's own help — and
+// would then be a check that passes for the wrong reason. Every real run
+// prints the `=== freeze / pin check` header and a `  tree:` / `  lane:` /
+// `  pin:` block; help must print none of those.
+note('BEHAVIOUR ARM  --help must print usage and check nothing');
+{
+  const problems = [];
+  const cases = [
+    { args: ['--help'], why: 'a bare --help' },
+    { args: ['-h'], why: 'the -h short form' },
+    { args: ['--tree', '/tmp', '--help'], why: '--help aimed at a tree that CANNOT be checked' },
+    { args: ['--self-test', '--help'], why: '--help alongside a mode flag; help must still win' },
+    { args: ['--help', '--self-test'], why: 'the same, in the other order' },
+    { args: ['--strict', '--help'], why: '--help alongside --strict' },
+  ];
+  for (const c of cases) {
+    const r = spawnSync(process.execPath, [CLI, ...c.args], { encoding: 'utf8' });
+    const out = `${r.stdout || ''}`;
+    if (r.status !== 0) problems.push(`${c.why}: expected exit 0, got ${r.status}`);
+    if (out.includes('=== freeze / pin check')) problems.push(`${c.why}: ran the check and printed a report header`);
+    if (/^\s*(tree|lane|pin):/m.test(out)) problems.push(`${c.why}: printed a tree/lane/pin block, so a check ran`);
+    if (/\b(on-pin|OFF-PIN|NOT-INITIALISED)\b/.test(out)) problems.push(`${c.why}: printed a pin verdict`);
+    if (!out.includes('USAGE')) problems.push(`${c.why}: printed no usage text`);
+  }
+  // help must never be exit 2 — "tell me the flags" is not "I could not look"
+  const r2 = spawnSync(process.execPath, [CLI, '--tree', '/tmp', '--help'], { encoding: 'utf8' });
+  if (r2.status === 2) problems.push('--help exited 2, conflating a help request with an uncheckable tree');
+
+  if (problems.length) {
+    for (const p of problems) bad(`--help: ${p}`);
+  } else {
+    note(`  ok  ${cases.length} forms: exit 0, usage printed, no report header, no pin verdict, never exit 2`);
+  }
+}
+note('');
+
 // ── the working tree is still byte-identical ───────────────────────────────
 note('AFTER  working tree must be byte-identical (it was never written to)');
 if (sha256(CLI) !== hashBefore) bad('the tool changed on disk — this harness must never write it');
@@ -236,4 +278,4 @@ if (failures > 0) {
   console.log(`falsify: ${failures} problem(s) — see the FAIL lines above`);
   process.exit(1);
 }
-console.log(`falsify: all ${ARMS.length} arms produced their expected red, working tree untouched`);
+console.log(`falsify: ${ARMS.length} mutation arms produced their expected red, the --help behaviour arm passed, working tree untouched`);

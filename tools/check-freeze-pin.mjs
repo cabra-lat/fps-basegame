@@ -31,7 +31,8 @@
 //   node tools/check-freeze-pin.mjs --all-lanes          # every worktree, by lane
 //   node tools/check-freeze-pin.mjs --tree /path/to/wt   # a specific worktree
 //   node tools/check-freeze-pin.mjs --strict             # exit 1 on a mismatch
-//   node tools/check-freeze-pin.mjs --self-test
+//   node tools/check-freeze-pin.mjs --path addons/cabra.lat_shooters --help
+//   node tools/check-freeze-pin.mjs --help
 //
 // Exit codes:
 //   0  ran; nothing to report (or advisory default, findings present)
@@ -323,10 +324,45 @@ const opt = (n, d = null) => {
   return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d;
 };
 
+const USAGE = `check-freeze-pin — ADVISORY. Reports whether a tree's submodule is on
+the pin its SUPERPROJECT GITLINK records. Never mutates, never picks a winner,
+never runs \`git submodule update\`, never edits a freeze name.
+
+USAGE
+  node tools/check-freeze-pin.mjs [options]
+
+OPTIONS
+  --tree <path>    worktree to inspect           (default: cwd)
+  --path <path>    submodule path to compare    (default: addons/cabra.lat_shooters)
+  --name <sha>     a written freeze name, to price against the gitlink
+  --all-lanes      report every worktree found, grouped by lane
+  --strict         exit 1 when something needs a human (advisory otherwise)
+  --self-test      run this tool's own self-test (48 checks)
+  --help, -h       print this and exit WITHOUT checking anything
+
+EXIT CODES
+  0  ran; nothing to report (or findings, under the advisory default)
+  1  --strict and something needs a human
+  2  the check COULD NOT RUN — a missing tree, a non-gitlink path, or a name
+     that does not exist. Never 0: a check that could not look is not a check
+     that found nothing. --help is NOT this case and never produces it.
+
+This tool is advisory. It is not wired into verify-all and is not in CI.`;
+
+if (flag('--help') || flag('-h')) {
+  // A help request is a request for help, not a request to check. It must
+  // short-circuit BEFORE any git runs, so it can never print a pin verdict and
+  // can never exit 2 — conflating "tell me the flags" with "I could not look"
+  // would be a smaller version of the exact defect this tool exists to catch.
+  console.log(USAGE);
+  process.exit(0);
+}
+
 if (flag('--self-test')) {
   const { selfTest } = await import('./check-freeze-pin.self-test.mjs');
   process.exit(selfTest({ classifySeverity, relation, commitSets, renderTreeReport, renderFreezeReport, commandLog, READ_ONLY, declaredPin, checkedOut, exitCodeFor }) ? 0 : 1);
 }
+
 
 const subpath = opt('--path', 'addons/cabra.lat_shooters');
 const treeArg = opt('--tree', process.cwd());
@@ -442,3 +478,5 @@ function exitCodeFor(couldNotRun, needsHuman, strict) {
   return strict && needsHuman ? 1 : 0;
 }
 process.exit(exitCodeFor(couldNotRun, needsHuman, strict));
+
+// probe
