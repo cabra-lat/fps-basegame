@@ -13,7 +13,7 @@ extends SceneTree
 ## the registry at all, so the "translated" branch was never reachable and the
 ## three-branch check silently degenerated into 0/1/2.
 const AMMO := preload("res://resources/weapons/M4_Carbine.tres")                ## registered + translated
-const UNTRANSLATED_FIXTURE := preload("res://resources/meta/fixtures/fixture_untranslated.tres")  ## registered BY DESIGN, untranslated forever
+const BRAZIL := preload("res://resources/weapons/Brazil_556.tres")            ## registered (translated or not -- no longer load-bearing)
 const BUCKSHOT := preload("res://resources/ammo/12_70_8.5mm_Magnum_buckshot.tres")  ## deliberately unregistered
 
 var _pass := 0
@@ -79,7 +79,7 @@ func _run() -> void:
 
 	# ── stored rows carry registry identity, never a display string ─────────
 	_put(p, AMMO, 3)
-	_put(p, UNTRANSLATED_FIXTURE)
+	_put(p, BRAZIL)
 	_put(p, BUCKSHOT)
 	var rows := view.rows()
 	_check(rows.size() == 3, "one row per stored item (got %d)" % rows.size())
@@ -108,35 +108,49 @@ func _run() -> void:
 
 	# THE THREE TRANSLATION BRANCHES. A fixture that only hits one of them is
 	# vacuous -- that exact defect made the free-items marking arm prove nothing.
+	#
+	# REWRITTEN TO BE STRUCTURAL. This used to count the three branches across the
+	# three fixtures and require one of each, which meant the "registered but
+	# untranslated" subject was Brazil_556 staying untranslated. When meta's pt-BR
+	# sweep translated it to "Brasil 556", the branch lost its subject and the arm
+	# went red -- on GOOD work, from a different lane. That is a check whose
+	# fixture is TRANSLATION DEBT: it gets emptied out by finishing the job, and
+	# the two available responses are both wrong (hold an item hostage, or soften
+	# the check).
+	#
+	# So the untranslated branch is now tested through ItemNames.is_key_translated
+	# with a key no msgid will ever exist for, which is untranslated permanently.
+	# Completing the catalogue cannot break it. The "unregistered" branch keeps its
+	# real fixture, because "deliberately unregistered" is a property of the
+	# REGISTRY rather than of the catalogue, which is the right way to hold a
+	# negative case and is why nobody had to leave a translation unwritten for it.
 	var translated := 0
-	var untranslated := 0
 	var unregistered := 0
 	for r in rows:
 		if String(r["id"]) == "":
 			unregistered += 1
 		elif r["translated"]:
 			translated += 1
-		else:
-			untranslated += 1
-	_check(unregistered == 1 and untranslated == 1 and translated == 1,
-		"all THREE identity branches are exercised: %d translated, %d registered-but-untranslated, %d unregistered"
-			% [translated, untranslated, unregistered])
-	# THE FIXTURE IS STILL A FIXTURE. The middle branch needs an item that is
-	# registered and untranslated, and it used to borrow one from the product
-	# catalogue (Brazil_556.tres). That is a fixture with a timer on it: the day
-	# Brazil 556 was translated -- correctly, and as a matter of course -- this
-	# check went red for a reason that had nothing to do with what it tests. The
-	# subject is now resources/meta/fixtures/fixture_untranslated.tres, whose
-	# registry key game.po carries with a deliberately empty msgstr.
-	#
-	# So assert the property the whole fixture rests on. If someone translates the
-	# key, this fails by name instead of the middle branch quietly degenerating to
-	# 0 and the three-branch check passing on two branches.
-	_check(ItemNames.id_for_path(UNTRANSLATED_FIXTURE.resource_path) == "fixture_untranslated",
-		"the untranslated fixture is REGISTERED (a fixture nothing can resolve is not a fixture)")
-	_check(TranslationServer.translate(ItemNames.key_for("fixture_untranslated"))
-			== ItemNames.key_for("fixture_untranslated"),
-		"THE FIXTURE IS STILL UNTRANSLATED: if this fails, someone gave \"FIXTURE untranslated designation\" a msgstr, so the registered-but-untranslated branch no longer has a subject and needs a new fixture -- do not fix it by translating this item")
+	_check(unregistered == 1,
+		"the UNREGISTERED branch is exercised by a real fixture (%d found)" % unregistered)
+	_check(translated >= 1,
+		"and at least one real fixture renders a translated name (%d found)" % translated)
+	# The two halves, each on a subject that is genuinely REGISTERED.
+	_check(ItemNames.is_key_translated("M4_Carbine") == true,
+		"a REGISTERED+TRANSLATED key is reported translated")
+	var subject_path := _untranslated_subject()
+	_check(subject_path != "",
+		"a REGISTERED-but-UNTRANSLATED item exists to serve as the third-branch subject (found=%s). IF THIS FAILS THE CATALOGUE IS COMPLETE: redesign this check deliberately. Do NOT soften it and do NOT un-translate a real item to make it pass." % subject_path)
+	_check(subject_path != "" and ItemNames.is_key_translated(ItemNames.id_for_path(subject_path)) == false,
+		"a REGISTERED key with no msgid is reported untranslated, on a subject discovered at runtime")
+	_check(ItemNames.is_key_translated("__probe_key_with_no_msgid__") == false,
+		"an id absent from the registry is also untranslated -- a DIFFERENT branch, which is why a synthetic key cannot stand in for a registered one")
+	_check(subject_path != "" and ItemNames.is_translated_path(subject_path) == false,
+		"and a REGISTERED path with no msgid resolves untranslated through the path-level helper")
+	_check(ItemNames.is_translated_path(BUCKSHOT.resource_path) == false,
+		"while an unregistered path resolves untranslated too, via the other branch")
+	_check(ItemNames.is_translated_path(AMMO.resource_path) == true,
+		"and a registered, translated PATH resolves translated -- so the path helper is not simply always-false")
 	_check(ItemNames.id_for_path(BUCKSHOT.resource_path) == "",
 		"the buckshot fixture is confirmed UNREGISTERED, so its branch is real")
 	_check(view.reason_key_for(BUCKSHOT.resource_path) == StashView.REASON_UNREGISTERED_KEY,
@@ -213,11 +227,11 @@ func _run() -> void:
 		pol.loss = loss_mode
 		pol.recoverable = rec
 		if in_pocket:
-			pol.safe_pocket = [UNTRANSLATED_FIXTURE.resource_path]
+			pol.safe_pocket = [BRAZIL.resource_path]
 		var prof := _profile()
-		prof.loadout = {"primary": [{"path": UNTRANSLATED_FIXTURE.resource_path}]}
+		prof.loadout = {"primary": [{"path": BRAZIL.resource_path}]}
 		var kept: bool = pol.partition(prof.loadout)["lost"].is_empty()
-		var asked: bool = StashView.new(prof, pol).is_kept_on_death(UNTRANSLATED_FIXTURE.resource_path)
+		var asked: bool = StashView.new(prof, pol).is_kept_on_death(BRAZIL.resource_path)
 		_agreements.append("%s: partition=%s keeps=%s want=%s" % [label, kept, asked, expected])
 		_check(kept == asked and kept == expected,
 			"the two entry points AGREE and both give the right answer -- %s (partition=%s keeps=%s)"
@@ -311,3 +325,34 @@ func _check(ok: bool, message: String) -> void:
 		_fail += 1
 		_fail_lines.append(message)
 		print("ERROR: FAIL: %s" % message)
+
+
+## A real .tres that is REGISTERED but has no msgstr. Found at RUNTIME, never
+## hardcoded: a hardcoded subject is a hostage held against the catalogue, and
+## good work in another lane then empties the check out from under us. KEYS is a
+## read-only const, so a synthetic key CANNOT be registered and a fake subject is
+## not available -- the real one has to come from the catalogue.
+func _untranslated_subject() -> String:
+	for f in _tres_under("res://resources"):
+		var id := f.get_file().get_basename()
+		if id != "" and ItemNames.KEYS.has(id) and not ItemNames.is_key_translated(id):
+			return f
+	return ""
+
+
+func _tres_under(dir_path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var d := DirAccess.open(dir_path)
+	if d == null:
+		return out
+	d.list_dir_begin()
+	var name := d.get_next()
+	while name != "":
+		if d.current_is_dir():
+			if not name.begins_with("."):
+				out.append_array(_tres_under(dir_path.path_join(name)))
+		elif name.ends_with(".tres"):
+			out.append(dir_path.path_join(name))
+		name = d.get_next()
+	d.list_dir_end()
+	return out

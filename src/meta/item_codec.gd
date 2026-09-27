@@ -13,6 +13,7 @@ extends RefCounted
 const WEAPON_DIR := "res://resources/weapons"
 const AMMO_DIR := "res://resources/ammo"
 const ATTACH_DIR := "res://resources/attachments"
+const RESOURCE_ROOT := "res://resources"
 
 # ─── ENCODE ─────────────────────────────────────────
 
@@ -38,11 +39,22 @@ static func encode_item(item: InventoryItem) -> Dictionary:
 		d["feed"] = _encode_feed(content as AmmoFeed)
 	elif content is InventoryContainer:
 		d["kind"] = "container"
-		d["path"] = content.resource_path
+		# RESOURCE_ROOT, not a single category dir: containers are not confined to
+		# weapons/ammo/attachments, and this line used to read `resource_path` with
+		# NO fallback whatsoever, so a runtime duplicate encoded as an empty path and
+		# was dropped on decode. See _base_path.
+		d["path"] = _base_path(content, RESOURCE_ROOT)
 		d["nested"] = encode_container(content as InventoryContainer)
 	elif content is Item:
 		d["kind"] = "item"
-		d["path"] = content.resource_path
+		# This used to be `content.resource_path`, bare. Weapons and attachments got
+		# a meta tag and a directory scan as fallbacks; a plain Item got NOTHING,
+		# so the arena's `duplicate(true)` (which drops resource_path) turned every
+		# armour, medical and magazine item into an empty path and then, in
+		# _decode_plain, into a DROPPED item. Silent data loss on save, for the
+		# majority of the catalogue, which nobody saw because it only happens to
+		# runtime-duplicated resources.
+		d["path"] = _base_path(content, RESOURCE_ROOT)
 	else:
 		d["kind"] = "empty"
 		d["path"] = ""
@@ -325,7 +337,77 @@ static func _base_path(res: Resource, dir: String) -> String:
 	var meta_path := String(res.get_meta("base_path", ""))
 	if meta_path != "":
 		return meta_path
-	return _scan_for_name(dir, res.name)
+	# The last resort used to be a scan of ONE directory, which meant the fallback
+	# silently worked for weapons/ammo/attachments and silently did NOT work for
+	# everything else. 33 real Items live outside those three directories (23 armor,
+	# 9 medical, 1 item) and any of them that reaches here as a runtime duplicate
+	# encodes with an EMPTY path and is then DROPPED on decode, by _decode_plain,
+	# with only a warning. That is silent data loss on a save, and it was invisible
+	# because every item that mattered happened to be in a scanned directory. Try the
+	# caller's own directory first (the hot path, and unchanged), then fall back to
+	# the whole resource tree.
+	#
+	# JUSTIFICATION FOR THE WIDENING, precisely, because a weaker version of this
+	# claim was here first and is wrong. It is tempting to write that the widening
+	# rescues name-less resources. It does not, and it must not be defended on that
+	# basis: every real Item outside the three directories DOES carry a name. The
+	# name-less .tres files under resources/ are config (DeathPolicy, Faction, Quest,
+	# RoleDefinition, StarterLoadout, the mode resources) and pathless magazines,
+	# which are not Items and never reach this ladder. The widening is justified by
+	# DIRECTORY COVERAGE -- 33 named items the single-directory scan could not see --
+	# and if that population is ever gone the cached tree walk can go with it.
+	var found := _scan_for_name(dir, res.name)
+	if found != "":
+		return found
+	return _scan_tree_for_name(res.name)
+
+
+## name -> path for every Item .tres under RESOURCE_ROOT, built once per session.
+## Cached because a directory walk that `load()`s every .tres is far too expensive
+## to repeat on every encode, and encodes happen on every stash and loadout write.
+## Keyed by `name`, matching the existing per-directory scan's semantics.
+static var _name_index: Dictionary = {}
+
+
+static func _build_name_index() -> void:
+	_name_index.clear()
+	_collect_names(RESOURCE_ROOT)
+
+
+static func _collect_names(dir_path: String) -> void:
+	var d := DirAccess.open(dir_path)
+	if d == null:
+		return
+	# Sorted so the index is deterministic across runs: two items sharing a `name`
+	# must always resolve to the same path, or an item's identity would depend on
+	# directory iteration order and a save could decode to a different item.
+	var entries := d.get_files()
+	entries.sort()
+	for f in entries:
+		if not f.ends_with(".tres"):
+			continue
+		var p := dir_path.path_join(f)
+		var r := load(p) as Resource
+		if r == null:
+			continue
+		var n := String(r.get("name"))
+		if n != "" and not _name_index.has(n):
+			_name_index[n] = p
+		# Recurse: items live in per-category subdirectories (armor/, medical/,
+		# magazines/...), so a single level is not enough.
+	var subs := d.get_directories()
+	subs.sort()
+	for s in subs:
+		if not s.begins_with("."):
+			_collect_names(dir_path.path_join(s))
+
+
+static func _scan_tree_for_name(target: String) -> String:
+	if target == "":
+		return ""
+	if _name_index.is_empty():
+		_build_name_index()
+	return String(_name_index.get(target, ""))
 
 static func _round_path(a: Ammo) -> String:
 	if a.resource_path != "":

@@ -256,7 +256,15 @@ func _container_reasons(container: InventoryContainer, slot_name: String, depth:
 					"slot": slot_name, "item": item,
 					"reason": Reason.CONTAINER_CYCLE, "key": REASON_KEYS[Reason.CONTAINER_CYCLE],
 				})
-			out.append_array(_container_reasons(item.extra, slot_name, depth + 1))
+				# STOP here rather than descending. A cyclic item's "subtree" IS the
+				# cycle, so walking it re-reports the same condemnation once per level
+				# until the depth cap: one corrupt item produced NINE identical
+				# CONTAINER_CYCLE rows, all naming the same item, which the screen
+				# would render as nine separate things wrong with one object. The
+				# depth cap is a backstop against runaway recursion, not a substitute
+				# for not descending.
+			else:
+				out.append_array(_container_reasons(item.extra, slot_name, depth + 1))
 	return out
 
 

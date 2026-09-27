@@ -119,6 +119,36 @@ static func key_for(item_id: String) -> String:
 	return String(KEYS.get(item_id, ""))
 
 
+## Does this key actually resolve to a translation?
+##
+## SPLIT OUT FROM `is_translated_path` so the two halves of the "registered but
+## untranslated" case can be tested SEPARATELY. That distinction is not cosmetic:
+## a check that needs a real item to be untranslated is a check whose subject is
+## TRANSLATION DEBT, so the day the catalogue is completed the check loses its
+## fixture and either fails for the wrong reason or gets softened. Given a key
+## directly, the untranslated branch is structural -- a key nobody will ever add a
+## msgid for is untranslated forever, and the test cannot be emptied out from under
+## it by good work elsewhere.
+static func is_key_translated(item_id: String) -> bool:
+	var key := key_for(item_id)
+	if key == "":
+		return false
+	return TranslationServer.translate(key) != key
+
+
+## Is the item at this resource path translated? False when the path is not
+## registered, which is the "cannot render a name at all" case rather than the
+## "registered but untranslated" one, and a UI must mark the two the same way but
+## for different reasons.
+##
+## This is the single implementation. It was duplicated byte-for-byte in
+## StashView and FreeItemsView, which is exactly how two screens start disagreeing
+## about whether a row can render.
+static func is_translated_path(path: String) -> bool:
+	var id := id_for_path(path)
+	return id != "" and is_key_translated(id)
+
+
 ## Localized display name for an item id, or "" when the id is not registered.
 ## Callers decide their own fallback: a gate shows a generic phrase, an
 ## inventory row shows the item's own name. Static, so the key resolves through

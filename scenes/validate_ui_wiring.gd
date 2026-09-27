@@ -54,9 +54,51 @@ var failures := 0
 
 func _initialize() -> void:
 	_run()
+	_entry_point()
 	print("ui wiring: checks=%d passed=%d" % [checks, checks - failures])
 	print("RESULT: %s" % ("PASS" if failures == 0 else "FAIL"))
 	quit(0 if failures == 0 else 1)
+
+
+## 334d99: pressing "godot + enter" launched the arena directly, so the first
+## thing an owner saw was the game, not the menu -- the menu was reachable only by
+## editing project.godot by hand. That is the same class as everything else this
+## harness exists to catch: a screen that exists and is not where the game starts.
+##
+## The assertion is deliberately TWO-SIDED. Checking only that the main scene is
+## the menu would pass just as happily on a menu with no way into the game, so the
+## other direction is pinned here too: the menu must actually load, and it must
+## still navigate onward to the arena. A one-line fix that satisfies the first
+## check while making the project unplayable is a real hazard, not a hypothetical.
+func _entry_point() -> void:
+	var cfg := FileAccess.get_file_as_string("res://project.godot")
+	var main_scene := ""
+	for line in cfg.split("\n"):
+		if line.begins_with("run/main_scene"):
+			main_scene = line.split("=")[1].strip_edges().trim_prefix("\"").trim_suffix("\"")
+	_check(main_scene == "res://scenes/main_menu.tscn",
+		"project.godot run/main_scene is the MAIN MENU, so launching the project does not drop the owner straight in-game (found: %s)"
+			% (main_scene if main_scene != "" else "NOT SET"))
+
+	# It must be a scene that genuinely boots. Naming a path is not a route; a
+	# main scene that fails to load is a worse first impression than the old one.
+	var packed: PackedScene = load(main_scene) as PackedScene if main_scene != "" else null
+	_check(packed != null and packed.can_instantiate(),
+		"and that main scene actually loads and instantiates")
+	if packed != null:
+		var inst: Node = packed.instantiate()
+		var menu: Node = inst.get_node_or_null("Menu")
+		_check(menu != null and menu.get_node_or_null("BtnPlay") != null,
+			"and the menu it boots has a control that starts the game, so fixing the entry point did not strand the player on a dead menu")
+		inst.free()
+
+	# The route onward, pinned as a navigation CALL rather than a bare constant --
+	# a declared-but-unused constant is the 'no caller' failure found four times
+	# in this project, and a string match cannot tell the two apart.
+	var menu_src := FileAccess.get_file_as_string(MAIN_MENU)
+	_check(menu_src.contains("change_scene_to_file(\"res://scenes/arena_blockout.tscn\")")
+			or menu_src.contains("change_scene_to_file(ARENA_SCENE)"),
+		"and pressing it changes scene to the arena (a real navigation call, not a constant declaration)")
 
 
 func _run() -> void:
