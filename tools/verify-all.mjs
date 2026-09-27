@@ -191,8 +191,9 @@ const MIN_CHECKS = {
   // became 36 pass / 0 fail, and that number is the signal that the fix worked --
   // not the absence of an error). The remaining 10 are the detach-gate controls
   // added alongside it, including the one that fails if a later refactor lets a
-  // null detach bypass the INTERNAL gate.
-  weapon_requests_runtime: 46,
+  // null detach bypass the INTERNAL gate, and the counterpart that fails if a
+  // refusal announces a change it did not make.
+  weapon_requests_runtime: 48,
   meta_persistence: 126,
   meta_progression: 34,
   meta_market: 53,
