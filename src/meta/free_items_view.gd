@@ -67,7 +67,7 @@ func rows() -> Array[Dictionary]:
 			out.append({
 				"id": ItemNames.id_for_path(String(data.get("path", ""))),
 				"path": String(data.get("path", "")),
-				"translated": _is_translated(String(data.get("path", ""))),
+				"translated": ItemNames.is_translated_path(String(data.get("path", ""))),
 				"reason": Reason.PENDING_RETURN,
 				"key": REASON_KEYS[Reason.PENDING_RETURN],
 				"due_raid": due_raid,
@@ -113,11 +113,3 @@ func _raids_until(due_raid: int) -> int:
 	return maxi(due_raid - _profile.raids, 0)
 
 
-## Registered in the catalogue, so the row can render through translation. A row
-## that cannot is marked, not shown as English: that is the whole point of the
-## registry and the reason an unregistered id must be visible rather than silent.
-func _is_translated(path: String) -> bool:
-	var id := ItemNames.id_for_path(path)
-	if id == "":
-		return false
-	return TranslationServer.translate(ItemNames.key_for(id)) != ItemNames.key_for(id)

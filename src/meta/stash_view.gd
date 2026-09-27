@@ -79,7 +79,7 @@ func rows() -> Array[Dictionary]:
 		out.append({
 			"id": ItemNames.id_for_path(path),
 			"path": path,
-			"translated": _is_translated(path),
+			"translated": ItemNames.is_translated_path(path),
 			"population": Population.STORED,
 			"key": POPULATION_KEYS[Population.STORED],
 			"position": item.position,
@@ -101,7 +101,7 @@ func safe_pocket_rows() -> Array[Dictionary]:
 		out.append({
 			"id": ItemNames.id_for_path(path),
 			"path": path,
-			"translated": _is_translated(path),
+			"translated": ItemNames.is_translated_path(path),
 			"population": Population.SAFE_POCKET,
 			"key": POPULATION_KEYS[Population.SAFE_POCKET],
 		})
@@ -124,7 +124,7 @@ func recoverable_rows() -> Array[Dictionary]:
 			out.append({
 				"id": ItemNames.id_for_path(path),
 				"path": path,
-				"translated": _is_translated(path),
+				"translated": ItemNames.is_translated_path(path),
 				"population": Population.RECOVERABLE,
 				"key": POPULATION_KEYS[Population.RECOVERABLE],
 				"due_raid": due_raid,
@@ -179,7 +179,7 @@ func preserved_role_kit_rows(faction_id: String) -> Array[Dictionary]:
 			out.append({
 				"id": ItemNames.id_for_path(path),
 				"path": path,
-				"translated": _is_translated(path),
+				"translated": ItemNames.is_translated_path(path),
 				"population": Population.SAFE_POCKET,
 				"key": POPULATION_KEYS[Population.SAFE_POCKET],
 				"slot": String(slot),
@@ -262,11 +262,3 @@ func _policy_kept_paths() -> Array:
 	return out
 
 
-## Registered in the catalogue, so the row can render through translation. A row
-## that cannot is marked, not shown as English: that is the whole point of the
-## registry and the reason an unregistered id must be visible rather than silent.
-func _is_translated(path: String) -> bool:
-	var id := ItemNames.id_for_path(path)
-	if id == "":
-		return false
-	return TranslationServer.translate(ItemNames.key_for(id)) != ItemNames.key_for(id)

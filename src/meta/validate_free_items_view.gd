@@ -87,25 +87,33 @@ func _initialize() -> void:
 			% [int(r0.get("raids_until", -2)), view.raids_until_next_return()])
 
 	# ── the untranslated mark, WHICH IS THE REASON THE REGISTRY MATTERS ──────
-	# THREE rows in one claim list, one per branch of _is_translated(), so the
-	# marking is shown to DISCRIMINATE and not merely to exist. A fixture with one
-	# item passes whether the flag is computed or hardcoded.
+	# TWO rows whose state is DURABLE, so completing the catalogue cannot break this:
+	# M4_Carbine is registered and translated, buckshot is deliberately UNREGISTERED.
+	# The third branch (registered, no msgid) is tested at the PREDICATE level below
+	# with a key nobody will ever add a msgid for.
 	#
-	# THE THIRD ROW EXISTS BECAUSE A RED ARM PROVED THE FIRST TWO INSUFFICIENT.
-	# Arming the translate comparison to `return true` left the harness 25/25, and
-	# the reason is that an UNREGISTERED item returns early at the `id == ""` guard
-	# and never reaches that line at all. The fixture therefore exercised only the
-	# unregistered branch, and the registered-but-untranslated branch -- 42 of the
-	# 50 registered ids, and the one that matters at scale -- was never tested.
-	# Brazil_556 is registered, has a real .tres, and has no msgid.
-	var registered_untranslated := preload("res://resources/weapons/Brazil_556.tres")
-	_check(ItemNames.id_for_path(registered_untranslated.resource_path) == "Brazil_556",
-		"Brazil_556 is confirmed REGISTERED, so it reaches the translate comparison the previous fixture skipped")
-	_check(TranslationServer.translate(ItemNames.key_for("Brazil_556")) == ItemNames.key_for("Brazil_556"),
-		"and confirmed UNTRANSLATED, so the mark below is a real branch rather than a coincidence")
-	ins.register_loss([ItemCodec.encode_item(_item(registered_untranslated))], profile)
-	# And one that is not registered at all: 12_70_8.5mm_Magnum_buckshot is one of
-	# the 69 items deliberately left out (its id is truncated).
+	# WHY NO REAL UNTRANSLATED ITEM ANYMORE: this block used to register Brazil_556
+	# and require it to stay untranslated. When meta's pt-BR sweep translated it to
+	# "Brasil 556", the fixture lost its subject and this harness went red -- on GOOD
+	# work, from another lane. A negative case whose subject is TRANSLATION DEBT is a
+	# case that is emptied by finishing the job. Both available responses were wrong:
+	# hold Brazil_556 hostage forever, or pick another of the 19 still-untranslated
+	# ids and move the hostage one item along. (Choosing a 20th is not a fix; it just
+	# buys another sweep.)
+	var registered_translated := preload("res://resources/weapons/M4_Carbine.tres")
+	_check(ItemNames.id_for_path(registered_translated.resource_path) == "M4_Carbine",
+		"M4_Carbine is confirmed REGISTERED, and it is translated, so its row must NOT be marked")
+	ins.register_loss([ItemCodec.encode_item(_item(registered_translated))], profile)
+	var subject_path := _untranslated_subject()
+	_check(subject_path != "",
+		"a REGISTERED-but-UNTRANSLATED item exists to serve as the third-branch subject (found=%s). IF THIS FAILS THE CATALOGUE IS COMPLETE: redesign this check deliberately. Do NOT soften it and do NOT un-translate a real item to make it pass." % subject_path)
+	if subject_path != "":
+		ins.register_loss([ItemCodec.encode_item(_item(load(subject_path)))], profile)
+	# 12_70_8.5mm_Magnum_buckshot is one of the 69 items deliberately left out (its
+	# id is truncated). "Deliberately unregistered" is a property of the REGISTRY, not
+	# of the catalogue, so this subject is permanent -- which is exactly why the
+	# registered-but-untranslated case had to be moved off a catalogue item and onto
+	# the predicate, where a synthetic key can be.
 	var unregistered := preload("res://resources/ammo/12_70_8.5mm_Magnum_buckshot.tres")
 	_check(ItemNames.id_for_path(unregistered.resource_path) == "",
 		"the buckshot is confirmed UNREGISTERED, so its mark comes from the id=='' branch")
@@ -113,18 +121,39 @@ func _initialize() -> void:
 	rows = view.rows()
 	_check(rows.size() == view.pending_item_count(), "every claim is listed (%d rows, %d pending)" % [rows.size(), view.pending_item_count()])
 
-	var untranslated := 0
-	var translated := 0
+	var m4_translated := false
+	var buck_translated := false
+	var subject_translated := true
 	for row in rows:
-		if bool(row.get("translated", false)):
-			translated += 1
-		else:
-			untranslated += 1
+		var rid := String(row.get("id", ""))
+		if rid == "M4_Carbine":
+			m4_translated = bool(row.get("translated", false))
+		elif rid == ItemNames.id_for_path(subject_path):
+			subject_translated = bool(row.get("translated", false))
+		elif rid == "":
+			buck_translated = bool(row.get("translated", false))
 	print("NOTE: FREE-ITEMS TRANSLATION DEBT: %d of %d pending rows are untranslated and will be MARKED rather than rendered as English"
-		% [untranslated, rows.size()])
-	_check(untranslated == 2 and translated == 1,
-		"the mark DISCRIMINATES across all three branches: %d unmarked (registered+translated), %d marked (one registered-untranslated, one unregistered)"
-			% [translated, untranslated])
+		% [_count_untranslated(rows), rows.size()])
+	_check(m4_translated == true,
+		"a registered+translated row is NOT marked, so the mark is computed rather than always-on")
+	_check(subject_translated == false,
+		"a REGISTERED-but-UNTRANSLATED row IS marked -- this is the branch the early `id == \"\"` guard skips, and the one that matters at scale")
+	_check(buck_translated == false,
+		"an unregistered row is UNTRANSLATED and therefore marked, so the same flag discriminates across fixtures in one list")
+	# The third branch, on a REAL registered subject. A hardcoded `return true` is
+	# caught here, which is what the earlier red arm was protecting: the unregistered
+	# row returns early at the id == "" guard, so on its own it cannot tell a
+	# correct comparison from a hardcoded true.
+	_check(ItemNames.is_key_translated("M4_Carbine") == true,
+		"a REGISTERED+TRANSLATED key is reported translated")
+	_check(subject_path != "" and ItemNames.is_key_translated(ItemNames.id_for_path(subject_path)) == false,
+		"a REGISTERED key with no msgid is reported untranslated, on a subject discovered at runtime")
+	_check(ItemNames.is_key_translated("no_such_id_at_all") == false,
+		"an id absent from the registry is also untranslated -- and that is a DIFFERENT branch, which is why it cannot stand in for the one above")
+	_check(ItemNames.is_translated_path(unregistered.resource_path) == false,
+		"and an unregistered PATH resolves untranslated through the path-level helper")
+	_check(ItemNames.is_translated_path(registered_translated.resource_path) == true,
+		"while a registered, translated PATH resolves translated -- so the path helper is not simply always-false")
 
 	# ── a player who still has gear is NOT in the zero state ─────────────────
 	var rich := MetaProfile.new()
@@ -167,3 +196,46 @@ func _check(ok: bool, message: String) -> void:
 	else:
 		failures += 1
 		print("ERROR: FAIL: %s" % message)
+func _count_untranslated(rows: Array) -> int:
+	var n := 0
+	for row in rows:
+		if not bool(row.get("translated", false)):
+			n += 1
+	return n
+
+
+## A real .tres that is REGISTERED but has no msgstr -- the only kind of subject
+## that reaches the translate comparison, because "registered" is the property
+## under test and a synthetic key cannot be registered (KEYS is a read-only const;
+## verified: assigning to it is a parse error, "Cannot assign a new value to a
+## constant").
+##
+## Discovered AT RUNTIME rather than hardcoded, for the reason recorded at the
+## call site: a hardcoded subject is a hostage held against the catalogue, and the
+## only two responses to that hostage are un-translating a real item forever or
+## softening the check. Finding it dynamically means good work elsewhere cannot
+## empty this check out from under us.
+func _untranslated_subject() -> String:
+	for f in _tres_under("res://resources"):
+		var id := f.get_file().get_basename()
+		if id != "" and ItemNames.KEYS.has(id) and not ItemNames.is_key_translated(id):
+			return f
+	return ""
+
+
+func _tres_under(dir_path: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var d := DirAccess.open(dir_path)
+	if d == null:
+		return out
+	d.list_dir_begin()
+	var name := d.get_next()
+	while name != "":
+		if d.current_is_dir():
+			if not name.begins_with("."):
+				out.append_array(_tres_under(dir_path.path_join(name)))
+		elif name.ends_with(".tres"):
+			out.append(dir_path.path_join(name))
+		name = d.get_next()
+	d.list_dir_end()
+	return out
