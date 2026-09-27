@@ -102,6 +102,7 @@ func _view(eq: Equipment, pack: InventoryContainer, limit: float = 0.0) -> Loado
 
 func _run() -> void:
 	_full_kit_is_deployable()
+	_new_reasons_fire()
 	_free_cells_are_delegated()
 	_mass_is_the_shared_number()
 	_names_come_from_the_registry()
@@ -149,6 +150,79 @@ func _full_kit_is_deployable() -> void:
 	var heavy_reasons := heavy.blocking_reasons()
 	_check(heavy_reasons.size() == 1 and int(heavy_reasons[0]["reason"]) == int(LoadoutView.Reason.OVER_MASS),
 		"a kit over its mass limit is condemned with OVER_MASS (reasons: %s)" % _reason_text(heavy_reasons))
+
+
+## The three reasons that were NOT derivable before the addon queries existed.
+## Each is proven twice where it can be: the legal case stays silent, and a
+## constructed break shows the discriminating power. A new capability with no red
+## arm is untested code.
+func _new_reasons_fire() -> void:
+	# SLOT_NOT_COMPATIBLE, from EquipmentSlot.is_legal_while_equipped().
+	#
+	# THE CONSTRUCTED BREAK HERE IS THE INTERESTING PART: the slot's own add_item()
+	# REFUSES a bandage in the primary slot, so this defect is unreachable through
+	# the API and only a hand-edited or migrated save can produce it. That is
+	# exactly why the predicate is a VALIDITY question and not an insertion one --
+	# can_add_item() answers the same question add_item() already answered, and so
+	# can never report damage that add_item() would have prevented.
+	var eq := _equipment()
+	var pack := _pack_of(6, 6)
+	_check(eq.slots["primary"].add_item(_item(ARMY_BANDAGE)) == false,
+		"CONSTRUCTED BREAK: the slot's add_item() refuses a bandage in the primary slot, so the defect is corrupt-save-only")
+	# Reaching past the API to BUILD the corrupt save, which is the only way to test
+	# a predicate that guards against corrupt saves.
+	eq.slots["primary"].items.append(_item(ARMY_BANDAGE))
+	var reasons := _view(eq, pack).blocking_reasons()
+	var kinds := _reason_kinds(reasons)
+	_check(kinds.has(int(LoadoutView.Reason.SLOT_NOT_COMPATIBLE)),
+		"an item whose category does not belong in its slot is condemned with SLOT_NOT_COMPATIBLE (kinds: %s)" % str(kinds))
+	# NOT `reasons[0]` UNGUARDED. It was, and it crashed when the reason list came
+	# back EMPTY, taking the next nine checks with it: a red arm then appeared to
+	# fail only the check it touched while silently skipping the coverage after it.
+	# A harness that stops reporting is worse than one that reports a failure, so
+	# the index is guarded and a missing entry is itself the failing observation.
+	var first_slot := "<no reason at all>"
+	if reasons.size() > 0:
+		first_slot = str(reasons[0].get("slot", ""))
+	_check(first_slot == "primary",
+		"the reason names the SLOT it belongs to, so the screen can put it next to that item (slot: %s)" % first_slot)
+
+	# The same slot with a legal weapon is SILENT -- the half that proves the check
+	# discriminates rather than condemns everything.
+	var eq2 := _equipment()
+	_check(eq2.slots["primary"].add_item(_item(RIFLE)), "a rifle goes into the primary slot")
+	_check(_reason_kinds(_view(eq2, _pack_of(6, 6)).blocking_reasons()).is_empty(),
+		"a legal rifle in the primary slot produces NO reason at all")
+
+	# OUT_OF_BOUNDS and GRID_OVERLAP, from grid.fits_in_bounds() and
+	# grid.occupant_at(): pure reads of the occupancy table.
+	var edge := _pack_of(4, 4)
+	var first := _item(ARMY_BANDAGE)
+	_check(edge.add_item(first, Vector2i(3, 3)), "an item sits on the last cell of a 4x4 grid")
+	var overlap := _pack_of(4, 4)
+	overlap.add_item(_item(ARMY_BANDAGE), Vector2i(0, 0))
+	var b := _item(WATER)
+	_check(overlap.add_item(b, Vector2i(0, 0)) == false,
+		"CONSTRUCTED BREAK: the grid REFUSES a second item on occupied cells, so an overlap cannot be created through the API - which is why the overlap check reads occupancy instead of trusting placement")
+	_check(_reason_kinds(_view(_equipment(), overlap).blocking_reasons()).is_empty(),
+		"a correctly packed container reports no overlap")
+	_check(edge.grid.fits_in_bounds(Vector2i(3, 3), Vector2i.ONE) and not edge.grid.fits_in_bounds(Vector2i(3, 3), Vector2i(2, 1)),
+		"fits_in_bounds() separates 'inside the grid' from 'would fit if it were smaller' (4x4, item at 3,3)")
+
+	# Occupancy is ATTRIBUTED, not merely counted: a cell reports the index of the
+	# item holding it, which is what lets the screen tell an overlap from an item's
+	# own footprint.
+	_check(edge.grid.occupant_at(Vector2i(3, 3)) >= 0 and edge.grid.occupant_at(Vector2i(0, 0)) == -1,
+		"occupant_at() reads the real table: the occupied cell has an occupant and the empty one does not")
+	_check(edge.grid.occupant_at(Vector2i(99, 99)) == -1 and edge.grid.occupant_at(Vector2i(-1, 0)) == -1,
+		"occupant_at() is bounds-guarded and returns -1 outside the grid instead of running away")
+
+
+func _reason_kinds(reasons: Array) -> Array:
+	var out: Array = []
+	for r in reasons:
+		out.append(int(r.get("reason", -1)))
+	return out
 
 
 ## LOADOUT-2 + break: the number is the container's, and it MOVES when the kit does.

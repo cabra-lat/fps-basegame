@@ -34,8 +34,11 @@ const SLOT_ORDER := ["head", "torso", "arms", "legs", "primary", "secondary", "b
 ## sentence is the catalogue's, not this file's.
 enum Reason {
 	NONE,
-	OVER_MASS,      ## the kit is heavier than the player may carry
+	OVER_MASS,       ## the kit is heavier than the player may carry
 	CONTAINER_CYCLE, ## a container holds itself or a descendant; only a corrupt save makes this
+	SLOT_NOT_COMPATIBLE, ## an equipped item's category does not belong in its slot
+	GRID_OVERLAP,    ## two items claim the same cells
+	OUT_OF_BOUNDS,   ## an item hangs off the edge of its container
 }
 
 ## The reason keys, as the catalogue msgids. Kept here so a missing translation is
@@ -44,6 +47,9 @@ enum Reason {
 const REASON_KEYS := {
 	Reason.OVER_MASS: "LOADOUT_REASON_OVER_MASS",
 	Reason.CONTAINER_CYCLE: "LOADOUT_REASON_CONTAINER_CYCLE",
+	Reason.SLOT_NOT_COMPATIBLE: "LOADOUT_REASON_SLOT_NOT_COMPATIBLE",
+	Reason.GRID_OVERLAP: "LOADOUT_REASON_GRID_OVERLAP",
+	Reason.OUT_OF_BOUNDS: "LOADOUT_REASON_OUT_OF_BOUNDS",
 }
 
 var equipment: Equipment = null
@@ -159,61 +165,98 @@ func _collect(container: InventoryContainer, out: Array, depth: int) -> void:
 
 ## ── deploy validity: a state with a reason, not a greyed button ──────────────
 ##
-## WHAT THIS CAN AND CANNOT ANSWER, MEASURED AGAINST THE REAL APIs, because two
-## of them answer a different question than their names suggest and using them
-## would have shipped a screen that calls every full kit undeployable:
+## THE DESIGN PASS'S THREE REMAINING REASONS ARE NOW ANSWERABLE, and this comment
+## is the record of why they were not before, because the reason was a trap rather
+## than a missing feature.
 ##
-##   EquipmentSlot.can_add_item() returns FALSE WHENEVER THE SLOT IS ALREADY
-##   OCCUPIED (`if items.size() > 0: return false`, equipment_slot.gd:24). It is
-##   an insertion predicate — "may I drop this in" — not "is what is in here
-##   legal". Asking it about an item already equipped reports every worn slot as
-##   a violation, i.e. it would mark a full, perfectly legal kit undeployable.
+##   EquipmentSlot.can_add_item() is an INSERTION predicate: it returns false the
+##   moment the slot is occupied, so it answers "may I drop this in" and not "is
+##   what is in here legal". A validator built on it condemns every worn slot --
+##   the harness demonstrates that, 2 violations on a legal kit. The addon now
+##   carries is_legal_while_equipped() for the other question, sharing ONE
+##   compatibility implementation with can_add_item so the two cannot drift.
 ##
-##   InventoryContainer.accepts_item() is ONLY a cycle check: it refuses a
-##   container that holds itself or a descendant (container.gd:82-91). It says
-##   nothing about categories, capacity or position.
+##   Overlap and bounds needed a READ of the occupancy table that does not rebuild
+##   it, which did not exist; the addon now carries occupant_at() and
+##   fits_in_bounds(). A rebuild-per-question would be both a lie about the grid's
+##   current state and a cost paid per question.
 ##
-## So the reasons below are the ones the tree can HONESTLY derive. The design pass
-## also asks for slot-category, overlap and out-of-bounds reasons, and NONE of
-## those is derivable from any existing API: answering them needs a validity query
-## in the shooter ADDON (a `is_legal_while_equipped()` beside can_add_item, and an
-## occupancy read that does not rebuild), which this lane may edit but not commit.
-## That gap is reported rather than filled with a second implementation, because a
-## parallel validator satisfies the sentence in a document and not in the game
-## (design pass rule 2).
-##
-## The legality questions that ARE asked here are the ones the tree already asks:
-## the shared mass query, and the container's own cycle check.
+## What this file still does NOT do is re-implement either. It asks.
 
 ## Every reason the kit cannot be deployed, each attached to the SLOT it belongs
 ## to, so the screen can say which item is the reason NEXT TO THAT ITEM instead of
 ## greying a button and sending the player to hunt.
+##
+## THE TWO QUERIES THIS ASKS ARE NOT LOCAL TO THIS FILE, and that is the whole
+## point. `is_legal_while_equipped()` is the slot's own category rule asked about
+## an item that is ALREADY equipped -- deliberately not can_add_item(), which is
+## the insertion question and returns false for any occupied slot, so building on
+## it condemns every worn slot. `occupant_at()` is a pure read of the grid's
+## occupancy table. Both were added to the shooter addon for this screen and both
+## delegate rather than re-decide: a second copy of the slot's category match, or
+## of the occupancy walk, is how a kit becomes legal in the screen and illegal in
+## the game (design pass rule 2).
 func blocking_reasons() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if max_mass > 0.0 and carried_mass() > max_mass:
 		out.append({"slot": "", "item": null, "reason": Reason.OVER_MASS, "key": REASON_KEYS[Reason.OVER_MASS]})
+	if equipment != null:
+		for slot_name in SLOT_ORDER:
+			var slot = equipment.slots.get(slot_name)
+			if slot == null:
+				continue
+			for item in slot.items:
+				if item != null and not slot.is_legal_while_equipped(item):
+					out.append({
+						"slot": slot_name,
+						"item": item,
+						"reason": Reason.SLOT_NOT_COMPATIBLE,
+						"key": REASON_KEYS[Reason.SLOT_NOT_COMPATIBLE],
+					})
 	if pack != null:
-		out.append_array(_cycle_reasons(pack, "pack"))
+		out.append_array(_container_reasons(pack, "pack", 0))
 	return out
 
 
-## Walks the pack for the one structural fault a corrupt save can produce. Keys
-## are the catalogue's; this file never composes the sentence.
-func _cycle_reasons(container: InventoryContainer, slot_name: String) -> Array[Dictionary]:
+## One walk of the pack, carrying each item's OWN index so occupancy can be
+## attributed: a cell held by a different index is an overlap, a cell held by this
+## item is simply where the item is.
+func _container_reasons(container: InventoryContainer, slot_name: String, depth: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for item in container.items:
+	if depth > 8:
+		return out
+	var grid = container.grid
+	for index in container.items.size():
+		var item: InventoryItem = container.items[index]
 		if item == null:
 			continue
-		var nested = item.extra
-		if nested is InventoryContainer and not container.accepts_item(item):
+		if not grid.fits_in_bounds(item.position, item.dimensions):
 			out.append({
-				"slot": slot_name,
-				"item": item,
-				"reason": Reason.CONTAINER_CYCLE,
-				"key": REASON_KEYS[Reason.CONTAINER_CYCLE],
+				"slot": slot_name, "item": item,
+				"reason": Reason.OUT_OF_BOUNDS, "key": REASON_KEYS[Reason.OUT_OF_BOUNDS],
 			})
-		if nested is InventoryContainer:
-			out.append_array(_cycle_reasons(nested, slot_name))
+		else:
+			var clash := false
+			for y in item.dimensions.y:
+				for x in item.dimensions.x:
+					var occupant: int = grid.occupant_at(item.position + Vector2i(x, y))
+					if occupant != -1 and occupant != index:
+						clash = true
+						break
+				if clash:
+					break
+			if clash:
+				out.append({
+					"slot": slot_name, "item": item,
+					"reason": Reason.GRID_OVERLAP, "key": REASON_KEYS[Reason.GRID_OVERLAP],
+				})
+		if item.extra is InventoryContainer:
+			if not container.accepts_item(item):
+				out.append({
+					"slot": slot_name, "item": item,
+					"reason": Reason.CONTAINER_CYCLE, "key": REASON_KEYS[Reason.CONTAINER_CYCLE],
+				})
+			out.append_array(_container_reasons(item.extra, slot_name, depth + 1))
 	return out
 
 
