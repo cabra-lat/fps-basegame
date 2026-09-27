@@ -220,3 +220,23 @@ msgstr "Kit de primeiros socorros de campo. Recupera até 85 PV e estanca hemorr
 
 msgid "A marked intel packet. Recover it and reach an extraction point."
 msgstr "Um pacote de intel marcado. Recupere-o e chegue a um ponto de extração."
+
+# --- loadout refusal reasons ---
+# Keys referenced as constants by src/meta/loadout_view.gd (REASON_KEYS).
+# msgids present, msgstr EMPTY = untranslated. Previously these keys were
+# absent from the catalog entirely, which the tooling could not distinguish
+# from translated (translate(key)==key is true for both).
+msgid "LOADOUT_REASON_OVER_MASS"
+msgstr ""
+
+msgid "LOADOUT_REASON_CONTAINER_CYCLE"
+msgstr ""
+
+msgid "LOADOUT_REASON_SLOT_NOT_COMPATIBLE"
+msgstr ""
+
+msgid "LOADOUT_REASON_GRID_OVERLAP"
+msgstr ""
+
+msgid "LOADOUT_REASON_OUT_OF_BOUNDS"
+msgstr ""
