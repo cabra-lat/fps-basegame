@@ -8,8 +8,8 @@
 
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -18,7 +18,16 @@ const CLI = join(HERE, 'check-freeze-pin.mjs');
 export function selfTest(api) {
   const { classifySeverity, renderTreeReport, renderFreezeReport, commandLog, READ_ONLY, exitCodeFor } = api;
   let failures = 0;
+  let total = 0;
+  // The banner is the point of this block, not decoration. This file used to
+  // print NOTHING and exit 0 when run directly, because it only exported
+  // selfTest and nothing ever called it — so running it was indistinguishable
+  // from 42 passing checks, and equally from a run that died before the first
+  // one. A silent success cannot be reviewed, because there is nothing to read.
+  // A run that does not print this line was not a self-test run.
+  console.log('check-freeze-pin SELF-TEST — tools/check-freeze-pin.mjs --self-test');
   const check = (ok, label, extra = '') => {
+    total += 1;
     console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${extra ? ' — ' + extra : ''}`);
     if (!ok) failures += 1;
   };
@@ -181,6 +190,46 @@ export function selfTest(api) {
   check(/COULD NOT RUN/.test(bad.stdout), 'CLI: and says COULD NOT RUN rather than reporting a verdict');
   check(!/nothing needs a human/.test(bad.stdout), 'CLI: and does NOT print the all-clear for a run that never happened');
 
-  console.log(failures ? `\n  self-test: ${failures} FAILED` : '\n  self-test: all checks passed');
+  // The count, not just the verdict. "all checks passed" is a claim about an
+  // unknown number of checks, and a reader who cannot see the number cannot
+  // tell a truncated run from a complete one.
+  console.log(failures
+    ? `\n  self-test: ${failures} of ${total} FAILED`
+    : `\n  self-test: all ${total} checks passed`);
   return failures === 0;
+}
+
+// ── RUNNING THIS FILE DIRECTLY ──────────────────────────────────────────────
+//
+// `node tools/check-freeze-pin.self-test.mjs` must RUN the checks, not merely
+// export them. The tool executes at module top level (it ends in process.exit),
+// so it cannot be imported to hand its functions over — which is precisely why
+// this file ended up a silent no-op. So the direct path spawns the real entry
+// point and forwards everything it says.
+//
+// Counting the verdicts is not cosmetic: this wrapper FAILS if the child
+// produced no PASS/FAIL lines at all. That is the only way the silent-success
+// mode can come back — if the tool ever stops printing, this goes red instead
+// of green. A wrapper that forwards a child's silence is not a wrapper.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.log('check-freeze-pin SELF-TEST — delegating to tools/check-freeze-pin.mjs --self-test');
+  if (!existsSync(CLI)) {
+    console.error(`  FAIL  the tool it must test is missing: ${CLI}`);
+    process.exit(1);
+  }
+  const child = spawnSync(process.execPath, [CLI, '--self-test'], { encoding: 'utf8' });
+  if (child.error) {
+    console.error(`  FAIL  could not run the self-test: ${child.error.message}`);
+    process.exit(1);
+  }
+  process.stdout.write(child.stdout || '');
+  process.stderr.write(child.stderr || '');
+  const verdicts = ((child.stdout || '').match(/^\s*(PASS|FAIL)\s/gm) || []).length;
+  if (verdicts === 0) {
+    console.error('  FAIL  the self-test produced no PASS/FAIL verdicts at all, so it did not run. '
+      + 'Exiting nonzero rather than reporting a silent success.');
+    process.exit(1);
+  }
+  console.log(`  self-test: ${verdicts} verdicts observed from the child run`);
+  process.exit(child.status === null ? 1 : child.status);
 }
