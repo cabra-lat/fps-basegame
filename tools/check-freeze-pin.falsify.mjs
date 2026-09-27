@@ -87,6 +87,25 @@ const ARMS = [
 
 const sha256 = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
+// A fingerprint, not just a hash. A hash answers "did it change"; the point of
+// recording this at all is that the NEXT unexplained nonzero should name what
+// moved without a human having kept the full output. The incident that
+// motivated this: one run exited 1, the diagnostic was destroyed by `tail -1`
+// before anyone read it, and six green runs afterwards left the cause
+// unidentified. A bare "the file changed" would not have helped either.
+function fingerprint(p) {
+  const text = readFileSync(p, 'utf8');
+  return { sha: createHash('sha256').update(text).digest('hex'), bytes: Buffer.byteLength(text), lines: text.split('\n').length };
+}
+
+function describeDrift(p, before) {
+  const after = fingerprint(p);
+  if (before.lines === after.lines) {
+    return `changed, same line count ${after.lines} (${after.bytes} bytes)`;
+  }
+  return `changed, ${before.lines} -> ${after.lines} lines (${before.bytes} -> ${after.bytes} bytes)`;
+}
+
 /**
  * Copy the tool + self-test into a fresh scratch dir, mutate the COPY, run the
  * copy's own self-test, and return everything needed to judge the result.
@@ -157,10 +176,11 @@ function judge(r, expectFails) {
 }
 
 // ── the working tree must be pristine, and we prove we never wrote it ───────
-const hashBefore = sha256(CLI);
-const hashTestBefore = sha256(SELFTEST);
+const hashBefore = fingerprint(CLI);
+const hashTestBefore = fingerprint(SELFTEST);
 note(`working tree: ${CLI}`);
-note(`  sha256 before = ${hashBefore.slice(0, 16)}`);
+note(`  tool     sha256 ${hashBefore.sha.slice(0, 16)}  ${hashBefore.lines} lines / ${hashBefore.bytes} bytes`);
+note(`  selftest sha256 ${hashTestBefore.sha.slice(0, 16)}  ${hashTestBefore.lines} lines / ${hashTestBefore.bytes} bytes`);
 note('');
 
 // ── positive control: an UNMUTATED copy must be fully green ────────────────
@@ -268,11 +288,17 @@ note('BEHAVIOUR ARM  --help must print usage and check nothing');
 note('');
 
 // ── the working tree is still byte-identical ───────────────────────────────
-note('AFTER  working tree must be byte-identical (it was never written to)');
-if (sha256(CLI) !== hashBefore) bad('the tool changed on disk — this harness must never write it');
-else note(`  ok  tool    sha256 ${hashBefore.slice(0, 16)} unchanged`);
-if (sha256(SELFTEST) !== hashTestBefore) bad('the self-test changed on disk');
-else note(`  ok  selftest sha256 ${hashTestBefore.slice(0, 16)} unchanged`);
+note('AFTER  working tree must be byte-identical (this harness never writes it)');
+if (sha256(CLI) !== hashBefore.sha) {
+  bad(`the TOOL changed on disk mid-run: ${describeDrift(CLI, hashBefore)}. This harness never writes it, so something else did — another lane, another process, or a concurrent edit. The line count is the fastest way to tell an appended line from a rewritten file.`);
+} else {
+  note(`  ok  tool     sha256 ${hashBefore.sha.slice(0, 16)} unchanged`);
+}
+if (sha256(SELFTEST) !== hashTestBefore.sha) {
+  bad(`the SELF-TEST changed on disk mid-run: ${describeDrift(SELFTEST, hashTestBefore)}`);
+} else {
+  note(`  ok  selftest sha256 ${hashTestBefore.sha.slice(0, 16)} unchanged`);
+}
 
 note('');
 if (failures > 0) {
