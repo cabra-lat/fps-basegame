@@ -386,6 +386,106 @@ function preflightHarnessCoverage() {
 if (!preflightHarnessPaths()) process.exit(2);
 preflightHarnessCoverage();
 
+// PIN SWEEP, the direction the working-tree preflight structurally cannot see.
+//
+// preflightHarnessPaths() asks "is the file on disk", so every gate in this file
+// describes the CHECKOUT, not the COMMIT. That is the wrong question for a submodule: the
+// game repo pins addons/cabra.lat_shooters to a gitlink, and a manifest can name a harness
+// the pinned commit does not contain while the checkout happens to be ahead of the pin. On
+// that machine every gate is green; a fresh clone at the pin, which is what CI gets, has
+// no such file. So "it works here" and "it is wired" are different claims and only the
+// second survives a clean checkout.
+//
+// Resolves each registered addon path AGAINST THE PIN via `git cat-file` in the addon
+// repo, never via existsSync. Exit 4, distinct from 2 (missing on disk) and 3 (unwired),
+// because the remedy differs again: a skew between a manifest and a pin is a bump
+// decision, not a typo and not a missing file.
+const ADDON_SUBMODULE = 'addons/cabra.lat_shooters';
+const ADDON_PREFIX = `res://${ADDON_SUBMODULE}/`;
+
+const gitOut = (args, cwd) =>
+  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+
+function preflightManifestAgainstPin() {
+  const addonDir = join(ROOT, ADDON_SUBMODULE);
+  // Not checked out is preflightHarnessPaths()'s finding, reported under its own exit
+  // code; reporting it twice would give one fault two owners.
+  if (!existsSync(join(addonDir, '.git'))) {
+    record('manifest_pin', 'SKIP', 'addon submodule not checked out; harness_paths owns this');
+    return true;
+  }
+  let pin;
+  try {
+    pin = gitOut(['ls-tree', 'HEAD', '--', ADDON_SUBMODULE], ROOT).trim().split(/\s+/)[2];
+  } catch {
+    record('manifest_pin', 'SKIP', 'could not read the pinned addon gitlink from HEAD');
+    return true;
+  }
+  if (!pin) {
+    record('manifest_pin', 'SKIP', 'HEAD carries no gitlink for the addon submodule');
+    return true;
+  }
+
+  const atPin = (rel) => {
+    try { gitOut(['cat-file', '-e', `${pin}:${rel}`], addonDir); return true; } catch { return false; }
+  };
+
+  const registered = HARNESS_SCRIPTS.filter(([, s]) => s.startsWith(ADDON_PREFIX));
+  const skew = registered.filter(([, s]) => !atPin(s.slice(ADDON_PREFIX.length)));
+
+  if (skew.length > 0) {
+    console.error(`verify-all: FATAL: ${skew.length} registered harness path(s) do not exist at the pinned addon commit ${pin.slice(0, 12)}:`);
+    for (const [name, script] of skew) {
+      console.error(`  ${name.padEnd(25)}${script}`);
+      console.error(`  ${''.padEnd(25)}present in the checkout, ABSENT at the pin — version skew`);
+    }
+    console.error('  A path that resolves only in the checkout passes here and fails in a fresh');
+    console.error('  clone. Either bump the pinned addon or correct the manifest; do not leave the');
+    console.error('  checkout ahead of the pin and call it wired.');
+    return false;
+  }
+
+  // Reported, never fatal: two NAMES for one file resolves cleanly and therefore passes
+  // every other check here, while the file runs twice against two floors that belong to
+  // whichever name last pointed at it. `weapon_mechanics+weapon_requests_runtime ->
+  // test/validate_weapon_mechanics.gd` is real: the addon renamed the file and the
+  // registration was repointed to keep the gate identity, but the file now serves floors
+  // of 45 and 48 while producing 41, so BOTH are unreachable. The floors are the owner's
+  // to set, not this preflight's to lower, and lowering one to make a red gate green is
+  // precisely the failure this whole mechanism exists to prevent.
+  const byScript = new Map();
+  for (const [name, script] of HARNESS_SCRIPTS) {
+    if (!byScript.has(script)) byScript.set(script, []);
+    byScript.get(script).push(name);
+  }
+  const aliases = [...byScript].filter(([, names]) => names.length > 1);
+
+  // Harnesses the PIN carries that this manifest never runs. A passing harness nobody
+  // executes is not evidence, and at this pin there are three. Registering another lane's
+  // harness is their call, so this is reported and not gated.
+  let orphans = [];
+  try {
+    orphans = gitOut(['ls-tree', '-r', '--name-only', pin, '--', 'test/'], addonDir)
+      .split('\n')
+      .filter((f) => /\/?(validate_|check_)[a-z0-9_]*\.gd$/.test(f))
+      .filter((rel) => !HARNESS_SCRIPTS.some(([, s]) => s.startsWith(ADDON_PREFIX) && s.endsWith(`/${rel.split('/').pop()}`)));
+  } catch { /* an addon with no test/ tree is not a pin fault */ }
+
+  const notes = [];
+  if (aliases.length > 0) {
+    notes.push(`${aliases.length} file(s) registered under more than one name: ` +
+      aliases.map(([s, ns]) => `${ns.join('+')} -> ${s.replace(ADDON_PREFIX, '')}`).join('; '));
+  }
+  if (orphans.length > 0) notes.push(`${orphans.length} harness(es) at the pin are not registered: ${orphans.map((f) => f.split('/').pop()).join(' ')}`);
+
+  record('manifest_pin', 'PASS',
+    `${registered.length} addon harness path(s) resolve at pin ${pin.slice(0, 12)}` +
+    (notes.length > 0 ? `, but ${notes.join('; and ')}` : ''));
+  return true;
+}
+
+if (!preflightManifestAgainstPin()) process.exit(4);
+
 function killTree(child) {
   if (!child?.pid) return;
   try { process.kill(-child.pid, 'SIGTERM'); } catch { try { child.kill('SIGTERM'); } catch {} }
