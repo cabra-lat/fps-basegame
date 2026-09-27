@@ -600,6 +600,22 @@ func _l_start() -> void:
 	# The detector is pinned FIRST, on data where the answer is not in doubt. A
 	# "nothing looks wrong" assertion is satisfied by a detector that never
 	# fires, so the detector is itself under test before it is trusted.
+	#
+	# ⚠️ THESE THREE ARE LOAD-BEARING. DO NOT DELETE THEM AS REDUNDANCY.
+	#
+	# Measured, not assumed: neutering ProfilerSemantics.falls() to `return 1`
+	# takes the gate from 120/0 PASS to 119/1 FAIL — and the ONE failure is the
+	# first check below, NOT the live measurement in _l_report(). Because a
+	# neutered falls() returns 1, the live assertion `swings >= 1` is trivially
+	# satisfied and passes. So the live checks CANNOT detect their own neutering;
+	# only these synthetic series can, because the answer is known in advance.
+	#
+	# That is not a redundancy to be tidied away. It looks like one — three
+	# checks on hardcoded arrays, sitting next to a real measurement that
+	# arguably covers the same ground — and the next person to clean that up
+	# will delete them and leave the live checks unfalsifiable. If these are ever
+	# removed, the claim "a cumulative clock can never be published as a cost"
+	# stops being tested, silently, and the gate keeps reporting green.
 	v.check(ProfilerSemantics.looks_cumulative(PackedFloat64Array([1.0, 2.0, 3.0, 10.0, 40.0, 400.0])),
 		"[L] detector: a series that only rises, fast, is recognised as a running total")
 	v.check(not ProfilerSemantics.looks_cumulative(PackedFloat64Array([10.0, 3.0, 11.0, 2.0, 9.0, 4.0])),
@@ -652,6 +668,14 @@ func _l_report(probe: ProfilerSemantics) -> void:
 	var pp: PackedFloat64Array = probe.published.get(&"physics_process_total", PackedFloat64Array())
 	if pp.size() >= 4:
 		var swings := ProfilerSemantics.falls(pp)
+		# This assertion has teeth of its own, and that was measured rather than
+		# assumed: making the PUBLISHER accumulate — with falls() and the
+		# detector self-checks left completely untouched, verified by checksum —
+		# drives this to 0 falls and reds it, alongside the cumulative-signature
+		# check, with all three self-checks still green. 120/0 -> 118/2.
+		#
+		# The converse is the trap: neutering falls() does NOT red this line,
+		# because returning 1 satisfies it. See the warning in _l_start().
 		v.check(swings >= 1,
 			"under a 1x/240x per-frame load swing, the published physics cost FALLS at least once (%d falls in %d samples) — a running total could not"
 				% [swings, pp.size()])
