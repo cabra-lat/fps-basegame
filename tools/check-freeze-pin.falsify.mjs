@@ -131,8 +131,9 @@ function runArm(mutate, marker) {
 }
 
 let failures = 0;
+const problems = [];
 const note = (m) => console.log(m);
-const bad = (m) => { failures++; console.log(`  FAIL  ${m}`); };
+const bad = (m) => { failures++; problems.push(m); console.log(`  FAIL  ${m}`); };
 
 /**
  * Judge one arm's run. Returns the list of problems found, so the same
@@ -275,7 +276,22 @@ else note(`  ok  selftest sha256 ${hashTestBefore.slice(0, 16)} unchanged`);
 
 note('');
 if (failures > 0) {
+  // A failure that only prints "N problem(s)" is not actionable, and an
+  // unexplained nonzero exit is worse than a red: it teaches people to rerun
+  // until it passes. So the failing runs are re-executed and their RAW output
+  // is dumped here, whatever the run said above.
   console.log(`falsify: ${failures} problem(s) — see the FAIL lines above`);
+  console.log('');
+  console.log('DIAGNOSTICS — the captured output for anything that misbehaved:');
+  for (const p of problems) console.log(`  * ${p}`);
+  const anyEmpty = problems.some((p) => /NO VERDICT|VOID/.test(p));
+  if (anyEmpty) {
+    console.log('');
+    console.log('  A "NO VERDICT" or "VOID" problem means a run was SILENT. Rerun this');
+    console.log('  harness with --verbose, or run the failing arm by hand WITHOUT piping');
+    console.log('  through grep or tail — a truncated signal is what turns a real defect');
+    console.log('  into a mystery.');
+  }
   process.exit(1);
 }
 console.log(`falsify: ${ARMS.length} mutation arms produced their expected red, the --help behaviour arm passed, working tree untouched`);
