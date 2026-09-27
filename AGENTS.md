@@ -24,6 +24,21 @@ bash tools/verify-all.sh --quick         # compatibility wrapper, equivalent fla
 # nothing for a broken script (proven by sabotage). Use it to refresh the import cache,
 # never as proof of parse. The parse gate is `check_scripts.gd`, run by verify-all.
 
+# ⚠️ An instrument needs a STATED VALIDITY TEST, and a check that cannot fail for
+# its own reasons is not a check. Ask of every probe, including your own: what
+# result would have told me it was broken? Concretely, on this repo tonight —
+# a mutation must be VERIFIED APPLIED *and* verified to BITE (`if (false) {}`
+# lands perfectly and changes nothing); print the mutated line so a reader can
+# tell a real mutation from a gesture in its direction; and `python3` is NOT
+# installed here, so a probe built on it is void — use `perl` or `node`.
+# Two couplings that look like redundancy and are not, recorded where they bite:
+# the three `[L] detector:` self-checks in src/dev/validate_profiler.gd are the
+# ONLY things that catch a neutered ProfilerSemantics.falls() (the live check
+# passes, because returning 1 satisfies it) — deleting them leaves that claim
+# untested and the gate still green; and tools/check-freeze-pin.self-test.mjs
+# counts the child's verdicts and exits nonzero on zero, which is what stops a
+# silent self-test from reading as 48 passing checks.
+
 # ⚠️ Run Godot DIRECTLY only through the lock wrapper. The `.godot/` cache is shared;
 # several lanes running `godot --import` at once HANG the import and block the gate for
 # everyone. `tools/godot-lock.sh` takes the SAME per-repo lock as verify-all, so a direct

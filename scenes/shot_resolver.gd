@@ -15,7 +15,13 @@ static func resolve(camera: Camera3D, world: World3D, center: Vector2, round: Am
 	var query := PhysicsRayQueryParameters3D.create(origin, end)
 	query.exclude = excludes
 	query.collide_with_areas = false
+	# Profiler scope (src/dev/profiler): two lines around the query only, never
+	# around this whole function — it has early returns, and a scope that can be
+	# abandoned mid-way is an instrumentation fault, not a measurement. No-op
+	# unless the profiler is explicitly switched on.
+	ProfilerRecorder.begin(&"physics_queries")
 	var result := world.direct_space_state.intersect_ray(query)
+	ProfilerRecorder.end()
 	if result.is_empty():
 		return {"hit": false}
 	var position: Vector3 = result.position

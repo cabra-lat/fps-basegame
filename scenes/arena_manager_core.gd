@@ -95,6 +95,12 @@ var _feed: Array[String] = []
 var _hud_t := 0.0
 
 func _ready() -> void:
+	# Profiler attach point (src/dev/profiler/profiler.gd). Returns null unless
+	# the run was started with --profile (or FPS_PROFILE=1), so this line is the
+	# only thing that exists in a release build and it does nothing there. The
+	# arena is the real playthrough scene, so this is the one that matters; the
+	# range scene has the same line.
+	Profiler.maybe_attach(self)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	plate_mat = BallisticMaterial.new()
 	plate_mat.name = "Arena Blockout"
@@ -506,6 +512,9 @@ func point_list_text() -> String:
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	# Profiler scope (src/dev/profiler): after the paused guard so the paused
+	# path produces no sample rather than an abandoned scope.
+	ProfilerRecorder.begin(&"world_managers")
 	if scenario != null and scenario.tick(delta) and raid != null and not _raid_over:
 		scenario.discard_carry(player.get_equipped_backpack())
 		raid.end(Raid.Outcome.MIA)
@@ -533,7 +542,11 @@ func _physics_process(delta: float) -> void:
 	if _hud_t >= 0.1:
 		_hud_t = 0.0
 		call("_refresh_top", "")
+		# Script-side HUD rebuild, measured separately from the world tick.
+		ProfilerRecorder.begin(&"ui_layout")
 		_refresh_raid_hud()
+		ProfilerRecorder.end()
+	ProfilerRecorder.end()
 
 func _input(event: InputEvent) -> void:
 	# PlayerController closes its inventory from _unhandled_input. The arena is

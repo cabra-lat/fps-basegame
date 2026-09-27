@@ -106,6 +106,9 @@ func close() -> void:
 # ─── BUILD ───
 
 func _build() -> void:
+	# Profiler scope (src/dev/profiler): script-side UI build work; see the
+	# profiler registry for what this does and does not cover.
+	ProfilerRecorder.begin(&"ui_layout")
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -133,6 +136,7 @@ func _build() -> void:
 	box.add_child(split)
 	_build_preview(split)
 	_build_side(split)
+	ProfilerRecorder.end()
 
 ## Left column: a SubViewport rendering the weapon (rotated in _physics_process).
 func _build_preview(parent: Control) -> void:

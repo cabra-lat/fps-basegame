@@ -20,6 +20,9 @@ var overlay: Label
 var _footsteps := Footsteps.new()
 
 func _ready() -> void:
+	# Profiler attach point (src/dev/profiler/profiler.gd). Null unless the run
+	# was started with --profile, so nothing exists in a release build.
+	Profiler.maybe_attach(self)
 	plate_mat = BallisticMaterial.new()
 	plate_mat.name = "Range Steel"
 	plate_mat.type = BallisticMaterial.Type.METAL_MEDIUM
