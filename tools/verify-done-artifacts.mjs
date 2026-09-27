@@ -217,6 +217,7 @@ export function verifyCard(card, repos, knownIds = new Set()) {
   // (3) EVERY CITED SHA MUST RESOLVE in the repository it is cited against, and the branch must
   // still exist. Resolved by rev-parse in the repo - by the card's word is the failure.
   let resolvedAny = false;
+  const namedBranchesHere = [];
   for (const sha of shas) {
     let checked = false;
     for (const n of named.length ? named : [{ kind: "game", value: "" }]) {
@@ -238,16 +239,58 @@ export function verifyCard(card, repos, knownIds = new Set()) {
           } else if (ship.state === "unknown") {
             failures.push({ defect: "shipping could not be established", detail: `${sha}: ${ship.detail}` });
           }
-        }        // (4) A BRANCH NAMED ALONGSIDE MUST STILL EXIST - but ONLY a branch the proof
+        }        // THE BRANCHES ARE COLLECTED FIRST, because the fraction check below needs them and
+        // the existence check that used to gather them runs after it. On the first attempt the
+        // list was still empty when the check read it, so the check passed everything - the same
+        // failure shape as a check that cannot fail.
+        namedBranchesHere.length = 0;
+        for (const m of proof.matchAll(/\b(?:branch|on)\s+(?:branch\s+)?([A-Za-z0-9._-]+(?:\/[A-Za-z0-9._/-]+)?)/g)) {
+          const ref = m[1];
+          // TWO BUGS WERE LIVE HERE AT ONCE, and both made a check inert rather than wrong.
+          // The pattern matched the words "on branch" and captured the word "branch" as the ref
+          // name, so "on branch main" yielded a ref called "branch" and main was never read - the
+          // branch-existence check had been passing everything. And the first version required a
+          // slash, which also excluded "main", the most common branch name there is.
+          //
+          // THE REPOSITORY DECIDES WHAT A BRANCH IS, NOT THE SHAPE OF THE WORD. A bare word is a
+          // branch if refs/heads/<word> exists and prose if it does not, so "it" and "surface"
+          // stay prose without a shape rule, and "main" is a branch.
+          if (!git(dir, ["rev-parse", "--verify", `refs/heads/${ref}`])
+            && !git(dir, ["rev-parse", "--verify", `refs/remotes/origin/${ref}`])) continue;
+          namedBranchesHere.push(ref);
+        }
+
+        // THE FRACTION CHECK, and it is the gap the coordinator named with 87ab63 as its first
+        // live specimen. A card cites ONE commit. Its branch may hold two more that were never
+        // named, and the gate confirms exactly the citation, so both the author and the gate are
+        // honest while the work is half done. inventory-ux reported 4f96c64 as the durable half
+        // of a done card whose cited commits were already pushed.
+        //
+        // So the BRANCH TIP must be on a remote, not merely the cited SHA. A cited commit that is
+        // pushed while its branch tip is not means the card named the part that happened to
+        // travel.
+        if (shippedClaim === true) {
+          for (const ref of namedBranchesHere) {
+            const tip = git(dir, ["rev-parse", "--verify", `refs/heads/${ref}`]) || git(dir, ["rev-parse", "--verify", `refs/remotes/origin/${ref}`]);
+            if (!tip) continue;                       // existence is the branch check's job
+            const tipShip = shippedState(dir, tip);
+            if (tipShip.state !== "yes") {
+              failures.push({
+                defect: "the named branch has commits that are on no remote",
+                detail: `${ref} points at ${tip.slice(0, 8)} and it is ${tipShip.state} - a card names one commit, and a branch can hold more than the card named`,
+              });
+            }
+          }
+        }
+
+        // (4) A BRANCH NAMED ALONGSIDE MUST STILL EXIST - but ONLY a branch the proof
         // actually names as one. My first version scraped a token from anywhere near the SHA and
         // reported "named branch no longer exists: it" and ": surface" - English words read as
         // branch names, and the red control caught it refusing a WELL-EVIDENCED card over a
         // technicality. A gate that fails correct work for a wrong reason gets routed around
-        // within a day, so the check is now narrow: an explicit "branch <ref>" or "on <ref>",
-        // and only a ref-shaped token.
-        for (const m of proof.matchAll(/\b(?:branch|on)\s+([A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+|[A-Za-z0-9._-]*\/)?([A-Za-z0-9._-]+)/g)) {
-          const ref = (m[1] || "") + m[2];
-          if (!ref.includes("/")) continue;             // a bare word is prose, not a ref
+        // within a day, so the check is narrow: an explicit "branch <ref>" or "on <ref>", and
+        // only a ref-shaped token.
+        for (const ref of namedBranchesHere) {
           if (git(dir, ["rev-parse", "--verify", `refs/heads/${ref}`])) continue;
           if (git(dir, ["rev-parse", "--verify", `refs/remotes/origin/${ref}`])) continue;
           failures.push({ defect: "named branch no longer exists", detail: `${ref} (cited alongside ${sha})` });

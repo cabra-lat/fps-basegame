@@ -86,6 +86,35 @@ try {
   check("the gate REFUSES a card it cannot verify", !v3.ok, v3.failures.map((f) => f.defect).join("; "));
   check("it reports the unknown, not a clean pass", v3.failures.some((f) => /could not be established/.test(f.defect)), v3.failures.map((f) => f.defect).join(" | "));
 
+  console.log("\nARM 4 - THE FRACTION: the card names a PUSHED commit, and its branch holds more:");
+  // ARM 3 left origin pointing at a path that does not exist. Restore it FIRST: arm 4 asks
+  // whether the cited commit is on a remote, and with a dead origin every answer is "unknown",
+  // which is a true answer to the wrong question and reads as a broken check.
+  run(work, "remote", "set-url", "origin", origin);
+  // ARM 2 pushed main, so by now the whole branch is on the remote and there is no fraction left
+  // to find. Arm 4 makes its own: three fresh local commits, so main is ahead again while the
+  // commit the card names is still safely pushed. That is the state 87ab63 was in.
+  for (let i = 0; i < 3; i++) run(work, "commit", "-q", "--allow-empty", `-m arm4 local ${i}`);
+  const tipAfter = run(work, "rev-parse", "HEAD");
+  console.log(`  (main is now ahead of origin by 3 commits; the card will cite ${base.slice(0, 7)}, which IS pushed)`);
+  // inventory-ux reported 4f96c64 as the durable half of a done card whose cited commits were
+  // already pushed. That is the shape: every commit the card NAMES is on the remote, the card is
+  // honest, and the work is still half done. Arm 1 already caught an unpushed TIP. This arm
+  // catches the case arm 1 cannot see - a pushed citation with unpushed work behind it.
+  const baseCard = verifyCard({
+    id: "control4", status: "done",
+    proof: `landed in game: at ${work} commit ${base} on branch main, shipped: yes`,
+  }, { game: work, addon: work });
+  check("the cited commit IS on the remote", shippedState(work, base).state === "yes", "so the citation alone passes");  check("but the card is REFUSED anyway", !baseCard.ok, baseCard.failures.map((f) => f.defect).join("; "));
+  check("it names the fraction, not the push", baseCard.failures.some((f) => /commits that are on no remote/.test(f.defect)), baseCard.failures.map((f) => f.defect).join(" | "));
+  // And once the branch is pushed, the same card must pass: a check that cannot go green is broken.
+  run(work, "push", "-q", "origin", "main");
+  const baseCardAfter = verifyCard({
+    id: "control4b", status: "done",
+    proof: `landed in game: at ${work} commit ${base} on branch main, shipped: yes`,
+  }, { game: work, addon: work });
+  check("after pushing the branch, the same card is ACCEPTED", baseCardAfter.ok, baseCardAfter.failures.map((f) => f.defect).join("; "));
+
   console.log(`\nRED CONTROL #2: ${bad === 0 ? "PASS - a local commit cannot pass as shipped" : `FAIL - ${bad} arm(s) wrong`}`);
   process.exit(bad === 0 ? 0 : 1);
 } finally {
