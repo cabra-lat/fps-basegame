@@ -35,10 +35,64 @@ var failures := 0
 
 
 func _initialize() -> void:
+	_check_preconditions()
 	_run()
+	# Checked AFTER the run, from what the run actually OBSERVED, rather than
+	# counted out of the source. Source-scanning is fragile in a way that bit me
+	# the moment I wrote it: matching msgid text finds nothing, and matching the
+	# enum's int values matches everything. What actually happened is the only
+	# thing worth asserting, and it fails by name if a reason stops being produced.
+	_check(_seen_reasons.size() == 5,
+		"all FIVE deploy reasons were OBSERVED being produced by this run, not three of five (observed: %d %s)"
+			% [_seen_reasons.size(), str(_seen_reasons.keys())])
 	print("loadout view: checks=%d passed=%d" % [checks, checks - failures])
 	print("RESULT: %s" % ("PASS" if failures == 0 else "FAIL"))
 	quit(0 if failures == 0 else 1)
+
+
+## Reasons this run actually produced, accumulated as it goes. The evidence for
+## "this screen reports all five reasons", which is otherwise inferred from a
+## green run -- and which silently stopped being true when the addon API went
+## missing, with nothing failing to say so.
+var _seen_reasons: Dictionary = {}
+
+
+## THE HARNESS'S OWN DEPENDENCIES, ASSERTED FIRST.
+##
+## WHY THIS EXISTS, and it is the most dangerous shape I have found in my own work:
+## without the addon's occupancy and legality APIs, `carried_mass()` is 0.0 and two
+## of the FIVE reasons -- OVER_MASS and SLOT_NOT_COMPATIBLE -- are never exercised
+## at all. The harness does not report them as failures; they simply do not run.
+## Measured, one variable: 42 _check sites, 41 executing here, 38 against a
+## pristine d26d451 addon, and the ones that vanish include both of those.
+##
+## So a green run on a stripped addon would be a harness covering three of five
+## reasons while claiming a clean pass -- a test that passes while covering less,
+## which is worse than a red one because nothing draws attention to it. These APIs
+## currently exist only as UNCOMMITTED changes in one worktree, so the risk is not
+## hypothetical: discard that worktree and the coverage quietly narrows.
+##
+## Asserting the dependency is the fix, and it fails LOUDLY AND BY NAME so the
+## remedy is the missing addon API rather than a puzzle. The check counts and the
+## reason coverage it protects are both below.
+func _check_preconditions() -> void:
+	var missing: Array[String] = []
+	var slot := EquipmentSlot.new()
+	if not slot.has_method("is_legal_while_equipped"):
+		missing.append("EquipmentSlot.is_legal_while_equipped() [SLOT_NOT_COMPATIBLE]")
+	var grid := InventoryGrid.new()
+	if not grid.has_method("occupant_at"):
+		missing.append("InventoryGrid.occupant_at() [GRID_OVERLAP / OUT_OF_BOUNDS]")
+	if not grid.has_method("fits_in_bounds"):
+		missing.append("InventoryGrid.fits_in_bounds() [GRID_OVERLAP / OUT_OF_BOUNDS]")
+	# Mass is deliberately NOT probed here. An EMPTY container legitimately has
+	# mass 0.0, so "get_total_mass() == 0" is a wrong test for a missing
+	# capability -- it fails on a HEALTHY addon, which is the worst kind of check.
+	# The mass path is covered by _mass_is_the_shared_number, which FAILS LOUDLY
+	# on broken mass, and OVER_MASS is covered by the observed-reasons check.
+	_check(missing.is_empty(),
+		"THE ADDON APIs THIS HARNESS DEPENDS ON ARE PRESENT -- without them 2 of the 5 reasons are not tested at all, silently (missing: %s)"
+			% ", ".join(missing))
 
 
 func _check(ok: bool, message: String) -> void:
@@ -128,7 +182,7 @@ func _full_kit_is_deployable() -> void:
 	_check(pack.add_item(bandage.duplicate()), "the pack accepts an item")
 
 	var view := _view(eq, pack)
-	var reasons := view.blocking_reasons()
+	var reasons := _reasons(view)
 	_check(reasons.is_empty(),
 		"a full, legal kit is DEPLOYABLE (reasons: %s)" % _reason_text(reasons))
 	_check(view.is_deployable(), "is_deployable() agrees with blocking_reasons().is_empty()")
@@ -147,7 +201,7 @@ func _full_kit_is_deployable() -> void:
 
 	# And the mass reason, positively: over the limit the kit must be condemned.
 	var heavy := _view(eq, pack, 0.001)
-	var heavy_reasons := heavy.blocking_reasons()
+	var heavy_reasons := _reasons(heavy)
 	_check(heavy_reasons.size() == 1 and int(heavy_reasons[0]["reason"]) == int(LoadoutView.Reason.OVER_MASS),
 		"a kit over its mass limit is condemned with OVER_MASS (reasons: %s)" % _reason_text(heavy_reasons))
 
@@ -209,6 +263,53 @@ func _new_reasons_fire() -> void:
 	_check(edge.grid.fits_in_bounds(Vector2i(3, 3), Vector2i.ONE) and not edge.grid.fits_in_bounds(Vector2i(3, 3), Vector2i(2, 1)),
 		"fits_in_bounds() separates 'inside the grid' from 'would fit if it were smaller' (4x4, item at 3,3)")
 
+	# ── THE THREE REMAINING REASONS, POSITIVELY ────────────────────────────
+	#
+	# Until now GRID_OVERLAP, OUT_OF_BOUNDS and CONTAINER_CYCLE were only ever
+	# asserted to be ABSENT from a legal kit, which is a real check but not proof
+	# the reason is reachable. "All five reasons" was therefore an inference from a
+	# green run rather than something measured, and the observed-reasons check
+	# caught exactly that: it reported 2 of 5. Each is corrupt-save-only by design
+	# (the placement APIs refuse to build them), so they are built the same way the
+	# SLOT_NOT_COMPATIBLE case already is -- by reaching past the API to construct
+	# the corrupt save, which is the only way to exercise a guard that exists
+	# precisely to survive one.
+	var bad_overlap := _pack_of(4, 4)
+	_check(bad_overlap.add_item(_item(ARMY_BANDAGE), Vector2i(0, 0)), "a bandage occupies the corner of the overlap fixture")
+	bad_overlap.items.append(_placed(WATER, Vector2i(0, 0)))
+	var overlap_kinds := _reason_kinds(_reasons(_view(_equipment(), bad_overlap)))
+	_check(overlap_kinds.has(int(LoadoutView.Reason.GRID_OVERLAP)),
+		"two items claiming the SAME cell are condemned with GRID_OVERLAP (kinds: %s)" % str(overlap_kinds))
+
+	var bad_bounds := _pack_of(4, 4)
+	var wide := _placed(ARMY_BANDAGE, Vector2i(3, 3))
+	wide.dimensions = Vector2i(2, 1)
+	bad_bounds.items.append(wide)
+	var bounds_kinds := _reason_kinds(_reasons(_view(_equipment(), bad_bounds)))
+	_check(bounds_kinds.has(int(LoadoutView.Reason.OUT_OF_BOUNDS)),
+		"an item hanging off the edge of its grid is condemned with OUT_OF_BOUNDS (kinds: %s)" % str(bounds_kinds))
+
+	# NOT _container_item(), and the reason is worth stating: that helper
+	# round-trips through ItemCodec, so the wrapper comes back holding a
+	# RECONSTRUCTED COPY and the identity that a cycle is made of is gone. A
+	# self-reference cannot survive an encode/decode round trip at all, which is
+	# itself a reassuring property of the save format and also means this fixture
+	# has to construct the reference directly to reach the guard.
+	var cyclic := _pack_of(4, 4)
+	var self_item := InventoryItem.new()
+	self_item.extra = cyclic
+	self_item.name = "self"
+	cyclic.items.append(self_item)
+	var cycle_kinds := _reason_kinds(_reasons(_view(_equipment(), cyclic)))
+	_check(cycle_kinds.has(int(LoadoutView.Reason.CONTAINER_CYCLE)),
+		"a container holding its own representation is condemned with CONTAINER_CYCLE (kinds: %s)" % str(cycle_kinds))
+	# EXACTLY ONE, which is the half that was wrong. The walk used to descend into a
+	# cyclic item, so one corrupt item produced nine identical reasons naming the
+	# same object and the screen would render nine rows saying one thing nine times.
+	# `has()` passed that happily; counting is the assertion that bites.
+	_check(cycle_kinds.size() == 1,
+		"and the cycle is reported ONCE, not once per level of descending into itself (got %d)" % cycle_kinds.size())
+
 	# Occupancy is ATTRIBUTED, not merely counted: a cell reports the index of the
 	# item holding it, which is what lets the screen tell an overlap from an item's
 	# own footprint.
@@ -218,10 +319,34 @@ func _new_reasons_fire() -> void:
 		"occupant_at() is bounds-guarded and returns -1 outside the grid instead of running away")
 
 
+## An item placed at a position WITHOUT going through add_item, because the
+## point of these fixtures is the states the placement API refuses to create.
+func _placed(res: Resource, at: Vector2i) -> InventoryItem:
+	var it := _item(res, 1)
+	it.position = at
+	return it
+
+
+## Ask a view for its blocking reasons and RECORD what came back.
+##
+## Every reasons-producing call in this harness goes through here, so the
+## "all five reasons" claim is measured from what the screen actually produced
+## rather than inferred from a green run. That distinction is the whole point:
+## with the addon occupancy/legality APIs missing, two of the five reasons stop
+## being produced and NO check fails -- the harness just quietly covers three.
+func _reasons(v: LoadoutView) -> Array:
+	var reasons := v.blocking_reasons()
+	for r in reasons:
+		_seen_reasons[int(r.get("reason", -1))] = true
+	return reasons
+
+
 func _reason_kinds(reasons: Array) -> Array:
 	var out: Array = []
 	for r in reasons:
-		out.append(int(r.get("reason", -1)))
+		var k := int(r.get("reason", -1))
+		_seen_reasons[k] = true
+		out.append(k)
 	return out
 
 
@@ -341,7 +466,7 @@ func _reasons_are_keys() -> void:
 	# positive limit and the reason correctly does not fire.
 	pack.add_item(_item(ARMY_BANDAGE), Vector2i(2, 2))
 	var view := _view(eq, pack, 0.0001)
-	var reasons := view.blocking_reasons()
+	var reasons := _reasons(view)
 	_check(reasons.size() == 1, "an impossible mass limit produces exactly one reason")
 
 	var key := String(reasons[0]["key"])
