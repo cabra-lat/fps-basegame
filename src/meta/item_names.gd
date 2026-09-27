@@ -29,6 +29,20 @@ const KEYS := {
 	"Sweden_R1": "Red Dot Sight",
 	"USA_FH": "Muzzle Suppressor",
 	"M4_Carbine": "M4 Carbine",
+	# Registered by the 87ab63 starter-loadout assertion, which found the starter
+	# set's secondary weapon resolving to a GHOST ROW: the name was real and
+	# already in the .tres, it had simply never been registered, so the hub would
+	# have offered a weapon it could not name.
+	#
+	# THE KEY IS THE FILE BASENAME, not the resource's `name` field. id_for_path()
+	# returns path.get_file().get_basename() and asks whether KEYS has it, so
+	# registering "AK-47" (the .tres name) does nothing at all -- and the i18n
+	# harness caught exactly that, twice and correctly: "registered ids resolve
+	# from their resource" because an id whose file is named differently silently
+	# falls back to the .tres name, and "no registered item id is ever rendered as
+	# itself" because id == display name leaks the id to the player. Both failures
+	# were mine, from guessing the key instead of reading how the lookup works.
+	"AK_47": "AK-47",
 	"army_bandage": "Army Bandage",
 	"cat_hemostatic_tourniquet": "CAT Hemostatic Tourniquet",
 	"salewa_first_aid_kit": "First Aid Kit",
