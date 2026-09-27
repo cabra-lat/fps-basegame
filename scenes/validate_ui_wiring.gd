@@ -42,11 +42,43 @@ const MAIN_MENU := "res://scenes/main_menu.gd"
 ## listed with the reason, because an entry without a reason is indistinguishable
 ## from an oversight and this project's whole argument is that the two must not look
 ## the same. An empty map is the goal, not the starting state.
+##
+## NOW EMPTY, and that is the point of recording it. All three were excused here
+## as "no handler exists", and the excuse survived the handlers landing -- the
+## harness passed 20/20 while still carrying three reasons that were by then
+## FALSE, because a signal that is both connected AND excused satisfies the
+## contract without either fact being examined. So a stale entry is not neutral:
+## it is a false statement that keeps a real defect invisible. Deleting the three
+## entries is what turned the acceptance test back on, and it then had to pass on
+## the wiring actually existing.
 const KNOWN_UNIMPLEMENTED := {
-	"request_unload_magazine": "remove-magazine: no handler exists in the player controller or the arena manager; the context menu offers it anyway",
-	"request_extract_rounds": "extract-rounds: no handler exists; the context menu offers it anyway",
-	"request_cycle_action": "cycle-action: no handler exists; the context menu offers it anyway",
 }
+
+## THE GENERALISED RULE, because the three stale entries were not a one-off.
+##
+## A waiver has two possible shapes and only one of them is safe:
+##
+##   Gated on a MACHINE-CHECKABLE predicate -- "the resource does not exist
+##   yet" -- it SELF-EXPIRES. The moment the condition stops holding, the waiver
+##   stops applying and the checks run, with nobody remembering to remove it.
+##   validate_meta_persistence.gd:147 is this shape: the marked-intel block is
+##   gated on ResourceLoader.exists(RAID1_MARKED_INTEL_PATH), the resource is
+##   present, so the branch runs rather than skips.
+##
+##   Gated on PROSE -- "no handler exists" -- it is PERMANENT and INVISIBLE. No
+##   amount of running can falsify a sentence, so the waiver keeps excising the
+##   very thing it was written to excuse, indefinitely, and reports success the
+##   whole time. That is what happened here: the three reasons were false the
+##   moment the handlers landed, and the harness said 20/20 anyway.
+##
+## So the escape hatch is now CHECKED rather than merely empty. Re-adding an
+## entry fails this gate immediately, which is the point: the registry should
+## only ever be repopulated together with a predicate the harness can evaluate,
+## and an author who cannot supply one has not yet found the defect they are
+## excusing.
+func _no_signal_is_excused() -> void:
+	_check(KNOWN_UNIMPLEMENTED.is_empty(),
+		"NO signal is excused: the unimplemented registry is empty, and re-adding an entry fails here on purpose. An excuse must be gated on something the harness can EVALUATE (a resource that does not exist, a symbol that is absent) so it expires by itself; a prose reason can never expire and reports success forever -- which is exactly how three false reasons outlived the handlers and the harness passed 20/20 while excusing them [entries: %d]" % KNOWN_UNIMPLEMENTED.size())
 
 var checks := 0
 var failures := 0
@@ -54,6 +86,7 @@ var failures := 0
 
 func _initialize() -> void:
 	_run()
+	_no_signal_is_excused()
 	_entry_point()
 	print("ui wiring: checks=%d passed=%d" % [checks, checks - failures])
 	print("RESULT: %s" % ("PASS" if failures == 0 else "FAIL"))
