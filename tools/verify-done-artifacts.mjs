@@ -28,7 +28,11 @@ const AM_ROOT = process.env.AM_ROOT || path.join(REPO_ROOT, ".agent-mail");
 // reported against a checkout nobody could see. Requiring the prefix makes "which repo" part of
 // the claim instead of something the verifier guesses.
 const REPO_PREFIX = /\b(game|addon):\s*([^\s,;]+)/gi;
-const SHA_RE = /\b[0-9a-f]{6,40}\b/g;  // 6, not 7: git permits 6, and cf9448 in the red-control specimen is one. At 7 the verifier silently skipped a SHA that does not exist anywhere.
+// 6 characters, not 7, because git permits 6 and cf9448 in the red-control specimen is one. At 7
+// alone the verifier silently skipped a SHA that exists nowhere. The lookarounds keep a token from
+// being half of an identifier: without them f0f289, out of task_1790536717287_f0f289, reads as a
+// commit. A SHA is a STANDALONE token.
+const SHA_RE = /(?<![A-Za-z0-9_-])([0-9a-f]{6,40})(?![A-Za-z0-9_-])/g;
 // Evidence that is a report rather than an artifact. Listed so the refusal says WHY, not just
 // that a card failed - a gate that cannot explain itself gets ignored, which is worse than none.
 const NARRATIVE_ONLY = [
@@ -98,9 +102,88 @@ const shaExists = (repoDir, sha) => git(repoDir, ["cat-file", "-e", `${sha}^{com
  * Each failure names the DEFECT it corresponds to, because this gate was built from four real
  * ones and a reader who cannot tell which one fired will assume it is noise.
  */
-export function verifyCard(card, repos) {
+/**
+ * IS THE COMMIT ACTUALLY SHIPPED? Returns "yes" | "no" | "unknown".
+ *
+ * THE GAP THIS CLOSES. Resolving a SHA and finding its branch is NOT delivery. On 2026-09-27
+ * thirteen commits sat on local main, the owner main-menu fix among them, and every check available
+ * passed: the SHA resolved, the branch existed, the diff was non-empty, the tree was correct. The
+ * feature was in no other clone.
+ *
+ * "unknown" IS A REAL ANSWER, not a shrug. A verifier that cannot read the remote has no evidence
+ * either way and must NOT pass by default: a check that reports "fine" because it could not look
+ * is believed, and belief is what makes an instrument dangerous.
+ *
+ * The boundary is a REMOTE ref read through ls-remote, never a local ref. A branch that tracks
+ * nothing is a commit that exists, not one that ships.
+ */
+export function shippedState(repoDir, sha) {
+  if (!fs.existsSync(repoDir)) return { state: "unknown", detail: "repository is not present here" };
+  const remoteUrl = git(repoDir, ["config", "--get", "remote.origin.url"]);
+  if (!remoteUrl) return { state: "unknown", detail: "no origin remote is configured" };
+
+  let tips;
+  try {
+    tips = execFileSync("git", ["ls-remote", "origin"], { cwd: repoDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch {
+    return { state: "unknown", detail: "the remote could not be read, so shipping is unknown - NOT a pass" };
+  }
+
+  const remoteRefs = new Map();
+  for (const line of tips.split("\n")) {
+    const [sha2, ref] = line.trim().split(/\s+/);
+    if (!sha2 || !ref || ref === "HEAD") continue;
+    remoteRefs.set(ref.replace(/^refs\/remotes\//, "").replace(/^refs\/heads\//, ""), sha2);
+  }
+  if (remoteRefs.size === 0) return { state: "unknown", detail: "the remote reported no refs" };
+
+  // A remote-tracking ref is evidence ONLY if it matches what the remote reports NOW. A tracking
+  // ref that lags answers a question about the past, and answering a past question is exactly how
+  // this check would go green on an unpushed commit.
+  const isFresh = (name, tipSha) => git(repoDir, ["rev-parse", "--verify", `refs/remotes/origin/${name}`]) === tipSha;
+  if (![...remoteRefs].some(([n, t]) => isFresh(n, t))) {
+    try {
+      execFileSync("git", ["fetch", "--quiet", "origin"], { cwd: repoDir, stdio: "ignore" });
+    } catch {
+      return { state: "unknown", detail: "no fresh remote-tracking ref and the fetch failed" };
+    }
+  }
+
+  // PROBE ONLY THE REMOTE-TRACKING NAMESPACE. The first version also probed the BARE ref name,
+  // which resolved to the LOCAL branch: thirteen unpushed commits came back as "reachable from the
+  // remote ref main" and the control went green on the exact failure it exists to catch. The bare
+  // name is the local line of work; the tracking name is the remote. Conflating them is the bug.
+  for (const [name, tipSha] of remoteRefs) {
+    if (!isFresh(name, tipSha)) continue;
+    try {
+      execFileSync("git", ["merge-base", "--is-ancestor", sha, `refs/remotes/origin/${name}`], { cwd: repoDir, stdio: "ignore" });
+      return { state: "yes", detail: `reachable from the remote ref origin/${name}` };
+    } catch { /* not an ancestor of this remote ref; try the next */ }
+  }
+  const names = [...remoteRefs.keys()];
+  return {
+    state: "no",
+    detail: `the commit resolves locally but is behind every remote ref (${names.slice(0, 5).join(", ")}${names.length > 5 ? `, and ${names.length - 5} more` : ""})`,
+  };
+}
+
+export function verifyCard(card, repos, knownIds = new Set()) {
   const failures = [];
   const proof = typeof card.proof === "string" ? card.proof : "";
+  // DELIVERY IS AN EXPLICIT TOKEN, NOT A KEYWORD. An earlier version asked whether the proof
+  // contained "merged" or "shipped", and it failed this project own proof - which discusses what
+  // shipped and unbuilt means and states merged=false - for claiming to have shipped something.
+  // That is a gate failing an honest proof for using a word, and the fix is worse than the bug: it
+  // teaches authors to write less evidence. Keyword matching cannot tell a CLAIM from a
+  // DISCUSSION, so the claim is now stated. A done card says "shipped: yes" or "shipped: no".
+  const claimMatch = proof.match(/\bshipped\s*[:=]\s*\**\s*(yes|no|true|false)\b/i);
+  const shippedClaim = claimMatch ? /^(yes|true)$/i.test(claimMatch[1]) : null;
+  // A card is cited by the six-to-eight character tail of its id. Those tails are all-hex and the
+  // right length, so 87ab63 standing alone in a sentence is indistinguishable from a short SHA by
+  // shape. Only the bus knows which names are cards, so the bus is asked.
+  const selfTail = String(card.id || "").match(/([0-9a-f]{6,8})$/i);
+  if (selfTail) knownIds.add(selfTail[1]);
+  if (card.id) knownIds.add(String(card.id));
   const where = card.id;
 
   if (!proof.trim()) {
@@ -121,7 +204,7 @@ export function verifyCard(card, repos) {
   // (2) NARRATIVE EVIDENCE IS NOT AN ARTIFACT. Named first because it is the most common way a
   // sound close ends up with nothing behind it.
   const narrative = NARRATIVE_ONLY.filter((re) => re.test(proof)).map((re) => re.source);
-  const shas = (proof.match(SHA_RE) || []).filter((s) => !/^(game|addon)$/i.test(s));
+  const shas = (proof.match(SHA_RE) || []).filter((s) => !/^(game|addon)$/i.test(s) && !knownIds.has(s));
 
   if (shas.length === 0) {
     failures.push({
@@ -143,19 +226,19 @@ export function verifyCard(card, repos) {
         checked = true; resolvedAny = true;
         // (5) A COMMIT CLAIMED AS ON-MAIN MUST BE AN ANCESTOR OF MAIN, or a side-branch commit
         // passes as shipped.
-        if (/\bon main\b|\bmerged\b|\bshipped\b/i.test(proof)) {
-          const isAncestor = (() => {
-            try { execFileSync("git", ["merge-base", "--is-ancestor", sha, "main"], { cwd: dir, stdio: "ignore" }); return true; }
-            catch { return false; }
-          })();
-          if (!isAncestor) {
-            failures.push({
-              defect: "commit is not on main but the proof implies it shipped",
-              detail: `${sha} resolves in ${n.kind} but is not an ancestor of main`,
-            });
+        // Only an EXPLICIT "shipped: yes" demands the remote boundary. A card that says
+        // "shipped: no" has told the truth about a local commit and is not penalised for it: the
+        // failure this check exists to catch is a card REPORTING delivery that did not happen, not
+        // a card declining to claim one. The on-main ancestor test it replaces was necessary but
+        // not sufficient - a resolvable local commit passes it every time.
+        if (shippedClaim === true) {
+          const ship = shippedState(dir, sha);
+          if (ship.state === "no") {
+            failures.push({ defect: "commit resolves locally but is not on any remote", detail: `${sha}: ${ship.detail} - a commit that exists is not a commit that ships` });
+          } else if (ship.state === "unknown") {
+            failures.push({ defect: "shipping could not be established", detail: `${sha}: ${ship.detail}` });
           }
-        }
-        // (4) A BRANCH NAMED ALONGSIDE MUST STILL EXIST - but ONLY a branch the proof
+        }        // (4) A BRANCH NAMED ALONGSIDE MUST STILL EXIST - but ONLY a branch the proof
         // actually names as one. My first version scraped a token from anywhere near the SHA and
         // reported "named branch no longer exists: it" and ": surface" - English words read as
         // branch names, and the red control caught it refusing a WELL-EVIDENCED card over a
@@ -193,6 +276,12 @@ export function verifyCard(card, repos) {
     }
   }
 
+  // A done card must SAY whether it shipped. Silence is not a pass: thirteen commits were local
+  // tonight and every card behind them looked fine to any check that did not ask the question.
+  if (shippedClaim === null) {
+    failures.push({ defect: "no shipping claim", detail: 'the proof must state "shipped: yes" or "shipped: no"' });
+  }
+
   return { ok: failures.length === 0, failures };
 }
 
@@ -214,7 +303,13 @@ export function verifyAll(repoRoot = REPO_ROOT, amRoot = AM_ROOT) {
   const inPlace = (c) => Date.parse(c.created || 0) >= Date.parse(CONVENTION_FROM);
   const legacyShaped = done.filter((c) => !legacy.includes(c) && !inPlace(c));
   const evaluated = done.filter((c) => !legacy.includes(c) && inPlace(c));
-  const results = evaluated.map((c) => ({ id: c.id, ...verifyCard(c, repos) }));
+  // Every id the bus knows, so a card tail in a proof is never read as a commit.
+  const knownIds = new Set();
+  for (const c of done) {
+    const m = String(c.id || "").match(/([0-9a-f]{6,8})$/i);
+    if (m) knownIds.add(m[1]);
+  }
+  const results = evaluated.map((c) => ({ id: c.id, ...verifyCard(c, repos, knownIds) }));
   return {
     scanned: done.length,
     evaluatedCount: evaluated.length,

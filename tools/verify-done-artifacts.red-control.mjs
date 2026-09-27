@@ -66,7 +66,7 @@ for (const [defect, why] of EXPECTED) {
 // simply refusing everything and would be ignored within a day.
 const good = verifyCard({
   id: "control", status: "done",
-  proof: `landed in addon: at ${GAME} commit 69ebb9a on branch main, merged and an ancestor of main`,
+  proof: `landed in addon: at ${GAME} commit 69ebb9a on branch main, shipped: yes`,
 }, repos);
 console.log(`\npositive control (a resolvable on-main commit): accepted=${good.ok}`);
 if (!good.ok) console.log(`  unexpected: ${good.failures.map((f) => f.defect).join("; ")}`);
