@@ -78,6 +78,13 @@
             pkgs.xorg-server       # Xvfb
             pkgs.ffmpeg
             pkgs.imagemagick
+            # X11 input injection. Declared so agent-driven input has an
+            # EXTERNAL route alongside the in-engine one: xdotool moves the
+            # pointer and sends keys into a live window, which is the only way
+            # to drive a real captured-mouse camera. The in-engine harness
+            # (task_1790521455278_159cc8) needs none of this and is the
+            # preferred path; this is here for the visible-window case.
+            pkgs.xdotool
             # local AI / build toolchain
             laya-cpu
             pkgs.cmake

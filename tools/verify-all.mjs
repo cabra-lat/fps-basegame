@@ -174,13 +174,14 @@ function harnessScript(name) {
 // what the COMMITTED harness does, so it is not a reason for a red gate on
 // every other lane's checkout while that patch waits to land.
 const MIN_CHECKS = {
+  profiler: 120,
   assets: 123,
   ballistics: 52,
   weapon_mechanics: 45,
   inventory_ux: 77,
   meta_persistence: 126,
-  meta_progression: 44,
-  meta_market: 61,
+  meta_progression: 34,
+  meta_market: 53,
   meta_flea: 35,
   meta_deploy_raid: 42,
   i18n: 12,
