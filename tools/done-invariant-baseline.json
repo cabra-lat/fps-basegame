@@ -1,0 +1,12 @@
+{
+  "_comment": "KNOWN done_at invariant violations, accepted and NAMED - not the same as fixed.",
+  "known": [
+    {
+      "id": "task_1790452331402_0273c0",
+      "status": "blocked",
+      "done_at": "2026-09-27T01:37:46.824Z",
+      "owner": "range",
+      "why": "claim landed 2m03s after completion; the card carries done_at while blocked. NOT repaired - range's to answer. The write-time guard (herdr-plugin-amq 5948c25) refuses further writes to it, so it cannot get worse; this baseline exists only so the sweep can run as a gate without being permanently red for a violation someone has already accepted."
+    }
+  ]
+}
