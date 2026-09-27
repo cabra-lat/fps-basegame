@@ -339,13 +339,23 @@ static func _base_path(res: Resource, dir: String) -> String:
 		return meta_path
 	# The last resort used to be a scan of ONE directory, which meant the fallback
 	# silently worked for weapons/ammo/attachments and silently did NOT work for
-	# everything else. 50 shipped items live outside those three directories (23
-	# armor, 12 meta, 9 medical, 3 magazines, ...) and any of them that reaches
-	# here as a runtime duplicate encodes with an EMPTY path and is then DROPPED on
-	# decode, by _decode_plain, with only a warning. That is silent data loss on a
-	# save, and it was invisible because every item that mattered happened to be
-	# in a scanned directory. Try the caller's own directory first (the hot path,
-	# and unchanged), then fall back to the whole resource tree.
+	# everything else. 33 real Items live outside those three directories (23 armor,
+	# 9 medical, 1 item) and any of them that reaches here as a runtime duplicate
+	# encodes with an EMPTY path and is then DROPPED on decode, by _decode_plain,
+	# with only a warning. That is silent data loss on a save, and it was invisible
+	# because every item that mattered happened to be in a scanned directory. Try the
+	# caller's own directory first (the hot path, and unchanged), then fall back to
+	# the whole resource tree.
+	#
+	# JUSTIFICATION FOR THE WIDENING, precisely, because a weaker version of this
+	# claim was here first and is wrong. It is tempting to write that the widening
+	# rescues name-less resources. It does not, and it must not be defended on that
+	# basis: every real Item outside the three directories DOES carry a name. The
+	# name-less .tres files under resources/ are config (DeathPolicy, Faction, Quest,
+	# RoleDefinition, StarterLoadout, the mode resources) and pathless magazines,
+	# which are not Items and never reach this ladder. The widening is justified by
+	# DIRECTORY COVERAGE -- 33 named items the single-directory scan could not see --
+	# and if that population is ever gone the cached tree walk can go with it.
 	var found := _scan_for_name(dir, res.name)
 	if found != "":
 		return found
