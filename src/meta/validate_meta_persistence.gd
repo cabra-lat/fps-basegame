@@ -403,6 +403,86 @@ func _scenario_hub_deploy_contract() -> void:
 	var starter := load(STARTER) as StarterLoadout
 	_check(service.grant_starter_loadout(starter) == 2, "starter granted once")
 	_check(service.grant_starter_loadout(starter) == 0, "starter grant is idempotent (no duplicate starter)")
+
+	# THE ROUND TRIP, WHICH NOTHING HERE TESTED BEFORE. The idempotence check above
+	# runs twice inside ONE process, so it would still pass if the flag were held
+	# only in memory and never written to the save. A player who quits and returns
+	# is a different situation, and it is the one that hands out a second kit.
+	#
+	# THE FIRST VERSION OF THIS CHECK WAS WRONG AND IT IS WORTH SAYING SO, because
+	# the wrong version reported a defect that does not exist. It reloaded the save
+	# immediately after granting, at a point where the profile had never been
+	# written, so it reloaded an empty profile and "proved" the starter was granted
+	# twice. The fix is to SAVE FIRST and reload after, which is the situation a
+	# returning player is actually in. The lesson is the one this lane keeps
+	# relearning: a red that survives a moment of scepticism is often the fixture's
+	# ordering and not the code's behaviour.
+	service.persist()
+	var restarted_starter := ProfileStore.load_profile(path)
+	var restart_service := MetaService.new()
+	restart_service.save_path = path
+	restart_service.use_profile(restarted_starter, path)
+	_check(bool(restarted_starter.role_state().get("starter_granted", false)),
+		"the granted flag is actually present in the reloaded save, so the next check tests the flag and not an empty profile")
+	_check(restart_service.grant_starter_loadout(starter) == 0,
+		"CONSTRUCTED BREAK: the starter is NOT re-granted after a save and reload (the flag survives the round trip)")
+	# And the kit itself must be untouched by the refused second grant. This is the
+	# half that matters if the guard ever fails: grant_starter_loadout ASSIGNS
+	# profile.loadout[slot_name] = arr rather than appending, so a second grant
+	# would not merely duplicate a faucet, it would overwrite whatever the player
+	# had equipped. Comparing the signature is what turns "returns 0" into "the
+	# player's kit is intact", which are different claims.
+	var granted_kit_sig := _loadout_signature(service.profile.loadout)
+	_check(_loadout_signature(restarted_starter.loadout) == granted_kit_sig,
+		"a refused second grant leaves the player's current loadout byte-identical (no silent overwrite)")
+
+	# ONCE PER FACTION, which is the documented promise and needs two factions to
+	# mean anything: one grant on the starting faction, a second on another, and a
+	# refusal when returning to the first.
+	var multi := MetaProfile.new()
+	var multi_service := MetaService.new()
+	multi_service.save_path = TEST_DIR + "/starter_multifaction.save"
+	ProfileStore.delete(multi_service.save_path)
+	multi_service.use_profile(multi, multi_service.save_path)
+	_check(multi_service.grant_starter_loadout(starter) > 0, "first faction receives its starter kit")
+	_check(multi.switch_faction("drifter").get("ok", false), "switching to a REGISTERED second faction is allowed")
+	_check(multi_service.grant_starter_loadout(starter) > 0, "a second faction receives its own starter kit, once per faction as documented")
+	_check(multi_service.grant_starter_loadout(starter) == 0, "and only once")
+	_check(multi.switch_faction(multi.faction).get("ok", false) == false, "switching to the faction already active is refused")
+	_check(multi.switch_faction("contractor").get("ok", false), "switching back to the first faction is allowed")
+	_check(multi_service.grant_starter_loadout(starter) == 0, "returning to the first faction does NOT grant a second kit")
+
+	# THE FAUCET THIS CLOSES, and it is arithmetic rather than hygiene: starter_granted
+	# is per-IDENTIFIER, so an unregistered id gets a fresh role state with the flag
+	# false and mints another complete kit. Inventing ids would therefore grant
+	# without limit, and "once per faction" was really once per string.
+	_check(multi.switch_faction("raider2").get("ok", false) == false, "an UNREGISTERED faction id is refused rather than silently creating a role for it")
+	_check(multi.switch_faction("raider2").get("reason", "").find("desconhecida") >= 0, "the refusal says WHY (unknown faction), in the caller's language")
+	# CAUGHT BY A RED ARM, and worth recording: this check first read
+	# `not multi.role_state().has("raider2")`, which looks like it asserts "no
+	# phantom role was created" and asserts nothing of the kind. role_state()
+	# returns the state dict OF a faction, whose keys are kit/karma/raids, so
+	# `.has("raider2")` is false in both the guarded and the unguarded world and the
+	# check passed with the guard removed. The assertion belongs on the profile's
+	# `roles` REGISTRY, which is the thing that grows a phantom entry.
+	_check(not multi.roles.has("raider2"), "the refused switch created no phantom entry in the roles registry to grant from")
+	# Asserted as a PROPERTY rather than a count, because a count is brittle in a
+	# way that hides the thing being checked: two factions were legitimately visited
+	# here, so "size == 1" was simply the wrong expectation and a size check would
+	# have needed editing every time the scenario gained a faction. What must never
+	# appear is an id outside the data registry.
+	var unregistered_ids: Array[String] = []
+	for role_id in multi.roles:
+		if not FactionNames.KEYS.has(String(role_id)):
+			unregistered_ids.append(String(role_id))
+	_check(unregistered_ids.is_empty(),
+		"NO invented faction id ever entered the roles registry, so there is no fresh starter_granted to grant from (found: %s; roles: %s)"
+		% [", ".join(unregistered_ids), str(multi.roles.keys())])
+	_check(multi.faction == "contractor", "a refused switch leaves the active faction untouched")
+	# The registered-but-unplayable case is deliberately NOT asserted as blocked:
+	# raider is in the registry with playable = false, and whether an unplayable
+	# faction may be selected is a product decision this lane does not make. The
+	# guard is asserted; this gap is reported rather than decided.
 	var empty_options := MetaService.new()
 	var empty_profile := MetaProfile.new()
 	empty_options.use_profile(empty_profile, TEST_DIR + "/empty_projection.save")

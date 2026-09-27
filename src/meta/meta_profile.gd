@@ -92,6 +92,24 @@ func switch_faction(target_id: String) -> Dictionary:
 		return {"ok": false, "reason": "faccao invalida"}
 	if target_id == faction:
 		return {"ok": false, "reason": "ja e' a faccao ativa"}
+	# THE TARGET MUST BE A REGISTERED FACTION, and the reason is arithmetic rather
+	# than tidiness. `starter_granted` is per-faction state, so the once-per-faction
+	# grant is really once-per-IDENTIFIER: an unregistered id gets a FRESH role
+	# state from _fresh_role_state(), starter_granted is false, and the next grant
+	# hands out another complete kit. Before this check a caller could mint kits
+	# without limit simply by inventing ids ("raider2", "raider3"), so
+	# "once per faction" was once per string and the guarantee was not a guarantee.
+	#
+	# The test is against FactionNames.KEYS, the DATA registry, and deliberately not
+	# a list written out here: factions are content, and a game may ship three or
+	# thirty of them. Same rule as the item registry, and the same reason.
+	#
+	# NOT CHECKED HERE, and it is a real remaining gap rather than an oversight:
+	# `playable`. raider is registered but its .tres says playable = false, and this
+	# function will still switch to it. Whether an unplayable faction is selectable
+	# is a product decision, so it is reported and not silently decided.
+	if not FactionNames.KEYS.has(target_id):
+		return {"ok": false, "reason": "faccao desconhecida: %s" % target_id}
 	role_state(faction)["kit"] = loadout.duplicate(true)
 	var incoming: Dictionary = role_state(target_id)["kit"]
 	loadout = incoming.duplicate(true)
