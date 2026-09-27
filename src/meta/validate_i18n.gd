@@ -126,6 +126,7 @@ func _initialize() -> void:
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
+	_check_untranslated_description_count()
 	# AWAITED, and that word is load-bearing. This check renders a live scene, so
 	# it contains `await`; called without it, GDScript runs it as a coroutine,
 	# returns at the first await, and the rest of it executes after _initialize()
@@ -231,6 +232,138 @@ func _check_every_key_is_translated() -> void:
 ## does come back as the English key, which is what the check above looks for.
 func _check_teeth() -> void:
 	_check(TranslationServer.translate(MISSING_PROBE) == MISSING_PROBE, "an absent entry falls back to the key, so the untranslated-key check can fail")
+
+## REPORT-ONLY, AND THAT IS THE WHOLE DESIGN. It prints the count and asserts
+## nothing, so it can never red anyone's gate; `true` is passed literally and the
+## number is in the message. It is here because the untranslated-description figure
+## was wrong three times in one evening (118/112, then 117/111 at 66d41cf, then
+## 116/110 once a pending scaffold fix lands) and every wrong number came from the
+## same place: nobody derived the POPULATION, so each figure was a fresh manual
+## measurement that could be wrong quietly. This makes the figure a property of the
+## build instead of a claim in a thread.
+##
+## WHY NOT AN ASSERTION, argued rather than assumed: `untranslated == 0` is RED right
+## now, so shipping it means a knowingly-red gate on five lanes until the debt is
+## resolved. Making the debt visible in-game is the USER's decision and is a
+## different card; until it is made, the honest state is a loud number and a green
+## gate, not a red one nobody can act on.
+##
+## THE POPULATION IS PARSED, NOT GREPPED, and that is the load-bearing part. Every
+## wrong number came from a text search: 118/118 came from grepping the string
+## "scout", and a naive scan of `description = ` also picks up the 15 AmmoFeed
+## `sub_resource` descriptions that are NOT item descriptions and were never
+## translation debt. So this counts only the description in the file's top-level
+## `[resource]` block, exactly the split my measurement made, and the count is
+## therefore 117 at 66d41cf rather than 132.
+##
+## TWO INDEPENDENT HALVES, because one of them is the easy one to get wrong: the
+## POPULATION is structural (which files have a top-level description, from parsing),
+## while the STATUS is behavioural (`ItemDescriptions.untranslated_for_path()`, the
+## real runtime predicate the flea frame consults). A text scan could have decided
+## both, and then a build whose catalogue works would still print a confident wrong
+## number -- worse than printing nothing. Where the two halves disagree, the
+## disagreement is printed rather than resolved, because a report-only check that
+## quietly picks a winner is a claim wearing a check's clothes.
+##
+## CITATIONS, all read before citing: `ItemDescriptions.untranslated_for_path()`
+## (src/meta/item_descriptions.gd:48) returns `raw != "" and
+## TranslationServer.translate(raw) == raw`, which is the "no catalogue entry" test
+## and NOT a scaffold test. The falsification pattern above is `_check_teeth` at
+## line 232, which I read rather than assumed. I do NOT cite
+## `_trader_item_paths()` (line 479) as a no-hardcoding precedent: it hardcodes the
+## three trader paths at 480-482 while its own comment claims it does not, which is
+## why this check enumerates `res://resources/` from the filesystem instead.
+func _check_untranslated_description_count() -> void:
+	var described := 0
+	var untranslated := 0
+	var disagreements: Array[String] = []
+	for path in _resources_with_top_level_description():
+		described += 1
+		var declared := not ItemDescriptions.source_text(load(path)).strip_edges().is_empty()
+		var is_untranslated := ItemDescriptions.untranslated_for_path(path)
+		if is_untranslated:
+			untranslated += 1
+		if declared != is_untranslated and not declared:
+			disagreements.append(path.get_file())
+	# PRINTED, not asserted through _check(). This harness's _check() only counts
+	# and emits push_error on failure, so a report delivered as `_check(true, msg)`
+	# would print NOTHING on a passing run and the number would never be seen -- a
+	# report that only exists when it fails is an error message, not a measurement.
+	print("[desc] REPORT-ONLY: %d item descriptions declared, %d untranslated, %d translated" % [described, untranslated, described - untranslated])
+	print("[desc] REPORT-ONLY: parse/loader disagreement (text declares a description the loader reports empty): %s" % (", ".join(disagreements) if not disagreements.is_empty() else "none"))
+	# The ONE assertion here is about the CHECK, never about the debt: a scan that
+	# found nothing would make the number above look like "all translated", which
+	# is the dangerous direction -- a broken measure reporting zero debt. Non-vacuity
+	# is what keeps a report-only check honest, and it is red for a typo'd root
+	# rather than for 111 untranslated strings.
+	_check(described > 0,
+		"the description scan found resources to measure (%d declared, root res://resources/)" % described)
+
+## Every .tres under res://resources/ whose TOP-LEVEL [resource] block declares a
+## description, by parsing the file text.
+##
+## The [gd_resource] header, every [ext_resource] and every [sub_resource] block is
+## skipped, and only the final [resource] block is read -- which is where a Godot
+## .tres puts the resource's own exported properties. That is the whole reason this
+## is not `grep description`: in weapon .tres files the AmmoFeed sub_resource
+## carries its own `description = "This Ammofeed is the default one."`, and a scan
+## that counted those would report 132 rather than 117 and would call developer
+## placeholder text translation debt.
+##
+## Enumerated from the FILESYSTEM rather than a list of the known item resources, for
+## the reason the [L] trader check in validate_meta_flea.gd enumerates its
+## directory: a resource nobody remembered to list is the one whose debt goes
+## unmeasured, and a count that silently excludes files is worse than no count.
+func _resources_with_top_level_description() -> Array[String]:
+	var out: Array[String] = []
+	for path in _resource_text_paths("res://resources/"):
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f == null:
+			continue
+		var in_top_level := false
+		var found := false
+		while not f.eof_reached():
+			var line := f.get_line()
+			var trimmed := line.strip_edges()
+			# A [resource] header opens the top-level block; a [sub_resource] or
+			# [ext_resource] header closes it again. Nesting does not occur in a
+			# .tres, so the last header of the family to appear wins, which is what
+			# "top-level" means in this format.
+			if trimmed.begins_with("[resource]"):
+				in_top_level = true
+				continue
+			if trimmed.begins_with("["):
+				in_top_level = false
+				continue
+			if in_top_level and trimmed.begins_with("description") and not found:
+				# `begins_with("description")` rather than "description =" so a
+				# multiline """...""" value is counted as present; only EXISTENCE
+				# matters here, because the translated/untranslated verdict comes
+				# from the runtime, not from this text.
+				found = true
+		f.close()
+		if found:
+			out.append(path)
+	return out
+
+## Every .tres under `root`, recursively, from the filesystem.
+func _resource_text_paths(root: String) -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(root)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full := root.path_join(entry)
+		if dir.current_is_dir():
+			if not entry.begins_with("."):
+				out.append_array(_resource_text_paths(full))
+		elif entry.ends_with(".tres"):
+			out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()
+	return out
 
 ## The translated text lives in locale/game.po and nowhere else.
 func _check_no_translated_literal_in_source() -> void:
