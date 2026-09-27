@@ -19,7 +19,7 @@ enum LoadoutState {
 
 @export var title_text := "CENTRAL DE OPERAÇÕES"
 @export var empty_report_text := "Nenhum relatório anterior"
-@export var empty_loadout_text := "Nenhum loadout disponível"
+@export var empty_loadout_text := "No loadout available"
 @export var invalid_loadout_text := "Loadout inválido ou incompleto"
 @export var valid_loadout_text := "Pronto para iniciar"
 
@@ -87,7 +87,7 @@ func _build_ui() -> void:
 	var section := _section("PERFIL", column)
 	profile_label = Label.new()
 	profile_label.name = "ProfileSummary"
-	profile_label.text = "Faction: —    Créditos: —"
+	profile_label.text = _profile_line("—", -1)
 	profile_label.add_theme_font_size_override("font_size", 18)
 	profile_label.add_theme_color_override("font_color", Color(0.78, 0.84, 0.92))
 	section.add_child(profile_label)
@@ -106,13 +106,13 @@ func _build_ui() -> void:
 	loadout_section.add_child(loadout_picker)
 	loadout_details = Label.new()
 	loadout_details.name = "LoadoutDetails"
-	loadout_details.text = empty_loadout_text
+	loadout_details.text = _t(empty_loadout_text)
 	loadout_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	loadout_section.add_child(loadout_details)
 
 	status_label = Label.new()
 	status_label.name = "LoadoutStatus"
-	status_label.text = empty_loadout_text
+	status_label.text = _t(empty_loadout_text)
 	status_label.add_theme_color_override("font_color", Color(0.68, 0.72, 0.78))
 	column.add_child(status_label)
 
@@ -217,13 +217,24 @@ func can_deploy() -> bool:
 	return loadout_state == LoadoutState.VALID and selected_loadout_id != ""
 
 
+## One place builds the profile line, so the "no profile" state and the real one
+## cannot drift into different wording -- they were separate literals, one of them
+## hardcoding an English label and the other a Portuguese one. Two keys rather
+## than one, because a translator reordering a line should not have to reproduce
+## the four-space gutter between two unrelated facts.
+func _profile_line(faction_display: String, currency: int) -> String:
+	var credits := "—" if currency < 0 else _t("Credits: %d") % currency
+	return _t("Faction: %s") % (faction_display if faction_display != "" else "—") + "    " + credits
+
+
 func _refresh() -> void:
+
 	_recompute_state()
 	if profile_label != null:
 		if profile == null:
-			profile_label.text = "Faction: —    Créditos: —"
+			profile_label.text = _profile_line("—", -1)
 		else:
-			profile_label.text = "Faction: %s    Créditos: %d" % [profile.faction_name(), profile.currency]
+			profile_label.text = _profile_line(FactionNames.display_name_for_id(profile.faction), profile.currency)
 	if report_label != null:
 		report_label.text = _report_text()
 	if loadout_picker != null:
@@ -239,7 +250,7 @@ func _refresh() -> void:
 				status_label.text = invalid_loadout_text
 				status_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45))
 			_:
-				status_label.text = empty_loadout_text
+				status_label.text = _t(empty_loadout_text)
 				status_label.add_theme_color_override("font_color", Color(0.68, 0.72, 0.78))
 	if deploy_button != null:
 		deploy_button.disabled = not can_deploy()
@@ -260,10 +271,18 @@ func _find_option(loadout_id: String) -> Dictionary:
 	return {}
 
 
+## One render-time translation point for the whole hub. The loadout payload
+## carries ENGLISH SOURCE STRINGS as keys (the meta service builds them, the
+## controller projects them), so translating HERE is what makes every state
+## resolve through the same mechanism. It did not, and that was the defect the
+## coordinator found in the pixels: the same widget read one language in one
+## state and another in the other, because the payload carried an English
+## literal and the controller's const carried hardcoded Portuguese, and only the
+## latter was ever going to look right in a screenshot.
 func _rebuild_picker() -> void:
 	loadout_picker.clear()
 	if loadout_options.is_empty():
-		loadout_picker.add_item(empty_loadout_text)
+		loadout_picker.add_item(_t(empty_loadout_text))
 		loadout_picker.set_item_disabled(0, true)
 		loadout_picker.select(0)
 		return
@@ -271,29 +290,35 @@ func _rebuild_picker() -> void:
 	for i in loadout_options.size():
 		var option := loadout_options[i]
 		var label := String(option.get("label", option.get("id", "Loadout %d" % (i + 1))))
-		loadout_picker.add_item(label)
+		loadout_picker.add_item(_t(label))
 		loadout_picker.set_item_metadata(i, String(option.get("id", "")))
 		if String(option.get("id", "")) == selected_loadout_id:
 			selected_index = i
 	loadout_picker.select(selected_index)
 
 
+## Static so the render path and the harnesses resolve a key the same way; tr()
+## is instance-bound and these are called from places that have no node.
+static func _t(key: String) -> String:
+	return TranslationServer.translate(key)
+
+
 func _details_text() -> String:
 	if loadout_options.is_empty():
-		return empty_loadout_text
+		return _t(empty_loadout_text)
 	var option := _find_option(selected_loadout_id)
 	if option.is_empty():
-		return "Selecione um loadout"
+		return _t("Select a loadout")
 	var summary := String(option.get("summary", ""))
 	if summary != "":
-		return summary
+		return _t(summary)
 	var items = option.get("items", [])
 	if items is Array and not (items as Array).is_empty():
 		var labels: Array[String] = []
 		for item in items:
 			labels.append(String(item.get("name", item)) if item is Dictionary else String(item))
 		return ", ".join(labels)
-	return "Sem detalhes fornecidos"
+	return _t("No details provided")
 
 
 func _report_text() -> String:

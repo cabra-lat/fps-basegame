@@ -196,21 +196,29 @@ func _market_buy(index: int) -> void:
 	var r: Dictionary = meta.buy(_market_trader, index)
 	if r.get("ok", false):
 		var item = r.get("item")
-		var nm: String = item.name if item != null else "item"
-		market_msg.text = "Comprado: %s" % nm
-		_push_feed("Comprou %s" % nm)
+		# Item identity is the resource, not its name: the purchase line resolves the
+		# display text through ItemNames, so buying the marked intel no longer
+		# renders `Comprou marked intel` with the .tres name inside a Portuguese
+		# sentence. The raw name is only a fallback for an unregistered item, and
+		# the i18n invariant fails if anything a trader sells is unregistered.
+		var nm: String = ItemNames.display_name_for_item(item)
+		if nm == "":
+			nm = String(item.name) if item != null else tr("an item")
+			push_warning("market: bought item '%s' has no ItemNames entry" % (item.resource_path if item != null else "?"))
+		market_msg.text = tr("Bought: %s") % nm
+		_push_feed(tr("Bought %s") % nm)
 	else:
-		market_msg.text = "Recusado: %s" % String(r.get("reason", "?"))
+		market_msg.text = tr("Rejected: %s") % String(r.get("reason", "?"))
 	meta.persist()
 	_refresh_market()
 
 func _market_sell(index: int) -> void:
 	var r: Dictionary = meta.sell(_market_trader, index)
 	if r.get("ok", false):
-		market_msg.text = "Vendido por %d cr" % int(r.get("price", 0))
-		_push_feed("Vendeu por %d cr" % int(r.get("price", 0)))
+		market_msg.text = tr("Sold for %d cr") % int(r.get("price", 0))
+		_push_feed(tr("Sold %d cr") % int(r.get("price", 0)))
 	else:
-		market_msg.text = "Recusado: %s" % String(r.get("reason", "?"))
+		market_msg.text = tr("Rejected: %s") % String(r.get("reason", "?"))
 	meta.persist()
 	_refresh_market()
 

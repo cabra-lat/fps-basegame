@@ -516,6 +516,17 @@ func _focus_corpse_inventory(container: InventoryContainer) -> void:
 			corpse_ui = ui
 	if corpse_ui == null:
 		return
+	# The frame here is load-bearing and stays. An earlier version skipped it
+	# when the corpse panel looked like it was already in view; both attempts at
+	# that were wrong (the first guarded on where the VIEWPORT is, the second on
+	# a count that the panel column does not share), and a wrong guard here makes
+	# the corpse silently invisible. Reverted on QA's instruction, with the
+	# numbers recorded so nobody re-derives it:
+	#   this await costs one frame, ~16.7 ms at 60 fps
+	#   inventory-ux's node-reuse on the same path took 87.6 ms -> 1.6 ms
+	# Optimising the 16.7 ms is not worth a behaviour change whose correct form
+	# depends on pooled-UI ownership in another lane. If it is ever worth it, the
+	# red arm now exists: validate_inventory_ux's _check_corpse_panel_scroll().
 	await get_tree().process_frame
 	if not _inventory_open() or not is_instance_valid(corpse_ui):
 		return
@@ -646,8 +657,16 @@ func _winner_text() -> String:
 	return _result_adapter.winner_text(game_mode, PLAYER_ID)
 
 func _respawn_bot_later() -> void:
-	# NpcBot despawns itself; spawn a wave replacement after respawn_delay.
-	await get_tree().create_timer(game_mode.respawn_delay).timeout
+	# NpcBot despawns itself; spawn a wave replacement after the mode's
+	# bot-replacement delay. That is SEPARATE from the player's respawn_delay on
+	# purpose: the arena can be told (per server, in the mode .tres) that a
+	# reinforcement enters the fight immediately while the player still takes
+	# the 3 s breather. At 0.0 the guard below is still a POST-YIELD guard (a
+	# zero timer yields rather than resuming inline, measured), so the ordinary
+	# case is covered. The accepted edge of "enter immediately": a match that
+	# ends in the same frame as the kill can now spawn a replacement where the
+	# 3 s breather used to hide it. That is the price of the ruling, not a bug.
+	await get_tree().create_timer(game_mode.effective_bot_respawn_delay()).timeout
 	if not is_inside_tree() or _match_over or _raid_over:
 		return
 	var index := _bot_seq + 1

@@ -103,6 +103,7 @@ func _process(_delta: float) -> bool:
 		# NOT _done yet: the TDM section below still has to run (the gate only ends
 		# in the block after TDM_CHECK_FRAME).
 		_tdm_started = true
+		_check_bot_replacement_pacing()
 		_check_nobody_launched()
 		_check_mid_raid_bots_landed()
 		_check_free_spawn_dedup()
@@ -115,6 +116,76 @@ func _process(_delta: float) -> bool:
 		_cleanup_and_quit(v.finish())
 		return true
 	return false
+
+
+# ─── [0] BOT-REPLACEMENT PACING (data, not code) ──────
+
+# The user reported "death is too slow" and ruled that bot replacements should
+# read as reinforcements entering an in-progress fight, with the pacing chosen
+# per server in a .tres. The bug this catches is the one that made that
+# impossible to express: bot replacement sharing the PLAYER's respawn_delay, so
+# "replacement enters immediately" would also have meant "player back in 0 s".
+func _check_bot_replacement_pacing() -> void:
+	v.section("[bot-replacement pacing: mode .tres + effective delay]")
+	var ffa := FFAMode.new()
+	# -1.0 means "no server opinion" and must fall back to the match breather,
+	# which is the behaviour that existed before the field did.
+	ffa.bot_respawn_delay = -1.0
+	v.check(is_equal_approx(ffa.effective_bot_respawn_delay(), ffa.respawn_delay),
+		"bot_respawn_delay = -1.0 follows respawn_delay (%.1fs)" % ffa.respawn_delay)
+	ffa.bot_respawn_delay = 0.0
+	v.check(is_zero_approx(ffa.effective_bot_respawn_delay()),
+		"bot_respawn_delay = 0.0 is honoured immediately (player keeps respawn_delay = %.1fs)"
+		% ffa.respawn_delay)
+	ffa.bot_respawn_delay = 1.0
+	v.check(is_equal_approx(ffa.effective_bot_respawn_delay(), 1.0),
+		"an intermediate breather (1.0s) is a server value, not a special case")
+
+	# The shipped per-server files must load as real GameModes: this is the
+	# "configurable per server" contract, and a typo'd path must not silently
+	# fall back to code defaults forever.
+	for pair in [["ffa", 0.0], ["tdm", -1.0]]:
+		var path := "res://resources/modes/arena_%s.tres" % pair[0]
+		v.check(ResourceLoader.exists(path), "%s exists" % path)
+		var mode := load(path) as GameMode
+		v.check(mode != null, "%s loads as a GameMode" % path)
+		if mode == null:
+			continue
+		v.check(is_equal_approx(mode.bot_respawn_delay, float(pair[1])),
+			"%s ships bot_respawn_delay = %.1f" % [path, mode.bot_respawn_delay])
+		v.check(mode.respawn_delay > 0.0,
+			"%s keeps the player respawn_delay = %.1fs" % [path, mode.respawn_delay])
+
+	# The stronger, genuinely behavioural half: evaluate the SENTINEL on the
+	# LOADED resource, so the file -> sentinel -> effective-value path is covered
+	# end to end. This is what catches the real bug class here (a .tres that
+	# exists and parses but whose value never reaches the caller). It still does
+	# not prove a timer ever fires.
+	#
+	# Note the expectation is the EFFECTIVE delay, not the raw field: tdm ships
+	# -1.0 ("no opinion") and must therefore resolve to its own 4 s breather.
+	# Asserting -1.0 here would have passed a sentinel that never resolved at
+	# all, which is the same class of vacuous check as the tripwire below.
+	for pair in [["ffa", 0.0], ["tdm", 4.0]]:
+		var mode := load("res://resources/modes/arena_%s.tres" % pair[0]) as GameMode
+		if mode == null:
+			continue
+		v.check(is_equal_approx(mode.effective_bot_respawn_delay(), float(pair[1])),
+			"arena_%s.tres resolves to an effective bot delay of %.1fs" % [pair[0], float(pair[1])])
+		v.check(mode.respawn_delay > 0.0,
+			"arena_%s.tres keeps a non-zero PLAYER respawn_delay (%.1fs)" % [pair[0], mode.respawn_delay])
+
+	# TRIPWIRE, NOT COVERAGE. This proves a string appears in a file. It does not
+	# prove the .tres value reaches create_timer, that the call site is live, or
+	# that any bot is ever spawned. It exists to catch an accidental un-wiring
+	# (a rename, a dead path, a second call site bypassing the accessor) and must
+	# never be counted as behaviour proof.
+	var src := FileAccess.get_file_as_string("res://scenes/arena_manager_gameplay.gd")
+	v.section("[bot-replacement pacing: wiring tripwire (not behaviour proof)]")
+	v.check(src.contains("effective_bot_respawn_delay()"),
+		"TRIPWIRE: the arena's replacement timer reads effective_bot_respawn_delay()")
+	v.check(not src.contains("create_timer(game_mode.respawn_delay)"),
+		"TRIPWIRE: no path left where a bot replacement waits on the PLAYER's respawn_delay")
 
 
 func _cleanup_and_quit(code: int) -> void:

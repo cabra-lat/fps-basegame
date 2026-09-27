@@ -9,6 +9,13 @@ extends Resource
 ##   score_limit: int
 ##   time_limit: float          # seconds, 0 = no limit
 ##   respawn_delay: float
+##     THE PLAYER'S respawn. Also still read by src/npcs/wave_spawner.gd for WAVE
+##     population pacing — that is deliberate and not an oversight: a wave is
+##     match population, a corpse replacement is a reinforcement, and they are
+##     paced separately (see bot_respawn_delay). Touch either side, keep them
+##     apart.
+##   bot_respawn_delay: float   # additive, 2026: -1.0 = follow respawn_delay
+##                             # (effective_bot_respawn_delay() is the accessor)
 ##   friendly_fire: bool
 ##   on_kill(killer_id, victim_id, victim_team) -> void
 ##   is_match_over() -> bool
@@ -24,7 +31,22 @@ extends Resource
 @export var score_limit: int = 25
 @export var time_limit: float = 0.0
 @export var respawn_delay: float = 3.0
+## Bot-replacement pacing, kept SEPARATE from respawn_delay because that field is
+## also the PLAYER's respawn (see _respawn_player). A server that wants a
+## reinforcement to enter the fight the moment a bot dies does not want the
+## player back in 0 s, and that coupling is the whole reason this is its own
+## field rather than a tuning constant in the arena.
+##   -1.0 = "no opinion" -> follow respawn_delay (behaviour before this field).
+##    0.0 = the replacement enters immediately.
+## The real values live in the mode .tres (resources/modes/<mode>.tres), not in
+## code: pacing is data, so a server ships its own file and touches no script.
+@export var bot_respawn_delay: float = -1.0
 @export var friendly_fire: bool = false
+
+## Effective bot-replacement delay: bot_respawn_delay when a server set one,
+## else respawn_delay. Single place the "follow the match breather" rule lives.
+func effective_bot_respawn_delay() -> float:
+	return respawn_delay if bot_respawn_delay < 0.0 else bot_respawn_delay
 
 ## Spawn points injected by the level (arena markers). Not part of the frozen
 ## contract's signature, but get_spawn() needs them.
