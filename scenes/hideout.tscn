@@ -1,0 +1,46 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/hideout_controller.gd" id="1_ctrl"]
+[ext_resource type="Script" path="res://scenes/hideout_ui.gd" id="2_ui"]
+
+[node name="Hideout" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ctrl")
+
+[node name="Panel" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_ui")
+
+[node name="Title" type="Label" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Recovered goods"
+
+[node name="Summary" type="Label" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Rows" type="VBoxContainer" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnResolve" type="Button" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "collect"
+
+[node name="BtnBack" type="Button" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "back"

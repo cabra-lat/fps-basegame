@@ -5,6 +5,7 @@ extends Control
 ## UI clicks via shared GameAudio (UI bus pool).
 
 const HUB_SCENE := "res://scenes/operations_hub.tscn"
+const HIDEOUT_SCENE := "res://scenes/hideout.tscn"
 
 var audio: GameAudio
 var settings: Dictionary
@@ -20,6 +21,7 @@ func _ready() -> void:
 	($Menu/BtnPlay as Button).pressed.connect(_on_play)
 	($Menu/BtnPlay as Button).pressed.connect(audio.play_ui)
 	($Menu/BtnHub as Button).pressed.connect(_on_hub)
+	($Menu/BtnHideout as Button).pressed.connect(_on_hideout)
 	($Menu/BtnHub as Button).pressed.connect(audio.play_ui)
 	($Menu/BtnSettings as Button).pressed.connect(_on_open_settings)
 	($Menu/BtnSettings as Button).pressed.connect(audio.play_ui)
@@ -32,6 +34,13 @@ func _on_play() -> void:
 
 func _on_hub() -> void:
 	get_tree().change_scene_to_file(HUB_SCENE)
+
+
+## cf9448: the hideout is a ROUTE IN, not an orphan scene. A screen that exists with
+## no way in is the same failure as the unconnected gunsmith request signals, and
+## the acceptance for that card is the route rather than the screen internals.
+func _on_hideout() -> void:
+	get_tree().change_scene_to_file(HIDEOUT_SCENE)
 
 
 func _on_quit() -> void:
