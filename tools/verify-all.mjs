@@ -123,6 +123,11 @@ mkdirSync(logDir, { recursive: true });
 // paths is how the stale res://test/... registration hid in CI.
 const HARNESS_SCRIPTS = [
   ['check_scripts', 'res://addons/cabra.lat_shooters/test/check_scripts.gd'],
+  // Source-level guard: every print in grid.gd must sit behind the build check.
+  // grid.gd shipped 31 bare prints and the logging-bound refusal cost reached
+  // release, because a convention with no instrument is not a rule. Registered
+  // here so it is a gate, not a note. See card task_1790474085894_2f12c9.
+  ['no_bare_prints', 'res://addons/cabra.lat_shooters/test/check_no_bare_prints.gd'],
   ['assets', 'res://addons/cabra.lat_shooters/test/validate_assets.gd'],
   ['ballistics', 'res://addons/cabra.lat_shooters/test/validate_ballistics.gd'],
   ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
