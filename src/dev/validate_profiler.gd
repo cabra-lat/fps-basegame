@@ -14,6 +14,8 @@
 #   [I] the F8 overlay toggle works and the overlay never paints a 0 for a gap
 #   [J] the opt-in shutdown dump: off by default, hooked only when asked, and
 #       schema-identical to the F9 path with the not_sampled rule intact
+#   [K] the mon == -1 exit of the not-sampled rule: an engine monitor that does
+#       not resolve must degrade to a NAMED hole, never to a number
 #
 # [J] PROVES THE AFFORDANCE'S CONTRACT, NOT THE ENGINE'S DELIVERY. It calls the
 # shutdown handler directly and checks the file it writes. That the engine
@@ -68,6 +70,7 @@ func _process(_delta: float) -> bool:
 	_h_instrumentation_faults()
 	_i_overlay()
 	_j_dump_on_exit()
+	_k_monitor_miss_is_a_hole()
 
 	v.finish()
 	quit(v.failed)
@@ -490,6 +493,64 @@ func _j_dump_on_exit() -> void:
 		p.queue_free()
 	if is_instance_valid(quiet):
 		quiet.queue_free()
+## [K] The mon == -1 exit of the not-sampled rule.
+##
+## QA found this by breaking the branch and observing that the gate still
+## reported the same count and PASS. The rule was correct on that exit and
+## nothing reached it — the fourth hole tonight of the shape "no assertion
+## reaches it". It is reachable in production for a reason that is not
+## hypothetical: monitor names are resolved by NAME through ClassDB at runtime
+## precisely so that a rename or removal in a future engine degrades to a
+## visible "not sampled" instead of a parse error. If that degradation is the
+## designed behaviour, the behaviour needs a test.
+##
+## Both directions are asserted, because asserting only the not_sampled side
+## would pass just as happily if _entry_for() returned not_sampled for
+## everything.
+func _k_monitor_miss_is_a_hole() -> void:
+	_reset_instrument()
+	# Plain construction, never attached: [K] is about _entry_for()'s return value
+	# and needs no SceneTree, no opt-in and no accumulated state, so this section
+	# cannot be affected by how the profiler was brought up.
+	var p: Profiler = Profiler.new()
+
+	# A monitor name this engine does not have. Any id outside monitor_name()'s
+	# match list resolves to "", and "" to -1, which is the branch under test.
+	var missing := ProfilerSubsystems.Entry.new(
+		&"no_such_monitor", "a monitor this engine does not have",
+		ProfilerSubsystems.Source.ENGINE_MONITOR, "Performance.TIME_NOT_A_REAL_MONITOR")
+	v.check(missing.monitor_name() == "" and missing.monitor() == -1,
+		"precondition: an unresolvable monitor name yields -1, so this exercises the real branch (name='%s')" % missing.monitor_name())
+
+	var e := p._entry_for(missing, {})
+	v.check(e.get("state") == "not_sampled",
+		"an engine monitor that does not resolve reports not_sampled (got '%s')" % str(e.get("state")))
+	v.check(not e.has("value"),
+		"and carries NO value key — a missing monitor is a hole, not a 0.0 (keys: %s)" % str(e.keys()))
+	v.check(not e.has("mean"), "and no mean either, which is how a zero would arrive wearing a hat")
+	v.check(String(e.get("reason", "")).contains("no_such_monitor"),
+		"and the reason NAMES the subsystem, so the hole says which hole it is (reason: %s)" % str(e.get("reason")))
+
+	# The other direction: an id that DOES resolve must still produce a number.
+	# Without this, the checks above would be satisfied by a _entry_for() that
+	# reports not_sampled unconditionally.
+	var real_id := &"process_total"
+	var real_entry: ProfilerSubsystems.Entry = null
+	for x in ProfilerSubsystems.entries():
+		if x.id == real_id:
+			real_entry = x
+			break
+	v.check(real_entry != null, "the registry still contains a resolvable engine-monitor id")
+	if real_entry != null:
+		v.check(real_entry.monitor() != -1, "and it resolves in THIS engine (%s)" % real_entry.monitor_name())
+		var r := p._entry_for(real_entry, {})
+		v.check(r.get("state") == "sampled",
+			"a resolvable monitor still reports sampled (got '%s')" % str(r.get("state")))
+		v.check(r.has("value") and typeof(r["value"]) in [TYPE_FLOAT, TYPE_INT],
+			"with a numeric value, so [K] is not satisfied by blanket not_sampled")
+
+	_reset_instrument()
+
 ## Puts the instrument back to how a release build looks: no instance, recorder
 ## inert, no accumulated state.
 func _reset_instrument() -> void:

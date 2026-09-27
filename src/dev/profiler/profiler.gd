@@ -220,7 +220,15 @@ func _entry_for(entry: ProfilerSubsystems.Entry, scopes: Dictionary) -> Dictiona
 	if entry.source == ProfilerSubsystems.Source.ENGINE_MONITOR:
 		var mon := entry.monitor()
 		if mon == -1:
-			return {"state": "not_sampled", "reason": "registry declares no monitor for this id", "samples": 0}
+			# One line, and it is here because the REASON is the deliverable. The
+			# rule (no samples -> no value key) was already correct on this exit;
+			# what was missing was any assertion that could reach it, so a
+			# regression here would have been invisible — the gate reports the
+			# same count and PASS. The reason now names the id and the monitor it
+			# looked for, because "not sampled" is only actionable if it says what
+			# was missing: an engine that renames or drops a monitor degrades this
+			# entry to a hole, and the hole should say which hole.
+			return {"state": "not_sampled", "reason": "this engine has no Performance monitor named '%s' for '%s'" % [entry.monitor_name(), entry.id], "samples": 0}
 		var raw: float = float(Performance.get_monitor(mon))
 		# Engine monitors are seconds; counts and latencies keep their own unit.
 		var value := raw if entry.metric != "time" else raw * 1000.0
