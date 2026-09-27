@@ -525,6 +525,47 @@ func _scenario_hub_deploy_contract() -> void:
 	broke_service.grant_starter_loadout(starter)
 	_check(broke.currency == 5000, "a grant never reduces an existing balance (got %d)" % broke.currency)
 
+	# THE DEATH POLICY LANDS A REAL CALLER, AND IT MAKES THE OVERWRITE FIX LIVE.
+	# Re-based onto main 06f0f25, which carries DeathPolicy: _apply_regrant() calls
+	# grant_starter_loadout() on a REGRANT loss. That is a SECOND production call
+	# site, at death rather than at first deploy, and it means the skip added for
+	# e3646d is no longer guarding a function nobody can reach.
+	#
+	# The shipped death_policy.tres sets loss = 0, which is Loss.CONSUME, so the
+	# regrant does not fire by default. A game that sets REGRANT does fire it, and on
+	# that path the loadout has just been rebuilt from the SAFE POCKET and the
+	# leftovers -- the items the death policy promises to keep. Without the skip, the
+	# regrant would overwrite them with the starter.
+	var policy := DeathPolicy.new()
+	policy.loss = DeathPolicy.Loss.REGRANT
+	policy.starter = starter
+	var policy_service := MetaService.new()
+	var policy_path := TEST_DIR + "/death_regrant.save"
+	ProfileStore.delete(policy_path)
+	policy_service.save_path = policy_path
+	var policy_profile := MetaProfile.new()
+	policy_service.use_profile(policy_profile, policy_path)
+	policy_service.set_death_policy(policy)
+	# The pocket survives a death, so it occupies a slot when the regrant arrives.
+	policy_profile.loadout["primary"] = [ItemCodec.encode_item(ItemCodec.item_from_path(PLAYER_GUN_PATH))]
+	var pocket_primary: Array = policy_profile.loadout["primary"].duplicate(true)
+	policy_profile.role_state()["starter_granted"] = false
+	policy_service.grant_starter_loadout(starter)
+	# THE OCCUPIED SLOT, not the whole loadout. Asserting the entire signature was my
+	# first attempt and it failed for a reason that is the fix WORKING: the grant
+	# legitimately fills the EMPTY secondary slot, so the loadout grows and the
+	# signature changes. A whole-loadout assertion would have demanded the regrant do
+	# nothing at all, which is a different and wrong contract.
+	_check(policy_profile.loadout["primary"] == pocket_primary,
+		"CONSTRUCTED BREAK: on the REGRANT path the OCCUPIED safe-pocket slot is not overwritten by the starter, because the grant skips a slot the player fills")
+	_check(policy_profile.loadout.has("secondary") and (policy_profile.loadout["secondary"] as Array).size() > 0,
+		"while an EMPTY slot is still filled, so the skip protects the pocket without turning the regrant into a no-op")
+	_check(policy_service.death_policy.loss == DeathPolicy.Loss.REGRANT,
+		"and the policy under test really is REGRANT, so the check above is not passing against a CONSUME default that never calls the grant")
+	var shipped := load("res://resources/meta/death_policy.tres") as DeathPolicy
+	_check(shipped != null and shipped.loss == DeathPolicy.Loss.CONSUME,
+		"the SHIPPED default is CONSUME, so the regrant is a game-set policy rather than something a player hits today -- stated so the live path is not overstated")
+
 	# ONCE PER FACTION, which is the documented promise and needs two factions to
 	# mean anything: one grant on the starting faction, a second on another, and a
 	# refusal when returning to the first.
