@@ -853,3 +853,22 @@ msgstr ""
 msgid "This Attachment is the default one."
 
 msgstr ""
+
+# ── A FIXTURE, WHICH IS A RESIDUE ON PURPOSE AND NOT A DEBT ─────────────────
+# "FIXTURE untranslated designation" is the registry key of
+# resources/meta/fixtures/fixture_untranslated.tres, a test fixture registered
+# in ItemNames so that a harness can exercise the REGISTERED-BUT-UNTRANSLATED branch
+# of a translation-marking screen.
+#
+# IT MUST NEVER BE TRANSLATED, which is the entire reason it exists. The harnesses
+# used to point that branch at Brazil_556.tres, a real product designation, and the
+# day Brazil 556 was translated -- correctly -- the branch lost its subject and two
+# harnesses went red for a reason unrelated to what they test. A fixture borrowed
+# from the product catalogue is a fixture with a timer on it.
+#
+# So the empty msgstr below is a DECISION, recorded rather than left implicit. Both
+# harnesses assert the key is still absent from the catalogue, so translating it by
+# accident fails loudly instead of quietly emptying a branch.
+
+msgid "FIXTURE untranslated designation"
+msgstr ""

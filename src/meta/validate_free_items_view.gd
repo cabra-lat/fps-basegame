@@ -98,11 +98,24 @@ func _initialize() -> void:
 	# unregistered branch, and the registered-but-untranslated branch -- 42 of the
 	# 50 registered ids, and the one that matters at scale -- was never tested.
 	# Brazil_556 is registered, has a real .tres, and has no msgid.
-	var registered_untranslated := preload("res://resources/weapons/Brazil_556.tres")
-	_check(ItemNames.id_for_path(registered_untranslated.resource_path) == "Brazil_556",
-		"Brazil_556 is confirmed REGISTERED, so it reaches the translate comparison the previous fixture skipped")
-	_check(TranslationServer.translate(ItemNames.key_for("Brazil_556")) == ItemNames.key_for("Brazil_556"),
+	#
+	# NO LONGER BRAZIL_556. It used to be, and that was a fixture with a timer on it:
+	# Brazil 556 is a real product designation, so the day it was translated --
+	# correctly, and as a matter of course -- this harness went red for a reason that
+	# had nothing to do with what it tests. The subject is now
+	# resources/meta/fixtures/fixture_untranslated.tres, whose registry key
+	# game.po carries with a deliberately empty msgstr recorded in the RESIDUE block.
+	var registered_untranslated := preload("res://resources/meta/fixtures/fixture_untranslated.tres")
+	_check(ItemNames.id_for_path(registered_untranslated.resource_path) == "fixture_untranslated",
+		"the untranslated fixture is confirmed REGISTERED, so it reaches the translate comparison the previous fixture skipped")
+	_check(TranslationServer.translate(ItemNames.key_for("fixture_untranslated")) == ItemNames.key_for("fixture_untranslated"),
 		"and confirmed UNTRANSLATED, so the mark below is a real branch rather than a coincidence")
+	# AND IT IS STILL A FIXTURE. If the key ever gains a msgstr the middle branch
+	# silently empties and the check below passes on two branches, so the property the
+	# fixture rests on is asserted by name rather than assumed.
+	_check(TranslationServer.translate(ItemNames.key_for("fixture_untranslated"))
+			== ItemNames.key_for("fixture_untranslated"),
+		"THE FIXTURE IS STILL UNTRANSLATED: if this fails, someone gave \"FIXTURE untranslated designation\" a msgstr, so this branch needs a new fixture -- do not fix it by translating the fixture")
 	ins.register_loss([ItemCodec.encode_item(_item(registered_untranslated))], profile)
 	# And one that is not registered at all: 12_70_8.5mm_Magnum_buckshot is one of
 	# the 69 items deliberately left out (its id is truncated).

@@ -34,6 +34,11 @@ const KEYS := {
 	"salewa_first_aid_kit": "First Aid Kit",
 	"marked_intel": "Marked Intel",
 	"Brazil_556": "Brazil 556",
+	# A TEST FIXTURE, and the only entry here that is registered on purpose WITHOUT a
+	# translation: see resources/meta/fixtures/fixture_untranslated.tres for why the
+	# untranslated path needs a subject that will never be translated. game.po carries
+	# this key with a deliberately EMPTY msgstr, recorded in the RESIDUE block.
+	"fixture_untranslated": "FIXTURE untranslated designation",
 	"GOST_BR1": "GOST BR1",
 	"GOST_BR2": "GOST BR2",
 	"GOST_BR3": "GOST BR3",

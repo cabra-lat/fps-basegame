@@ -13,7 +13,7 @@ extends SceneTree
 ## the registry at all, so the "translated" branch was never reachable and the
 ## three-branch check silently degenerated into 0/1/2.
 const AMMO := preload("res://resources/weapons/M4_Carbine.tres")                ## registered + translated
-const BRAZIL := preload("res://resources/weapons/Brazil_556.tres")            ## registered, untranslated
+const UNTRANSLATED_FIXTURE := preload("res://resources/meta/fixtures/fixture_untranslated.tres")  ## registered BY DESIGN, untranslated forever
 const BUCKSHOT := preload("res://resources/ammo/12_70_8.5mm_Magnum_buckshot.tres")  ## deliberately unregistered
 
 var _pass := 0
@@ -79,7 +79,7 @@ func _run() -> void:
 
 	# ── stored rows carry registry identity, never a display string ─────────
 	_put(p, AMMO, 3)
-	_put(p, BRAZIL)
+	_put(p, UNTRANSLATED_FIXTURE)
 	_put(p, BUCKSHOT)
 	var rows := view.rows()
 	_check(rows.size() == 3, "one row per stored item (got %d)" % rows.size())
@@ -121,6 +121,22 @@ func _run() -> void:
 	_check(unregistered == 1 and untranslated == 1 and translated == 1,
 		"all THREE identity branches are exercised: %d translated, %d registered-but-untranslated, %d unregistered"
 			% [translated, untranslated, unregistered])
+	# THE FIXTURE IS STILL A FIXTURE. The middle branch needs an item that is
+	# registered and untranslated, and it used to borrow one from the product
+	# catalogue (Brazil_556.tres). That is a fixture with a timer on it: the day
+	# Brazil 556 was translated -- correctly, and as a matter of course -- this
+	# check went red for a reason that had nothing to do with what it tests. The
+	# subject is now resources/meta/fixtures/fixture_untranslated.tres, whose
+	# registry key game.po carries with a deliberately empty msgstr.
+	#
+	# So assert the property the whole fixture rests on. If someone translates the
+	# key, this fails by name instead of the middle branch quietly degenerating to
+	# 0 and the three-branch check passing on two branches.
+	_check(ItemNames.id_for_path(UNTRANSLATED_FIXTURE.resource_path) == "fixture_untranslated",
+		"the untranslated fixture is REGISTERED (a fixture nothing can resolve is not a fixture)")
+	_check(TranslationServer.translate(ItemNames.key_for("fixture_untranslated"))
+			== ItemNames.key_for("fixture_untranslated"),
+		"THE FIXTURE IS STILL UNTRANSLATED: if this fails, someone gave \"FIXTURE untranslated designation\" a msgstr, so the registered-but-untranslated branch no longer has a subject and needs a new fixture -- do not fix it by translating this item")
 	_check(ItemNames.id_for_path(BUCKSHOT.resource_path) == "",
 		"the buckshot fixture is confirmed UNREGISTERED, so its branch is real")
 	_check(view.reason_key_for(BUCKSHOT.resource_path) == StashView.REASON_UNREGISTERED_KEY,
@@ -197,11 +213,11 @@ func _run() -> void:
 		pol.loss = loss_mode
 		pol.recoverable = rec
 		if in_pocket:
-			pol.safe_pocket = [BRAZIL.resource_path]
+			pol.safe_pocket = [UNTRANSLATED_FIXTURE.resource_path]
 		var prof := _profile()
-		prof.loadout = {"primary": [{"path": BRAZIL.resource_path}]}
+		prof.loadout = {"primary": [{"path": UNTRANSLATED_FIXTURE.resource_path}]}
 		var kept: bool = pol.partition(prof.loadout)["lost"].is_empty()
-		var asked: bool = StashView.new(prof, pol).is_kept_on_death(BRAZIL.resource_path)
+		var asked: bool = StashView.new(prof, pol).is_kept_on_death(UNTRANSLATED_FIXTURE.resource_path)
 		_agreements.append("%s: partition=%s keeps=%s want=%s" % [label, kept, asked, expected])
 		_check(kept == asked and kept == expected,
 			"the two entry points AGREE and both give the right answer -- %s (partition=%s keeps=%s)"
