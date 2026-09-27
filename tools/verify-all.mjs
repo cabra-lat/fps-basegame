@@ -391,20 +391,30 @@ function gateUidTracking() {
     const scripts = files.filter((file) => /\.(gd|gdshader|gdshaderinc)$/.test(file) && !file.split('/').some((part) => part.startsWith('.')));
     const uids = new Set(files.filter((file) => /\.uid$/.test(file) && !file.split('/').some((part) => part.startsWith('.'))));
     const missing = scripts.map((file) => `${file}.uid`).filter((file) => !uids.has(file));
-    const scriptSet = new Set(scripts);
-    const orphan = [...uids].filter((file) => !scriptSet.has(file.replace(/\.uid$/, '')));
+    // A .uid belongs to a RESOURCE, and a resource is not only a script: a
+    // .gdextension, .tscn or .tres all get one, and Godot writes it as a
+    // sibling (`foo.gdextension` -> `foo.gdextension.uid`). Testing the uid
+    // against the SCRIPT set reported the descriptor's own uid as orphaned the
+    // first time a GDExtension was tracked — verifier, addons/libik/
+    // libik.gdextension.uid — which is a false positive, and a gate that
+    // reports false positives trains people to ignore the gate. The forward
+    // direction still uses `scripts` on purpose, because only scripts get a
+    // generated .uid; the reverse direction asks a different question, "does
+    // this uid's target exist", and the target need not be a script.
+    const resourceSet = new Set(files.filter((file) => !file.split('/').some((part) => part.startsWith('.'))));
+    const orphan = [...uids].filter((file) => !resourceSet.has(file.replace(/\.uid$/, '')));
     const count = missing.length + orphan.length;
     total += count;
     if (count) {
       details.push(`${repo}:${count}`);
       for (const file of missing) writeFileSync(list, `${repo}/${file.replace(/\.uid$/, '')} (script without .uid)\n`, { flag: 'a' });
-      for (const file of orphan) writeFileSync(list, `${repo}/${file} (uid without script)\n`, { flag: 'a' });
+      for (const file of orphan) writeFileSync(list, `${repo}/${file} (uid without a tracked resource)\n`, { flag: 'a' });
     }
   }
   const skipNote = skipped.length ? `; SKIPPED (no git checkout): ${skipped.join(' ')}` : '';
   if (!checked) record('uid_tracking', 'SKIP', `no git checkout to check (skipped: ${skipped.join(' ') || 'none'})`);
-  else if (total) record('uid_tracking', 'FAIL', `${total} tracked script(s) without a tracked .uid (${details.join(' ')}) — list in ${list}${skipNote}`);
-  else record('uid_tracking', 'PASS', `every tracked script in ${checked} repo(s) has a tracked .uid${skipNote}`);
+  else if (total) record('uid_tracking', 'FAIL', `${total} uid/script pairing problem(s) (${details.join(' ')}) — a script without a .uid, or a .uid whose resource is not tracked (an orphan .uid makes --import try to open a missing file) — list in ${list}${skipNote}`);
+  else record('uid_tracking', 'PASS', `every tracked script in ${checked} repo(s) has a tracked .uid, and every tracked .uid has a tracked resource${skipNote}`);
 }
 
 async function reimportAfterHarness(name) {
