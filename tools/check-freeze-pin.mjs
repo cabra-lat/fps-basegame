@@ -478,5 +478,3 @@ function exitCodeFor(couldNotRun, needsHuman, strict) {
   return strict && needsHuman ? 1 : 0;
 }
 process.exit(exitCodeFor(couldNotRun, needsHuman, strict));
-
-// probe
