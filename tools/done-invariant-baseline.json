@@ -1,12 +1,22 @@
 {
-  "_comment": "KNOWN done_at invariant violations, accepted and NAMED - not the same as fixed.",
+  "_rules": {
+    "purpose": "KNOWN done_at invariant violations that somebody has accepted and NAMED. Acknowledged is not the same as fixed, and nothing here claims it is fixed.",
+    "why_a_baseline_at_all": "The sweep was red for one violation whose owner has an open question about it. A gate that is red for a reason already accepted is a gate people learn to ignore, and after that the next real violation is missed too.",
+    "key_is": "id + status + done_at. NOT the id alone. An entry expires the moment the card drifts, so this cannot become a permanent amnesty for a card nobody looked at.",
+    "MUST_SAY_IN_WHY": "who the owner is AND that they were ASKED. A baseline entry naming no owner is a suppression, not an acknowledgement.",
+    "cap": "Fewer than 5 entries. If a sweep needs a sixth, the tool is wrong or the corpus is in a state a human should look at - do not add the entry. The cheapest way to make a gate green tomorrow is to baseline whatever it says, and the gate dies of that habit rather than of any single entry.",
+    "maintenance": "Every run prints baseline entries that match no card. Those are STALE: the card is clean, so remove the entry. Stale entries do not fail the run - a repair must not turn a green gate red - but they are never silent.",
+    "stale_one_so_far": "None. The entry below was live when committed."
+  },
   "known": [
     {
       "id": "task_1790452331402_0273c0",
       "status": "blocked",
       "done_at": "2026-09-27T01:37:46.824Z",
       "owner": "range",
-      "why": "claim landed 2m03s after completion; the card carries done_at while blocked. NOT repaired - range's to answer. The write-time guard (herdr-plugin-amq 5948c25) refuses further writes to it, so it cannot get worse; this baseline exists only so the sweep can run as a gate without being permanently red for a violation someone has already accepted."
+      "owner_asked": false,
+      "baselined_on": "2026-09-27",
+      "why": "A claim landed 2m03s after completion, so the card carries done_at while its status is blocked. NOT repaired - range has an open question about it. The write-time transition guard (herdr-plugin-amq 01aad98 for claims, 4b6ad21 for edges) refuses further STATE CHANGES to it, so it cannot become more contradictory. It does NOT refuse note appends or deletion: appendBoardTaskNote and deleteBoardTask write the card file directly and never reach the guard, so range CAN still annotate the card and the card CAN still be deleted. An earlier version of this field said the guard 'refuses further writes, so it cannot get worse', which is not true and would have told a future maintainer the card is frozen - the one thing this entry must not do, while its own owner has an open question about it."
     }
   ]
 }

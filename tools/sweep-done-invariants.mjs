@@ -50,7 +50,8 @@ function readField(content, field) {
 
 export function sweepBus(busDir, known = new Map()) {
   const hits = { claimedAfterDone: [], doneWithoutRecord: [], statusDoneWithoutDoneAt: [] };
-  let scanned = 0, wellFormed = 0, legacy = 0, knownCount = 0;
+  let scanned = 0, wellFormed = 0, legacy = 0, legacyExemptWithDoneAt = 0, knownCount = 0;
+  const matched = new Set();
 
   let stages = [];
   try {
@@ -87,27 +88,51 @@ export function sweepBus(busDir, known = new Map()) {
       //
       // So a card is MODERN if the current writer left any of its stamps behind. Only modern
       // cards are held to the invariant; legacy ones are counted and named, never failed on.
+      //
+      // BUT A CARD CARRYING done_at IS ALWAYS TESTED, even if it predates every other stamp.
+      // 13 cards on the live bus carry a completion record with no status_at, and the old rule
+      // exempted them for that reason alone - which is an accident of which fields the current
+      // writer happens to leave behind, not a property of the invariant. A card with a
+      // completion record is exactly the card the invariant is about. Exempting it means that if
+      // one is ever revived, the sweep cannot see it. All 13 currently satisfy the invariant
+      // (ballistics checked each), so testing them costs no coverage and moves no number today -
+      // which is the point: it closes a gap where a future violation would be invisible.
       const modern = claimedAt !== null || readField(content, "blocked_at") !== null ||
         readField(content, "status_at") !== null || readField(content, "next_actor_at") !== null;
-      if (!modern) { legacy++; continue; }
+      if (!modern && doneAt === null) { legacy++; continue; }
+      if (!modern) legacyExemptWithDoneAt++;
 
       // The invariant, both halves.
       if (status !== "done" && doneAt) {
         const afterClaim = Boolean(claimedAt && claimedAt > doneAt);
         const h = { id, rel, status, doneAt, claimedAt };
-        if (known.has(`${id}|${status}|${doneAt}`)) { knownCount++; continue; }
+        if (known.has(`${id}|${status}|${doneAt}`)) { knownCount++; matched.add(`${id}|${status}|${doneAt}`); continue; }
         (afterClaim ? hits.claimedAfterDone : hits.statusDoneWithoutDoneAt).push(h);
         continue;
       }
       if (status === "done" && !doneAt) {
-        if (known.has(`${id}|${status}|`)) { knownCount++; continue; }
+        if (known.has(`${id}|${status}|`)) { knownCount++; matched.add(`${id}|${status}|`); continue; }
         hits.doneWithoutRecord.push({ id, rel, status });
         continue;
       }
       wellFormed++;
     }
   }
-  return { scanned, wellFormed, legacy, knownCount, hits, stages };
+  // A BASELINE ENTRY THAT MATCHES NOTHING IS STALE, AND MUST BE REPORTED.
+  //
+  // My own claim that the baseline "is not a rug" was, until this line, only half-checked: the
+  // key expires when a card drifts (ballistics' arm 2) and does not match a different card (arm 3),
+  // but NOTHING ever iterated the baseline's own keys. So the moment 0273c0 is repaired - which
+  // is the expected outcome of range answering - its entry would silently stop firing and the run
+  // would print known=0, new=0, exit 0: a clean pass with a dead suppression still in the repo.
+  // That is the precise failure I said I wanted to avoid, one repair away from happening quietly.
+  //
+  // Exit 0 on a stale entry is deliberate. The entry is harmless once its card is clean; failing
+  // would mean a repair turns a green gate red, which is a second bad outcome. The fix is to
+  // REMOVE it. What is not acceptable is silence, because a baseline that can accumulate dead
+  // entries without ever mentioning them is a suppression nobody is maintaining.
+  const stale = [...known.keys()].filter((k) => !matched.has(k));
+  return { scanned, wellFormed, legacy, legacyExemptWithDoneAt, knownCount, stale, hits, stages };
 }
 
 /**
@@ -154,7 +179,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const n = (k) => r.hits[k].length;
   console.log(`scanned ${r.scanned} card(s) across ${r.stages.length} stage(s); ${r.wellFormed} well-formed`);
   console.log(`  legacy, predate the stamps    : ${r.legacy} (not held to the invariant)`);
+  console.log(`  legacy BUT carrying done_at    : ${r.legacyExemptWithDoneAt} (now TESTED anyway - see below)`);
   console.log(`  known, baselined, not new     : ${r.knownCount}`);
+  // Stale is printed loudly and does not fail. The card is clean, so the entry should be removed;
+  // failing here would mean a repair turns a green gate red, which is the other bad outcome.
+  if (r.stale.length) {
+    console.log(`  ⚠️  STALE baseline entries: ${r.stale.length} - no card matches these, remove them:`);
+    for (const k of r.stale) console.log(`      ${k.replace(/\|/g, "  ")}`);
+  }
   console.log(`  claim landed after completion : ${n("claimedAfterDone")}`);
   console.log(`  not done but carries done_at   : ${n("statusDoneWithoutDoneAt")}`);
   console.log(`  done with no completion record : ${n("doneWithoutRecord")}`);
