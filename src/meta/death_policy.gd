@@ -61,16 +61,50 @@ enum Loss {
 
 ## True when this item survives a death under this policy.
 ##
-## Two sources, deliberately: the declared path list, and a `keep_on_death` item
-## meta. The meta is the seam the addon's per-item export will arrive through, so
-## the population can move from a list to per-item flags without a code change
-## here.
+## SEMANTICS CALL, 2026-09-27 (meta, after inventory-ux reported the divergence
+## against StashView). This is the GENERAL "is this spared" query, NOT a pocket
+## query, and it reads `loss` as well as the pocket. The evidence that settled it,
+## in the order it decided it:
+##
+##   1. THIS FILE ALREADY SET THE PRECEDENT FOR THE OTHER DIRECTION. `recoverable`
+##      was missed in exactly this way once -- the first `_kept_by_policy`
+##      consulted the pocket and the meta but forgot the switch -- and the fix was
+##      to consult it in BOTH entry points, not to narrow either one. `loss` is
+##      the same class of switch, so the same answer applies.
+##   2. `keeps()` HAD NO CALL SITES AT ALL on main. Nothing depended on the narrow
+##      reading, so choosing it would have protected nothing and cost correctness.
+##   3. THE POCKET QUESTION IS ALREADY ANSWERED ELSEWHERE. StashView carries
+##      `safe_pocket_rows()` and `recoverable_rows()`, which are the honest pocket
+##      queries. If `keeps()` were the pocket query it would be a third answer to
+##      a question two dedicated methods already own.
+##
+## Both entry points now delegate to `_spared()`, so they cannot diverge by
+## omission again, which is the actual fix. Adding the `loss` test to this
+## function alone would have made the two agree today and left the next switch
+## free to be missed in one of them again.
 func keeps(item_path: String, item: Variant = null) -> bool:
+	var flagged := item != null and bool(item.get_meta("keep_on_death", false))
+	return _spared(item_path, flagged)
+
+
+## One definition of "this policy spares this item", consulted by every entry
+## point. `flagged` is the per-item `keep_on_death` signal, which arrives as an
+## item meta from a caller holding an Item and as a manifest field from
+## `partition` holding encoded data; both are folded in here so the two shapes
+## cannot answer differently.
+func _spared(item_path: String, flagged: bool = false) -> bool:
+	# The switch comes FIRST and overrides everything below it. Under KEEP_ALL the
+	# deployed kit comes back whole, so the pocket list and the recoverable flag
+	# have nothing left to decide. Reading it after `recoverable` would let
+	# `recoverable = false` claim to destroy a kit the switch already returned,
+	# which is the same class of bug this function exists to prevent.
+	if loss == Loss.CONSUME_KEEP_ALL:
+		return true
 	if not recoverable:
 		return false
 	if safe_pocket.has(item_path):
 		return true
-	return item != null and bool(item.get_meta("keep_on_death", false))
+	return flagged
 
 
 ## Split a carried manifest into the entries this policy destroys and the ones it
@@ -83,7 +117,7 @@ func partition(carried_loadout: Dictionary) -> Dictionary:
 		var entries: Array = carried_loadout[slot]
 		var surviving: Array = []
 		for data in entries:
-			if loss == Loss.CONSUME_KEEP_ALL or _kept_by_policy(data):
+			if _kept_by_policy(data):
 				surviving.append(data)
 			else:
 				lost.append(data)
@@ -93,21 +127,16 @@ func partition(carried_loadout: Dictionary) -> Dictionary:
 
 
 ## The per-entry half of `partition`, so the same rule is not written twice.
-## `recoverable` is checked HERE and not only in `keeps()`: the first version of
-## this function consulted the pocket and the meta but forgot the switch, so
-## `recoverable = false` kept everything and the flag that the original request
-## called "probably a setting" did nothing at all. The invariant arm
-## "recoverable = false keeps nothing, even from a populated pocket" is what
-## found it.
+## It holds no rule of its own any more: it normalises a manifest entry into a
+## path and a flag and hands both to `_spared`. That is the point of the refactor
+## -- while this function carried its own copy of the test, a switch added to one
+## entry point silently missed the other, which is the divergence inventory-ux
+## found on 2026-09-27 and pinned rather than patched.
 func _kept_by_policy(data: Dictionary) -> bool:
-	if not recoverable:
-		return false
 	var path := String(data.get("path", ""))
 	if path.is_empty() and data.has("extra_path"):
 		path = String(data.get("extra_path", ""))
-	if safe_pocket.has(path):
-		return true
-	return bool(data.get("keep_on_death", false))
+	return _spared(path, bool(data.get("keep_on_death", false)))
 
 
 ## Configuration errors, so a policy that cannot mean what it says is loud at

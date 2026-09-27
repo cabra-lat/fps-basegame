@@ -389,6 +389,32 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 		return 0
 	var added := 0
 	for slot_name in sl.slots:
+		# NEVER OVERWRITE A SLOT THE PLAYER ALREADY OWNS. This is the whole fix, and
+		# it is a skip rather than a merge on purpose.
+		#
+		# THE BUG: the line below ASSIGNS profile.loadout[slot_name] = arr. Combined
+		# with the per-identifier faucet (starter_granted is per-FACTION state and
+		# switch_faction() used to accept any non-empty string, so every invented id
+		# minted a fresh grant), a second grant SILENTLY REPLACED a slot the player
+		# had equipped. The severity is not a duplicated magazine: a duplicated item is
+		# a balance annoyance the player can see, and this is a destroyed loadout the
+		# player cannot undo, landing on whoever is mid-run rather than on a fresh
+		# profile.
+		#
+		# WHY NOT APPEND INSTEAD. Appending is the obvious alternative and it is wrong
+		# for a second reason. The guard for a refused grant is asserted by comparing
+		# the loadout signature before and after, and that assertion is only able to
+		# detect damage BECAUSE this function assigns rather than appends. Change the
+		# assignment to an append and the refusal check quietly stops being able to
+		# fail, and this entire class of bug returns with nothing red. Assigning into
+		# an EMPTY slot keeps the damage observable while removing the damage.
+		#
+		# A slot the player already fills is therefore left exactly as it is. If the
+		# starter and the player both want that slot, the player's kit wins: a grant
+		# must never be the thing that takes equipment away.
+		var existing: Array = profile.loadout.get(slot_name, [])
+		if not existing.is_empty():
+			continue
 		var arr: Array = []
 		for path in sl.slots[slot_name]:
 			var item := ItemCodec.item_from_path(String(path))
@@ -402,9 +428,18 @@ func grant_starter_loadout(sl: StarterLoadout) -> int:
 			added += 1
 		if not arr.is_empty():
 			profile.loadout[slot_name] = arr
+	# Currency was already guarded (`<= 0`), so a grant never topped a balance DOWN;
+	# it is left alone deliberately, because "refuse when the player has money" would
+	# be a different rule and a worse one.
 	if profile.currency <= 0:
 		profile.currency = sl.currency
-	profile.role_state()["starter_granted"] = true
+	# The flag records that the starter was DELIVERED, not merely considered. Setting
+	# it when nothing was granted would permanently mark a profile whose slots were
+	# all occupied as having received a starter it never got, and that profile could
+	# never be offered one again even after a raid emptied the loadout -- which is
+	# the exact state the free-items card is about.
+	if added > 0:
+		profile.role_state()["starter_granted"] = true
 	return added
 
 ## Validate a hub selection without mutating the profile. Selection values are

@@ -30,6 +30,17 @@ var last_report: Variant
 var loadout_options: Array[Dictionary] = []
 var selected_loadout_id := ""
 var loadout_state: LoadoutState = LoadoutState.EMPTY
+## Deploy-refusal reasons for the SELECTED loadout, as CATALOGUE KEYS and never as
+## composed sentences -- the reason strings live in the translation catalogue and
+## this file must not own a copy of them.
+##
+## WHY THE HUB NEEDS THEM AT ALL. The hub's own `LoadoutState` is a coarse
+## EMPTY/VALID/INVALID tri-state driven by `option.get("valid", true)`, so on its
+## own it can only ever say "invalid". LoadoutView knows WHICH of the five reasons
+## applies (OVER_MASS, CONTAINER_CYCLE, SLOT_NOT_COMPATIBLE, GRID_OVERLAP,
+## OUT_OF_BOUNDS), and this is the seam where that specificity reaches the player
+## instead of leaving them to guess which of five things to change.
+var loadout_reasons: Array[String] = []
 
 # Public handles for focused UI tests and for a parent shell that wants to add
 # decoration without reaching into the visual tree.
@@ -192,20 +203,28 @@ func set_last_report(value: Variant) -> void:
 ## selection state and never writes back to the owner.
 func set_loadouts(options: Array) -> void:
 	loadout_options.clear()
+	## Reasons describe the SELECTED loadout, so a new option set invalidates
+	## them. Kept in step with the list on purpose: a stale reason shown against a
+	## freshly chosen loadout is worse than no reason at all, because it names a
+	## real problem the player does not have.
+	loadout_reasons.clear()
 	for option in options:
 		if option is Dictionary and String(option.get("id", "")) != "":
 			loadout_options.append((option as Dictionary).duplicate(true))
-	if selected_loadout_id == "" and not loadout_options.is_empty():
-		selected_loadout_id = String(loadout_options[0].get("id", ""))
-	elif _find_option(selected_loadout_id) == null:
+	if not loadout_options.is_empty():
+		if _find_option(selected_loadout_id).is_empty():
+			selected_loadout_id = String(loadout_options[0].get("id", ""))
+	elif selected_loadout_id != "":
 		selected_loadout_id = ""
 	_recompute_state()
 	_refresh()
 
 
 func set_selected_loadout(loadout_id: String) -> void:
-	if loadout_id != "" and _find_option(loadout_id) == null:
+	if loadout_id != "" and _find_option(loadout_id).is_empty():
 		selected_loadout_id = ""
+		_recompute_state()
+		_refresh()
 		return
 	selected_loadout_id = loadout_id
 	_recompute_state()
@@ -215,6 +234,31 @@ func set_selected_loadout(loadout_id: String) -> void:
 
 func can_deploy() -> bool:
 	return loadout_state == LoadoutState.VALID and selected_loadout_id != ""
+
+
+## The deploy-refusal reasons for the selected loadout, from LoadoutView.
+## Accepts the view's REASON KEYS and keeps only non-empty strings, so a caller
+## cannot inject a raw sentence into a label that renders through the catalogue.
+func set_loadout_reasons(keys: Array) -> void:
+	loadout_reasons.clear()
+	for key in keys:
+		if key is String and String(key).strip_edges() != "":
+			loadout_reasons.append(String(key))
+	_refresh()
+
+
+## The reason text for the status line: one translated reason per line, or the
+## generic message when no specific reason is known. The fallback is deliberate
+## rather than a shortcut -- an INVALID loadout with no reason reported is a real
+## state (the option said invalid and nothing said why), and an empty label there
+## would look like a broken screen.
+func _reasons_text() -> String:
+	if loadout_reasons.is_empty():
+		return invalid_loadout_text
+	var lines: Array[String] = []
+	for key in loadout_reasons:
+		lines.append(_t(key))
+	return "\n".join(lines)
 
 
 ## One place builds the profile line, so the "no profile" state and the real one
@@ -247,7 +291,7 @@ func _refresh() -> void:
 				status_label.text = valid_loadout_text
 				status_label.add_theme_color_override("font_color", Color(0.45, 0.85, 0.58))
 			LoadoutState.INVALID:
-				status_label.text = invalid_loadout_text
+				status_label.text = _reasons_text()
 				status_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45))
 			_:
 				status_label.text = _t(empty_loadout_text)

@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AmmoFeed" load_steps=4 format=3]
+
+[ext_resource type="Script" uid="uid://174ja52pe154" path="res://addons/cabra.lat_shooters/src/core/item.gd" id="1_3gpyq"]
+[ext_resource type="Script" uid="uid://6ckswbqpufn8" path="res://addons/cabra.lat_shooters/src/core/ammo/ammo_feed.gd" id="2_46qal"]
+
+; A TEST FIXTURE, NOT A PRODUCT ITEM, and it exists for one reason: a harness needs
+; an item that is REGISTERED IN ItemNames and has NO catalogue entry, forever, to
+; exercise the "registered but untranslated" branch of a translation-marking screen.
+;
+; WHY IT EXISTS RATHER THAN A REAL ITEM. Both validate_stash_view and
+; validate_free_items_view used Brazil_556.tres for that branch, which is a real
+; ammunition designation in the product catalogue. That is a fixture with a timer on
+; it: the moment anyone translated Brazil 556 -- correctly, and as a matter of course
+; -- the middle branch lost its subject and two harnesses went red for a reason that
+; had nothing to do with what they test. The general form, because it will recur: any
+; test that needs a resource in state X is borrowing that resource from the product
+; catalogue, and the catalogue moves. Either the test owns a fixture built for the
+; purpose, or it asserts against something whose state is a product decision.
+;
+; WHY IT WILL NEVER BE TRANSLATED, and why that is the point: its registry key is
+; "FIXTURE untranslated designation" and locale/game.po carries it with a DELIBERATELY
+; EMPTY msgstr in the RESIDUE block, recorded with this reason. Both harnesses also
+; assert that the key is still absent from the catalogue, so if anyone ever "helpfully"
+; translates it, the failure says the fixture is no longer a fixture rather than
+; leaving a test silently testing nothing.
+;
+; WHERE IT LIVES, and why that matters: resources/meta/fixtures/ is a directory no
+; product scan enumerates. The stacks/weapons/ammo/medical/armor scans in
+; validate_stash_view count real stock in those four directories, and the item
+; description debt scan reads every .tres with a TOP-LEVEL description -- this file
+; deliberately declares none, so it is not item-description debt either. It is
+; registered (ItemNames.KEYS) and it is NOT a tradable, so no trader can offer it.
+
+[resource]
+script = ExtResource("2_46qal")
+type = 1
+empty_mass = 1.0
+compatible_calibers = ["5.56x45mm"]
+metadata/_custom_type_script = "uid://6ckswbqpufn8"

@@ -22,6 +22,15 @@ const SOURCE_FILES := [
 	"res://src/meta/flea_listing.gd",
 	"res://scenes/operations_hub.gd",
 	"res://scenes/operations_hub_controller.gd",
+	# src/meta/loadout_view.gd: the loadout screen's authority layer. It is here
+	# because its REASON_KEYS dict holds five catalogue keys as string literals and
+	# nothing else in the tree names them at a call site, so without this file the
+	# "declared but unused" half of the contract fires on all five and the
+	# "declared but absent" half cannot see them at all. Listing the file is what
+	# makes the five visible to BOTH halves; the leak check also gains coverage of
+	# this file's literals, which is a second reason to want it listed rather than
+	# special-cased.
+	"res://src/meta/loadout_view.gd",
 ]
 ## Every key those files use, plus the ItemNames registry. This is the
 ## catalogue contract: a new call site without an entry here fails, and an entry
@@ -84,6 +93,20 @@ const DECLARED_KEYS := [
 	"Contractor",
 	"Drifter",
 	"Raider",
+	# Loadout refusal reasons: loadout_view.gd's REASON_KEYS. These were MISSING
+	# from this list, and that absence is the whole reason the five keys went
+	# missing: the "no key is untranslated" check only walks DECLARED_KEYS, so a
+	# key nobody declared was never counted, never reported, and could not fail.
+	# It was invisible in BOTH directions -- the contract check ("a call site
+	# without an entry here fails") did not fire either, because the key is not
+	# named at a call site at all: it is carried as DATA and translated wherever
+	# rows() is rendered. The keys reached the catalogue by hand, which is how they
+	# arrived present-but-untranslated.
+	"LOADOUT_REASON_OVER_MASS",
+	"LOADOUT_REASON_CONTAINER_CYCLE",
+	"LOADOUT_REASON_SLOT_NOT_COMPATIBLE",
+	"LOADOUT_REASON_GRID_OVERLAP",
+	"LOADOUT_REASON_OUT_OF_BOUNDS",
 ]
 ## A key that is deliberately absent, used to prove the invariant has teeth.
 const MISSING_PROBE := "__i18n_missing_probe__"
@@ -123,9 +146,14 @@ func _initialize() -> void:
 	_check_gated_reason_is_localized()
 	_check_registry_ids_match_their_resources()
 	_check_every_offered_item_is_registered()
+	_check_every_visible_item_has_a_registered_id()
+	_check_role_display_names_resolve()
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
+
+	_check_source_language_invariant()
+
 	_check_untranslated_description_count()
 	# AWAITED, and that word is load-bearing. This check renders a live scene, so
 	# it contains `await`; called without it, GDScript runs it as a coroutine,
@@ -219,14 +247,156 @@ func _check_keys_are_declared() -> void:
 				used.append(literal)
 	var unused := _keys_in(DECLARED_KEYS, true, used)
 	_check(unused.is_empty(), "every declared key is used by a call site, a registry or a payload (unused: %s)" % ", ".join(unused))
+## THE SOURCE-LANGUAGE RULE, and the guard for the defect that broke it.
+##
+## CAUGHT 2026-09-27 while authoring the pt-BR descriptions: six .tres files
+## carried PORTUGUESE in the description field, five of them with accents missing
+## ("itens medicos", "extracao", "nao", "barters"), which inverts the rule that the
+## .tres holds the source-language string and the pt-BR rendering is a msgstr here.
+## It was invisible from the running game, because a msgstr existed for each of
+## them, so the player saw correct Portuguese while the DATA was in the wrong
+## language. The next person to add a key for one of these items would reasonably
+## assume the source was English and write an English msgid against a Portuguese
+## one, and the pipeline would then silently do nothing for that row.
+##
+## TWO CHECKS, because the two halves fail differently, and the first one was
+## WRONG when first written, which is worth recording because it is the failure
+## mode of a check that is only ever run against your own branch.
+##
+## 1. NO .tres description APPEARS AS A msgstr in the catalogue. This is the
+##    source/target INVERSION tell: a description that is also somebody else
+##    translation means the two columns were swapped, because a source string
+##    and a translation of it are not the same sentence in two languages.
+##
+##    The first version of this check was "every shipped .tres description IS a
+##    catalogue msgid, verbatim", and it is WRONG. It asserts the translation debt
+##    away: an untranslated description is by definition not a msgid, so the check
+##    demanded that the debt this repo has been measuring be zero, in a harness
+##    whose sibling check _check_untranslated_description_count exists precisely to
+##    REPORT that debt instead of failing on it. The two would have contradicted
+##    each other in the same run.
+##
+##    I only found out by running it against main rather than against my own
+##    branch, where I had just authored a translation for almost every description
+##    and it passed: 41/41 green on agent/inventory-ux, and on 06f0f25 it named 100+
+##    legitimately-untranslated descriptions as failures. A check that passes only
+##    because of the work in the same branch is not a check.
+##
+##    What survives of the pipeline guard is the inversion tell above plus a
+##    NON-VACUITY floor: the catalogue and the shipped descriptions must overlap at
+##    all, so an empty or renamed catalogue cannot pass quietly. The overlap is
+##    printed, because a number that only asserts its own absence is not evidence.
+##
+## 2. NO .tres description contains a Portuguese-only marker. This is the DETECTION
+##    guard for the real defect, and it is a DENYLIST, which is a heuristic and says
+##    so: the markers are Portuguese words that do not occur in the English source
+##    strings ("itens", "extraia", "municao", "acessorios"). It will not catch a
+##    Portuguese sentence built from words shared with English, and a language
+##    detector in a headless gate would be a dependency and a false-positive risk
+##    for a defect that is greppable.
+##
+## The honest limit, stated because a reader will otherwise assume more: NEITHER
+## check proves a source string is good ENGLISH. Only a human or a reviewer can say
+## that, and the six strings they fixed were authored rather than machine reversed
+## precisely because reversing the words was not available.
+func _check_source_language_invariant() -> void:
+	var po_ids := _po_msgids()
+	var po_targets := _po_msgstrs()
+	var inverted: Array[String] = []
+	var portuguese: Array[String] = []
+	var declared := 0
+	for path in _resources_with_top_level_description():
+		var source := ItemDescriptions.source_text(load(path))
+		if source.strip_edges().is_empty():
+			continue
+		if po_ids.has(source):
+			declared += 1
+		if po_targets.has(source):
+			inverted.append("%s: %s" % [path.get_file(), source])
+		var lowered := source.to_lower()
+		for marker in PORTUGUESE_SOURCE_MARKERS:
+			if lowered.contains(marker):
+				portuguese.append("%s: %s (marker '%s')" % [path.get_file(), source, marker])
+				break
+	print("[desc] SOURCE LANGUAGE: %d of the shipped descriptions are declared as msgids, so the source/target pipeline is live; the rest is the reported debt, not a failure" % declared)
+	_check(inverted.is_empty(),
+		"no shipped .tres description appears as a translation TARGET in the catalogue (inverted: %s)"
+			% ", ".join(inverted))
+	_check(portuguese.is_empty(),
+		"no shipped .tres description carries Portuguese source text (pt-BR in the data: %s)"
+			% ", ".join(portuguese))
+	_check(declared > 0,
+		"the catalogue and the shipped descriptions overlap at all (non-vacuity: 0 declared means the source-language pipeline is not being exercised)")
+## Portuguese-only tokens that must never appear in a SOURCE field. Kept as a
+## const beside the check that uses them so extending the list is a one-line edit
+## that cannot drift away from its own explanation.
+##
+## "barters" was ON this list and was removed from it BY ITS OWN CHECK, one run
+## after it was added: the new English trader descriptions say "accepts barters
+## for supplies" and "accepts barters for accessories", because TraderOffer's
+## field is barter_required and a trader may legitimately name the mechanic. A
+## marker that fires on correct data is worse than a missing marker, because it
+## teaches the next reader to ignore the check rather than to extend it. The
+## original defect is still caught without it -- "Medica: itens medicos e barters
+## de suprimentos." trips on "itens" and "medicos", and "Armas e anexos. Aceita
+## barters de acessorios." trips on "acessorios" and "anexos" -- which is the real
+## argument for several markers per phrase over one clever marker.
+const PORTUGUESE_SOURCE_MARKERS: Array[String] = [
+	"itens", "item ", "extraia", "sobreviva", "inimigos", "barganhas",
+	"municao", "munição", "acessorios", "acessórios", "anexos", "suprimentos",
+	"medicos", "médicos", "extracao", "extração", " nao ", " não ", "pela ponte",
+	"trata ferimentos", "elimine ",
+]
 
-## THE invariant: a key with no catalogue entry must fail, not fall back.
+## Every msgid in locale/game.po, so the source-language check can compare a
+## shipped string against the catalogue rather than against a list typed here.
+## The msgstr side is I18nCatalogue.msgstrs(), already used by the debt check.
+func _po_msgids() -> Array[String]:
+	var out: Array[String] = []
+	var regex := RegEx.new()
+	regex.compile("^msgid\\s+\"(.*)\"$")
+	for line in I18nCatalogue.read(PO_PATH).split("\n"):
+		var m := regex.search(line.strip_edges())
+		if m != null:
+			out.append(m.get_string(1))
+	return out
+
+## PRESENCE IS NOT CHANGE, and conflating the two is what made this metric lie.
+##
+## The check below asks whether a key is "untranslated" with
+## `TranslationServer.translate(key) == key`. That expression measures CHANGE, not
+## PRESENCE, and the difference is invisible from the outside:
+##
+##     absent from the catalogue          -> translate() returns the key -> "untranslated"
+##     present with an EMPTY msgstr       -> translate() returns the key -> "untranslated"
+##
+## Both look identical, so a report of "0 untranslated loadout reasons" was true and
+## useless: the five keys had been counted as translated while they were in fact
+## ABSENT from game.po entirely, existing only as GDScript constants in
+## loadout_view.gd's REASON_KEYS, where no translation tool could see them. That cost
+## an extra handoff, and it is the reason this function now separates the two.
+##
+## ABSENT is strictly worse than empty: an absent key is a hole the tooling cannot
+## even enumerate, so nothing reports it and nothing can go looking for it. An empty
+## msgstr is visible in the catalogue and in this report. Both are reported, by name,
+## every run, because a count that cannot distinguish them cannot supervise the work.
 func _check_every_key_is_translated() -> void:
-	var missing: Array[String] = []
+	var declared_ids := _po_msgids()
+	var untranslated: Array[String] = []
+	var absent: Array[String] = []
 	for key in DECLARED_KEYS:
 		if TranslationServer.translate(key) == key:
-			missing.append(key)
-	_check(missing.is_empty(), "no key is untranslated (missing entries: %s)" % ", ".join(missing))
+			untranslated.append(key)
+			if not declared_ids.has(key):
+				absent.append(key)
+	print("[i18n] KEYS: %d declared, %d change (untranslated), %d of those ABSENT from the catalogue entirely"
+		% [DECLARED_KEYS.size(), untranslated.size(), absent.size()])
+	if not absent.is_empty():
+		print("[i18n] ABSENT (worse than empty: invisible to the tooling, so nothing can go looking for it): %s"
+			% ", ".join(absent))
+	_check(untranslated.is_empty(),
+		"no key is untranslated (untranslated: %s | of those, ABSENT from the catalogue: %s)"
+			% [", ".join(untranslated), ", ".join(absent)])
 
 ## A check that cannot fail is decoration. This proves an absent entry really
 ## does come back as the English key, which is what the check above looks for.
@@ -376,21 +546,46 @@ func _check_no_translated_literal_in_source() -> void:
 			leaked.append(value)
 	_check(leaked.is_empty(), "no Portuguese msgstr appears in the source files (leaked: %s)" % ", ".join(leaked))
 
-## The registry is the id -> key mapping. Every entry must resolve to text that
-## is neither the raw id nor the untranslated key.
+## The registry is the id -> key mapping.
+##
+## REGISTRATION IS NOT TRANSLATION, and this check used to conflate the two, which
+## made it impossible to do the work it was meant to supervise. It demanded that
+## every registered id resolve to a TRANSLATED name. But the registry's own
+## contract says callers decide their own fallback and that an inventory row shows
+## the item's own name -- and registering an id is precisely what lets a row
+## REPORT that its name is untranslated instead of silently rendering English. A
+## gate that refuses untranslated registrations forces the choice between leaving
+## an item out of the registry (invisible debt) and going red (a gate that cries
+## wolf). So: registration and id-leakage are ASSERTED, and the untranslated count
+## is REPORTED as a NOTE, because the debt is authorised content work and not a
+## property this harness may decide.
 func _check_item_registry() -> void:
 	var ids := ItemNames.registered_ids()
-	var unresolved: Array[String] = []
+	var no_key: Array[String] = []
+	var leaks_id: Array[String] = []
+	var untranslated: Array[String] = []
 	for id in ids:
-		var shown := ItemNames.display_name(id)
-		if shown == "" or shown == id or shown == ItemNames.key_for(id):
-			unresolved.append(id)
-	_check(not ids.is_empty() and unresolved.is_empty(), "every registered item id resolves to a translated name (unresolved: %s)" % ", ".join(unresolved))
-	var bad: Array[String] = []
-	for key in _registry_keys():
-		if not DECLARED_KEYS.has(key) or TranslationServer.translate(key) == key:
-			bad.append(key)
-	_check(bad.is_empty(), "every ItemNames key is declared and translated (missing: %s)" % ", ".join(bad))
+		var key := ItemNames.key_for(id)
+		if key.is_empty():
+			no_key.append(id)
+			continue
+		# The raw id must never be what a row shows. That is the F-MKT leak
+		# ("Comprou marked intel") and it is the one thing here that is a bug
+		# rather than a debt.
+		if key == id or ItemNames.display_name(id) == id:
+			leaks_id.append(id)
+		if TranslationServer.translate(key) == key:
+			untranslated.append(id)
+	_check(not ids.is_empty() and no_key.is_empty(),
+		"every registered item id has a catalogue KEY (no key: %s)" % ", ".join(no_key))
+	_check(leaks_id.is_empty(),
+		"no registered item id is ever rendered as itself (leaking: %s)" % ", ".join(leaks_id))
+	# A NOTE and not a _check(): a check that cannot fail is narration wearing a
+	# counter, and the debt being non-zero is the authorised state, not a defect.
+	# Printed so the number cannot drift unnoticed between now and whenever the
+	# pt-BR strings are authored.
+	print("NOTE: REGISTRY DEBT: %d of %d registered ids are registered but UNTRANSLATED, and must be marked as such in the UI rather than rendered as English (ids: %s)"
+		% [untranslated.size(), ids.size(), ", ".join(untranslated.slice(0, 6))])
 
 ## If someone hardcodes a translated string in a display helper, these two stop
 ## being equal to the catalogue lookup.
@@ -580,18 +775,53 @@ func _function_body(path: String, func_name: String) -> String:
 ## market silently falls back to the .tres name.
 func _check_registry_ids_match_their_resources() -> void:
 	var mismatched: Array[String] = []
+	# EVERY item resource, not only the ones a trader sells and the ones in raid1.
+	# The search used to cover those two places, so a correct registration for an
+	# item in resources/armor read as MISMATCHED -- the check asking "does this id
+	# have a file?" while only looking in two directories, which is the same shape
+	# of error as answering a restore-path question from a default. Widening the
+	# search makes the check STRONGER: more ids are actually verified, not fewer.
+	var by_basename := {}
+	for path in _all_item_resource_paths():
+		by_basename[path.get_file().get_basename()] = path
 	for id in ItemNames.registered_ids():
-		var found := ""
-		for path in _trader_item_paths():
-			if path.get_file().get_basename() == id:
-				found = path
-				break
-		if found == "" and FileAccess.file_exists("res://resources/raid1/%s.tres" % id):
-			found = "res://resources/raid1/%s.tres" % id
+		var found: String = String(by_basename.get(id, ""))
 		if found == "" or ItemNames.id_for_path(found) != id or load(found) == null:
 			mismatched.append(id)
 	_check(mismatched.is_empty(),
 		"I18N-MKT registered_ids_resolve_from_their_resource: mismatched: %s (an id whose file is named differently would silently fall back to the .tres name)" % ", ".join(mismatched))
+
+
+## Every .tres under resources/ that is an Item, by class. The item classes are
+## named rather than found by walking base classes, because the set is the
+## project's CONTENT and a game may ship more; a base-class walk would be clever
+## and would silently absorb whatever a future resource happens to subclass.
+func _all_item_resource_paths() -> Array[String]:
+	var out: Array[String] = []
+	_collect_item_paths(out, "res://resources",
+		["Ammo", "Armor", "Weapon", "Attachment", "MedicalItem", "AmmoFeed", "Item"])
+	return out
+
+
+func _collect_item_paths(out: Array[String], path: String, classes: Array) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full := path + "/" + entry
+		if dir.current_is_dir():
+			if not entry.begins_with("."):
+				_collect_item_paths(out, full, classes)
+		elif entry.ends_with(".tres"):
+			var text := FileAccess.get_file_as_string(full)
+			for c in classes:
+				if text.contains("script_class=\"%s\"" % c):
+					out.append(full)
+					break
+		entry = dir.get_next()
+	dir.list_dir_end()
 
 ## The strong half: nothing a trader can sell or barter may be missing from the
 ## registry, because that is exactly how "Comprou marked intel" happened. Adding
@@ -608,6 +838,67 @@ func _check_every_offered_item_is_registered() -> void:
 ## Offer and barter item paths, read from the trader resources rather than
 ## hardcoded here, so a new offer cannot slip past the check by omission. Split
 ## into helpers because the nesting limit is 5 and the inline version hit 6.
+## The direction the other checks do NOT cover: id -> resource.
+## _check_registry_ids_match_their_resources() walks the REGISTRY and asks
+## whether each id has a file. This walks the FILES and asks whether each one has
+## an id, which is the other half of "cannot be translated without an id": today an
+## item .tres can be added to a trader, translated in the PO, shipped, and no check
+## notices, because nothing ever asks whether the file is reachable FROM the
+## registry. A display path that falls back to the .tres name renders the raw id
+## again -- the exact F-MKT defect -- and it is invisible until a player reads it.
+## Non-vacuous by construction: the trader offer paths are the source, so an empty
+## scan means the traders lost their offers, and that is a failure worth hearing.
+func _check_every_visible_item_has_a_registered_id() -> void:
+	var paths := _trader_item_paths()
+	var unregistered: Array[String] = []
+	for path in paths:
+		if ItemNames.id_for_path(path) == "":
+			unregistered.append(path)
+	_check(not paths.is_empty() and unregistered.is_empty(),
+		"every tradable item .tres is REACHABLE FROM the registry (unregistered: %s)"
+			% ", ".join(unregistered))
+
+## Role display names, so a role cannot ship with a name nothing can resolve.
+##
+## THE MECHANISM IS THE ROLE'S OWN KEY, NOT ItemNames. A role is not an item:
+## RoleDefinition carries `display_name_key`, a PO msgid, exactly parallel to
+## ItemNames.KEYS mapping an item id to its key, and there is deliberately no
+## RoleNames registry because roles are data. So this asks the question that
+## actually matters for a player: does the role's name RESOLVE IN THE CATALOGUE,
+## rather than rendering as the raw key?
+##
+## SCANNED, NOT HARDCODED: this reads whatever is in resources/meta/roles/ rather
+## than naming the shipped role, because a game ships three, five or ten of them
+## (project rule: content is data). The count travels in the evidence string, and
+## says VACUOUS at zero, so a green here cannot be read as coverage it lacks.
+func _check_role_display_names_resolve() -> void:
+	var dir := DirAccess.open("res://resources/meta/roles")
+	var scanned := 0
+	var unresolved: Array[String] = []
+	if dir:
+		dir.list_dir_begin()
+		var f := dir.get_next()
+		while f != "":
+			if f.ends_with(".tres"):
+				var role := load("res://resources/meta/roles/" + f) as Resource
+				if role == null:
+					continue
+				scanned += 1
+				var key := String(role.get("display_name_key"))
+				if key.is_empty():
+					unresolved.append("%s declares no display_name_key" % f)
+				elif TranslationServer.translate(key) == key:
+					# A real, shippable defect: the name is player-readable and the
+					# catalogue has no entry, so it renders as the raw key in every
+					# non-English locale. Reported, never worked around.
+					unresolved.append("%s key '%s' has no catalogue entry" % [f, key])
+			f = dir.get_next()
+		dir.list_dir_end()
+	_check(unresolved.is_empty(),
+		"every ROLE display name resolves through the catalogue (scanned=%d, unresolved: %s)%s"
+			% [scanned, ", ".join(unresolved),
+			" -- VACUOUS: this ref has no resources/meta/roles yet" if scanned == 0 else ""])
+
 func _trader_item_paths() -> Array[String]:
 	var out: Array[String] = []
 	for trader_path in ["res://resources/meta/traders/field_surgeon.tres",
