@@ -58,6 +58,14 @@ func _connect_ui() -> void:
 		return
 	if not _ui.resolve_requested.is_connected(_on_resolve_requested):
 		_ui.resolve_requested.connect(_on_resolve_requested)
+	# The Back button's route OUT. return_to_menu() existed from the first commit
+	# and had ZERO callers, so the screen had no way back to the menu: the player
+	# could enter the hideout and could not leave it. A one-way screen is reachable
+	# and still a trap, and no amount of checking "does the scene exist" or "is
+	# there a route in" would have shown that -- the route IN was the one that was
+	# tested.
+	if not _ui.back_requested.is_connected(return_to_menu):
+		_ui.back_requested.connect(return_to_menu)
 
 
 ## Resolve what is DUE, through the owning API, and re-render from its result.
@@ -77,13 +85,21 @@ func _on_resolve_requested() -> void:
 
 
 func return_to_menu() -> void:
+	# f5cac6: REACHED first, so a navigation that starts and does not land is a
+	# REACHED with no RESULT rather than silence.
+	var reach := ActionLog.reached("Hideout/BtnBack", "route", MAIN_MENU_SCENE)
 	# Cached and null-checked rather than a chained get_tree() deref: INV-38a
 	# ratchets chained get_tree() call sites, and this file added one. The fix is
 	# the pattern operations_hub_controller already uses, not a loosened baseline.
 	var tree: SceneTree = get_tree()
 	if tree == null:
+		# A real no-op with a real reason. Before the record existed this was the
+		# same silence the card exists to remove: a click that arrived, was
+		# understood, and left the player exactly where they were.
+		ActionLog.no_op(reach, "no_scene_tree", MAIN_MENU_SCENE)
 		return
 	tree.change_scene_to_file(MAIN_MENU_SCENE)
+	ActionLog.ok(reach, MAIN_MENU_SCENE)
 
 
 func _bind_existing_ui() -> void:

@@ -72,8 +72,11 @@ func _initialize() -> void:
 		"and the button is CONNECTED to that handler, not merely present in the scene tree")
 
 	# ── THE ROUTE OUT. A screen you cannot leave is a different orphan. ───────
-	var ctrl := FileAccess.get_file_as_string("res://scenes/hideout_controller.gd")
-	_check(ctrl.contains("change_scene_to_file") and ctrl.contains("MAIN_MENU_SCENE"),
+	# Declared here, where the route-out checks begin: the first version of this
+	# edit deleted a declaration further down that this block already used, which
+	# is how a "one variable" fix turned into an unbalanced-parens parse error.
+	var ctrl_src := FileAccess.get_file_as_string("res://scenes/hideout_controller.gd")
+	_check(ctrl_src.contains("change_scene_to_file") and ctrl_src.contains("MAIN_MENU_SCENE"),
 		"the hideout has a way back out to the main menu, so entering it is not a one-way trap")
 
 	# ── THE SURFACE IS NOT A HARODDLED ROSTER ────────────────────────────────
@@ -84,6 +87,38 @@ func _initialize() -> void:
 		"the recovered-goods list renders the existing FreeItemsView seam rather than reimplementing what is pending")
 	_check(not ui.contains("for id in") and not ui.contains("match id"),
 		"and it hardcodes no item roster, so content stays data")
+
+	# ── THE ROUTE OUT, which is the half that was never tested and was broken ─
+	# The hideout had a BtnBack that resolved as %BtnBack, was rendered, took the
+	# click, and was connected to NOTHING; and return_to_menu() existed from the
+	# first commit with ZERO callers. The player could enter the hideout and could
+	# not leave it. Everything above passed, because every one of those checks was
+	# about the route IN -- which was true -- and a route OUT is a different claim.
+	var scene := FileAccess.get_file_as_string(HIDEOUT_SCENE)
+
+	_check(scene.contains("BtnBack"), "route out: the scene HAS a Back button")
+	_check(ui.contains("_back.pressed.connect"),
+		"route out: and the surface actually CONNECTS it -- a resolved @onready that is never connected is the most expensive kind of dead UI, because it renders, it takes the click, and nothing happens anywhere")
+	_check(ui.contains("signal back_requested"),
+		"route out: emitting an intent rather than navigating itself, because the controller owns navigation")
+	_check(ctrl_src.contains("back_requested.connect(return_to_menu)"),
+		"route out: and the controller subscribes return_to_menu, which previously had no callers at all")
+	# Existence is not wiring. This is the specific false negative: a source search
+	# for "return_to_menu" FOUND the function, so the route out looked present.
+	_check(not (ctrl_src.contains("func return_to_menu") and not ctrl_src.contains("back_requested.connect(return_to_menu)")),
+		"route out: a defined-but-uncalled return_to_menu fails here, because its existence is not its wiring")
+	_check(ctrl_src.contains("ActionLog.reached(\"Hideout/BtnBack\""),
+		"route out: and pressing Back records a REACHED before it navigates, so a route that starts and does not land is visible")
+	_check(ctrl_src.contains("ActionLog.no_op(reach, \"no_scene_tree\""),
+		"route out: with a NO-OP and a reason when there is no tree, rather than the silent return it used to be")
+
+	# ── THE STASH HALF ──────────────────────────────────────────────────────
+	# The hideout showed claims only, so a player asking "what have I actually
+	# got" got the recovered-goods list and nothing else.
+	_check(ui.contains("StashView.new("),
+		"stash: the hideout also shows what is STORED, delegated to StashView rather than reimplementing an answer that already exists")
+	_check(ui.contains("_stash.used_cells(), _stash.capacity()"),
+		"stash: including its capacity, because a stash with no limit is one the player cannot tell is full")
 
 	print("hideout route: checks=%d passed=%d" % [checks, checks - failures])
 	print("RESULT: %s" % ("PASS" if failures == 0 else "FAIL"))

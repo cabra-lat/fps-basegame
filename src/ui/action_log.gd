@@ -37,6 +37,24 @@ enum Result { OK, NO_OP, REFUSED }
 ## not apply, and that reason is a fixable thing with an owner.
 enum Phase { REACHED, RESULT }
 
+## The hook a PRESENTATION layer binds to. This is the whole interface between
+## the permanent record and anything a player sees: the record notifies, a view
+## subscribes, and no view is required for the record to work. A refusal readout
+## (src/ui/refusal_readout.gd) is the current consumer.
+##
+## A subscriber list rather than a Godot `signal`, and that is forced rather than
+## chosen: ActionLog is a static-only class, and GDScript will not let a static
+## function emit a signal declared on it ("Cannot access signal from the static
+## function"). The alternative was to make this an autoload Node, which would have
+## been a larger change to every call site in exchange for no benefit -- and the
+## record is deliberately not a node, because a record that only exists inside a
+## scene tree cannot outlive the scene.
+##
+## Subscribers are called with the WHOLE entry rather than loose arguments, so a
+## consumer needing a field the first consumer did not need does not force a
+## change on the record.
+static var _subscribers: Array[Callable] = []
+
 const DEFAULT_CAPACITY := 256
 
 static var _entries: Array[Dictionary] = []
@@ -55,6 +73,7 @@ static func configure(capacity: int) -> void:
 ## destroys the one thing a bug report needs.
 static func clear() -> void:
 	_entries.clear()
+	_subscribers.clear()
 
 
 static func size() -> int:
@@ -104,7 +123,7 @@ static func settle(handle: int, result: Result, reason: String = "", target: Str
 				control = String(entry.get("control", ""))
 				action = String(entry.get("action", ""))
 				break
-	_append({
+	var entry := {
 		"seq": handle,
 		"at": _stamp(),
 		"phase": Phase.RESULT,
@@ -113,7 +132,29 @@ static func settle(handle: int, result: Result, reason: String = "", target: Str
 		"target": target,
 		"result": int(result),
 		"reason": reason,
-	})
+	}
+	_append(entry)
+	# AFTER the append, so a consumer that reads the log back sees this entry
+	# already in it. A view that renders from a log it cannot see is a view that
+	# disagrees with the record it claims to be showing.
+	for subscriber in _subscribers:
+		if subscriber.is_valid():
+			subscriber.call(entry)
+
+
+## Bind a presentation layer to the record. Returns nothing; pair with
+## unsubscribe() from _exit_tree so a freed view is not called into.
+static func subscribe(callable: Callable) -> void:
+	if callable.is_valid() and not _subscribers.has(callable):
+		_subscribers.append(callable)
+
+
+static func unsubscribe(callable: Callable) -> void:
+	_subscribers.erase(callable)
+
+
+static func subscriber_count() -> int:
+	return _subscribers.size()
 
 
 ## Convenience for a handler that has nothing to refuse on.

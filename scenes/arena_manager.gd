@@ -435,20 +435,39 @@ func _on_pause_continue() -> void:
 ## Order matters: close the inventory first (it recaptures the mouse), THEN
 ## open the gunsmith (which releases it last). In debug_range there is no
 ## listener, so nothing closes blindly — only the opener closes.
+##
+## f5cac6: this is the card's own repro -- "clicking Modify in the gunsmith
+## produces nothing visible" -- and it was invisible for a structural reason: the
+## guard below returned with nothing to show, and nothing recorded that the click
+## had arrived. The REACHED is recorded BEFORE the guard, because a record
+## written after the work cannot show that the click got here first.
+var _refusal_label: RefusalReadout = null
+
+
 func _on_weapon_modify_requested(w: Weapon) -> void:
-	# f5cac6. The card's own repro -- "clicking Modify in the gunsmith produces
-	# nothing visible" -- lives in this function, and it was invisible for a
-	# structural reason: the guard below returned with nothing to show, and
-	# nothing recorded that the click had arrived. The REACHED is recorded BEFORE
-	# the guard, because a record written after the work cannot show that the
-	# click got here first.
+	# A refusal is the answer to an action the player just took, so it is
+	# rendered IN PLACE, beside the control that produced it (coordinator's
+	# decision). The record is what persists; this is a view onto it, and it is
+	# the reason the no-op below stops being invisible rather than the reason it
+	# is logged.
+	if not _refusal_label:
+		_refusal_label = RefusalReadout.new()
+		_refusal_label.name = "GunsmithRefusalReadout"
+		add_child(_refusal_label)
+
 	var reach := ActionLog.reached("Inventory/ContextMenu/ModifyWeapon", "gunsmith.open", "" if w == null else w.resource_path)
 	if gunsmith == null or w == null:
 		# A real no-op with a real reason, not a placeholder: the gunsmith is not
 		# constructed, or the request carried no weapon. Before the record existed
 		# both were indistinguishable from the click not landing.
-		ActionLog.no_op(reach,
-			"no_gunsmith" if gunsmith == null else "no_weapon")
+		var reason: String = "no_gunsmith" if gunsmith == null else "no_weapon"
+		ActionLog.no_op(reach, reason)
+		# The reason is rendered rather than merely recorded. A control that
+		# refuses and says nothing is the defect; recording it and showing it are
+		# the same act here because the readout subscribes to the record rather
+		# than duplicating the decision.
+		if _refusal_label:
+			_refusal_label.show_reason(reason)
 		return
 	var inv = player.get("inventory_ui")
 	if inv != null and inv.has_method("close_inventory") and inv.visible:
@@ -457,7 +476,6 @@ func _on_weapon_modify_requested(w: Weapon) -> void:
 	# Names what CHANGED, not merely that a handler ran: "OK" on its own would be
 	# a receipt wearing a result's clothes.
 	ActionLog.ok(reach, w.resource_path)
-
 func _on_pause_restart() -> void:
 	get_tree().paused = false
 	get_tree().reload_current_scene()

@@ -30,7 +30,14 @@ func _initialize() -> void:
 	# reported "0 REACHED" as if the player had clicked into a dead control. The
 	# first version of this harness did exactly that.
 	await process_frame
-	_run()
+	# AWAITED, and that word is load-bearing. _refusal_readout_renders_in_place()
+	# contains `await process_frame`, so calling it WITHOUT await runs it up to
+	# that suspension and throws the rest away: the section silently contributed
+	# ZERO checks while looking like it had run. The only symptom was an
+	# unexpected check count, which is exactly the symptom a count-based gate
+	# cannot diagnose -- it just reports a number. A section that can be skipped
+	# by its own signature is a section that will be.
+	await _run()
 	call_deferred("_quit", 0 if _fail == 0 else 1)
 
 
@@ -43,6 +50,7 @@ func _run() -> void:
 	_timestamps_keep_milliseconds()
 	_bounded_drops_the_oldest()
 	_real_click_through_a_real_scene()
+	await _refusal_readout_renders_in_place()
 	_scope_inventory()
 	_summary()
 
@@ -286,6 +294,95 @@ func _real_click_through_a_real_scene() -> void:
 	menu.queue_free()
 	ActionLog.clear()
 	ActionLog.configure(256)
+
+
+## The readout is the coordinator's decision, and the acceptance is behavioural
+## in the same spirit as the rest: a refusal must APPEAR where the control is,
+## survive until the state that caused it is resolved, and clear when the player
+## does something that works. A check that only asserted the node exists would
+## pass for a label that never shows anything.
+func _refusal_readout_renders_in_place() -> void:
+	ActionLog.clear()
+	var readout := RefusalReadout.new()
+	readout.name = "Readout"
+	root.add_child(readout)
+	await process_frame
+
+	_check(readout is Label, "readout: it is a plain in-place Label, not a window, a dialog or an overlay")
+	_check(readout.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"readout: and it ignores the mouse, so a readout cannot swallow the click it is reporting on")
+	_check(not readout.is_showing(), "readout: it shows nothing before anything has gone wrong")
+
+	# A NO_OP: the refusal case the card is about.
+	var h1 := ActionLog.reached("Harness/BtnCycle", "cycle_action")
+	ActionLog.no_op(h1, "inventory_weapon_has_no_cycled_action")
+	_check(readout.is_showing(), "readout: a NO_OP makes it SHOW a refusal")
+	_check(String(readout.text) == "inventory_weapon_has_no_cycled_action",
+		"readout: showing the reason, so the text says WHY [got '%s']" % String(readout.text))
+	_check(readout.is_inside_tree() and readout.get_parent() != null,
+		"readout: and it lives in the tree beside the control rather than in some global layer")
+
+	# A REFUSED is the same class of message to the player and must render too,
+	# while staying distinguishable in the RECORD.
+	var h2 := ActionLog.reached("Harness/BtnUnload", "unload_magazine")
+	ActionLog.refused(h2, "inventory_internal_feed_cannot_be_detached")
+	_check(readout.is_showing() and String(readout.text) == "inventory_internal_feed_cannot_be_detached",
+		"readout: a REFUSED also renders, with its own reason [got '%s']" % String(readout.text))
+	_check(ActionLog.result_name(int(ActionLog.entries()[-1]["result"])) == "REFUSED",
+		"readout: and the two stay DISTINGUISHABLE in the record, because the readout showing text is not the same as the result being OK")
+
+	# IT PERSISTS ACROSS TIME. This is the anti-toast property, and it is the
+	# reason the decision went the way it did: the player can look away, come
+	# back, and the answer is still there. There is no timer anywhere in this
+	# component, so the test is that frames pass and the text remains.
+	#
+	# WHAT THIS DOES NOT CLAIM, because I got it wrong first. I originally asserted
+	# that a click on a DIFFERENT control must not dismiss the refusal, and that
+	# check FAILED against correct code. Re-reading the decision settles it: the
+	# readout "clears when the player next does something that produces a RESULT".
+	# A click elsewhere that succeeds IS such a RESULT, so clearing is the DECIDED
+	# behaviour and my check was the thing that was wrong. Keeping it would have
+	# meant shipping a readout that contradicts a scope the owner set, and calling
+	# the divergence an anti-toast improvement. The decision wins.
+	# AND THE WAIT IS REAL TIME, not a couple of frames. The first version of this
+	# check awaited two process frames and a red arm that added a 0.5s auto-clear
+	# -- a textbook toast -- passed 63/63, because two frames is about 30
+	# milliseconds and the timer had not fired yet. The property is "there is no
+	# timer", and only waiting longer than any plausible timer can actually test
+	# it. 0.7s against an arm of 0.5s.
+	await create_timer(0.7).timeout
+	_check(readout.is_showing(), "readout: it survives 0.7s of real time with no interaction at all -- there is no timer, which is what separates it from a toast [showing %s]" % str(readout.is_showing()))
+	_check(String(readout.text) == "inventory_internal_feed_cannot_be_detached",
+		"readout: still showing the same reason, so a player who looks away and comes back finds the answer [text '%s']" % String(readout.text))
+
+	# And it clears on the next thing that WORKED, not on a timer.
+	var h3 := ActionLog.reached("Harness/BtnCycle", "cycle_action")
+	ActionLog.ok(h3)
+	_check(not readout.is_showing(), "readout: and clears once the player does something that succeeds")
+	_check(String(readout.text) == RefusalReadout.EMPTY_TEXT, "readout: leaving no stale text behind")
+
+	# The record is unaffected by the view existing. A view that is required for
+	# the record to work would invert the split the decision rests on.
+	_check(ActionLog.size() == 6, "readout: and the record itself is untouched by any of this [entries %d of 6]" % ActionLog.size())
+	_check(ActionLog.subscriber_count() == 1, "readout: the hook lives on the RECORD and the view subscribed to it, rather than the record depending on a view")
+
+	# queue_free() is DEFERRED, so asserting the view was gone after a single
+	# frame failed on a queued-but-not-yet-freed node. That is a harness bug and
+	# not a leak, and the two are worth telling apart: "still subscribed after
+	# being freed" would be a real defect, this is not.
+	readout.queue_free()
+	for _i in 4:
+		await process_frame
+	# With the view gone, recording still works: the record does not depend on
+	# anybody being looking at it.
+	var h4 := ActionLog.reached("Harness/BtnAlone", "nobody_watching")
+	ActionLog.no_op(h4, "no_listener")
+	_check(not readout.is_inside_tree(), "readout: the view is now out of the tree")
+	_check(ActionLog.subscriber_count() == 0,
+		"readout: and it UNSUBSCRIBED on the way out, so the record holds no reference to a freed view [subscribers %d of 0]" % ActionLog.subscriber_count())
+	_check(ActionLog.size() == 8, "readout: recording works with NO view attached, which is the direction the dependency must point [entries %d of 8]" % ActionLog.size())
+
+	ActionLog.clear()
 
 
 ## The card names a bounded scope and says wiring every control is NOT required.
