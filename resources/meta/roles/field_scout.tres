@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RoleDefinition" load_steps=3 format=3 uid="uid://c4policyrole001"]
+
+[ext_resource type="Script" path="res://src/meta/role_definition.gd" id="1_rd"]
+[ext_resource type="Resource" path="res://resources/meta/starter_loadout.tres" id="2_sl"]
+
+[resource]
+script = ExtResource("1_rd")
+id = "field_scout"
+display_name_key = "Field scout"
+grants = ExtResource("2_sl")
+on_entry = 1

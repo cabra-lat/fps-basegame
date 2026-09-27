@@ -10,6 +10,8 @@ extends SceneTree
 
 const TEST_DIR := "user://meta_deploy_raid"
 const M4 := "res://resources/weapons/M4_Carbine.tres"
+const POLICY_PATH := "res://resources/meta/death_policy.tres"
+const ROLE_PATH := "res://resources/meta/roles/field_scout.tres"
 const AK := "res://resources/weapons/AK_47.tres"
 const AMMO := "res://resources/ammo/5_56_45mm_SS109_VPAM_PM7.tres"
 const BANDAGE := "res://resources/medical/army_bandage.tres"
@@ -27,6 +29,7 @@ func _initialize() -> void:
 	_cleanup()
 	_scenario_clear_and_reload()
 	_scenario_loss_and_duplicate_signal()
+	await _scenario_death_policy_is_data()
 	_scenario_bad_save_recovery()
 	quit(v.finish())
 
@@ -249,3 +252,137 @@ func _cleanup() -> void:
 		return
 	for file_name in dir.get_files():
 		dir.remove(file_name)
+
+## INV-39 -- the death policy is DATA and the shipped .tres means what it says.
+## Promoted from the dead-end work (task_1790377289975_a7fc59 / 020326) and QA's
+## review discipline: every claim here is paired with the arm that would make it
+## vacuous, because a policy check that only ever sees the shipped default
+## proves nothing about the values a game would change.
+func _scenario_death_policy_is_data() -> void:
+	v.section("[3] death policy: the shipped .tres, and each value it can take")
+	var path := TEST_DIR + "/policy.save"
+	var shipped: DeathPolicy = load(POLICY_PATH)
+	_check(shipped != null, "death_policy.tres loads")
+	if shipped == null:
+		return
+	_check(shipped.validate().is_empty(),
+		"the shipped policy has no configuration problems (%s)" % ", ".join(shipped.validate()))
+	_check(shipped.loss == DeathPolicy.Loss.CONSUME,
+		"the shipped policy is CONSUME: the human's answer, derived rather than chosen")
+	_check(not shipped.safe_pocket.is_empty(),
+		"the safe pocket ships POPULATED (a pocket with nothing in it is a word in a design doc)")
+	for entry in shipped.safe_pocket:
+		_check(ResourceLoader.exists(entry), "safe pocket entry loads: %s" % entry)
+
+	# The pocket has to actually keep something, or `partition` is a no-op dressed
+	# as a feature. Drive a real death with a pocketed item in the manifest.
+	# The value arms live in their own function: this one asserts what the
+	# shipped data SAYS, that one asserts what each value DOES. The split is
+	# what keeps both inside the 60-line audit limit.
+	_policy_value_arms()
+	# and the role's declarations, which are a separate claim
+
+## The value arms: every claim the shipped .tres does not make on its own,
+## each paired with the case that would make it vacuous. Extracted from
+## _scenario_death_policy_is_data purely for the audit's long-function limit;
+## same checks, same order, same messages.
+func _policy_value_arms() -> void:
+	# The armed item is the weapon, because an item that never equips was never
+	# at risk: `_resolve_loss` has always returned un-equipped entries as
+	# leftovers, so a bandage in `secondary` comes back under ANY policy and would
+	# make every arm here pass without the policy doing anything. The first
+	# version of this test used the bandage and reported a green that measured
+	# nothing -- the tell was that the "pocket keeps it" arm passed even with
+	# `recoverable = false`.
+	var armed := DeathPolicy.new()
+	armed.loss = DeathPolicy.Loss.CONSUME
+	armed.recoverable = true
+	armed.safe_pocket = [M4]
+	var pocketed := _death_with_policy(armed)
+	_check(pocketed.get("kept_paths", []).has(M4),
+		"an ARMED item in the safe pocket SURVIVES a death (kept=%s)" % str(pocketed.get("kept_paths", [])))
+	_check(not pocketed.get("lost_paths", []).has(M4),
+		"an armed item in the safe pocket is NOT reported lost (lost=%s)" % str(pocketed.get("lost_paths", [])))
+	_check(pocketed.get("lost_paths", []).has(AK) and not pocketed.get("kept_paths", []).has(AK),
+		"an armed item NOT in the safe pocket is still lost -- the pocket is a subset, not an amnesty")
+
+	# The switch the original request called "probably a setting".
+	var no_recovery := DeathPolicy.new()
+	no_recovery.recoverable = false
+	no_recovery.safe_pocket = [M4]
+	var hard := _death_with_policy(no_recovery)
+	_check(hard.get("lost_paths", []).has(M4) and not hard.get("kept_paths", []).has(M4),
+		"recoverable = false forfeits even a pocketed armed item (kept=%s lost=%s)" % [str(hard.get("kept_paths", [])), str(hard.get("lost_paths", []))])
+
+	# The opposite extreme, so the enum is exercised at both ends.
+	var keep_all := DeathPolicy.new()
+	keep_all.loss = DeathPolicy.Loss.CONSUME_KEEP_ALL
+	var all_kept := _death_with_policy(keep_all)
+	_check(all_kept.get("lost_paths", []).is_empty() and not all_kept.get("kept_paths", []).is_empty(),
+		"CONSUME_KEEP_ALL returns the whole kit (lost=%s kept=%s)" % [str(all_kept.get("lost_paths", [])), str(all_kept.get("kept_paths", []))])
+
+	# REGRANT: the kit is lost AND a starter comes back, which is the value a
+	# game would pick instead of CONSUME.
+	var regrant := DeathPolicy.new()
+	regrant.loss = DeathPolicy.Loss.REGRANT
+	regrant.starter = load("res://resources/meta/starter_loadout.tres")
+	_check(regrant.validate().is_empty(), "a REGRANT policy with a starter is a valid configuration")
+	var re_granted := _death_with_policy(regrant)
+	_check(not re_granted.get("kept_paths", []).is_empty(),
+		"REGRANT leaves the player a deployable kit (kept=%s)" % str(re_granted.get("kept_paths", [])))
+
+	# A REGRANT policy with no starter cannot mean what it says, and says so.
+	var broken := DeathPolicy.new()
+	broken.loss = DeathPolicy.Loss.REGRANT
+	_check(not broken.validate().is_empty(),
+		"a REGRANT policy with no starter is reported as a configuration error")
+
+	_role_declaration_arms()
+
+## The role arms. Split out for the same reason as _policy_value_arms.
+func _role_declaration_arms() -> void:
+	# The role is a declaration, and a declaration with no name is not one.
+	var role: RoleDefinition = load(ROLE_PATH)
+	_check(role != null, "field_scout.tres loads")
+	if role != null:
+		_check(not String(role.id).is_empty() and role.display_name_key != "" and role.grants != null,
+			"the role declares an id, a display name key and a kit")
+		_check(role.validate().is_empty(),
+			"the role has no configuration problems (%s)" % ", ".join(role.validate()))
+		_check(role.should_grant(false) and not role.should_grant(true),
+			"GRANT_ONCE grants to a fresh profile and not to one already granted")
+		var always := RoleDefinition.new()
+		always.on_entry = RoleDefinition.EntryPolicy.GRANT_ALWAYS
+		always.grants = load("res://resources/meta/starter_loadout.tres")
+		_check(always.should_grant(true),
+			"GRANT_ALWAYS grants even to a profile that already has the kit")
+
+## Resolve one death under `policy` and report which item paths came back and
+## which were destroyed. Reads the real settlement: this is the code path a
+## player loses a kit on, not `partition` called in isolation.
+func _death_with_policy(policy: DeathPolicy) -> Dictionary:
+	var service := MetaService.new()
+	service.use_profile(MetaProfile.new(), TEST_DIR + ("policy_%d_%d.save" % [int(policy.loss), 1 if policy.recoverable else 0]))
+	service.death_policy = policy
+	var second := ItemCodec.item_from_path(AK)
+	var weapon := ItemCodec.item_from_path(M4)
+	if second == null or weapon == null:
+		return {"kept_paths": [], "lost_paths": [], "error": "item missing"}
+	service.profile.loadout = {
+		"primary": [ItemCodec.encode_item(weapon)],
+		"secondary": [ItemCodec.encode_item(second)],
+	}
+	service.bind_raid(Raid.new())
+	service.bind_carrier(Equipment.new(), Backpack.new())
+	service.prepare_raid_checked()
+	var report := service.resolve_raid(Raid.Outcome.KIA, 0)
+	if report == null:
+		return {"kept_paths": [], "lost_paths": [], "error": "no report"}
+	var kept: Array[String] = []
+	for slot in service.profile.loadout:
+		for data in service.profile.loadout[slot]:
+			kept.append(String((data as Dictionary).get("path", "")))
+	var lost: Array[String] = []
+	for brief in report.lost:
+		lost.append(String((brief as Dictionary).get("path", "")))
+	return {"kept_paths": kept, "lost_paths": lost}
