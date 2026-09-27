@@ -35,6 +35,15 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 
+[node name="StashSummary" type="Label" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "stored goods"
+
+[node name="StashRows" type="VBoxContainer" parent="Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+
 [node name="BtnResolve" type="Button" parent="Panel"]
 unique_name_in_owner = true
 layout_mode = 2
