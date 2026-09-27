@@ -127,6 +127,7 @@ const HARNESS_SCRIPTS = [
   ['ballistics', 'res://addons/cabra.lat_shooters/test/validate_ballistics.gd'],
   ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
   ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
+  ['weapon_requests_runtime', 'res://addons/cabra.lat_shooters/test/validate_weapon_requests_runtime.gd'],
   ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
   ['meta_progression', 'res://src/meta/validate_meta_progression.gd'],
   ['meta_market', 'res://src/meta/validate_meta_market.gd'],
@@ -179,6 +180,19 @@ const MIN_CHECKS = {
   ballistics: 52,
   weapon_mechanics: 45,
   inventory_ux: 77,
+  // 38a378. EXECUTED-behaviour checks for the three inventory weapon actions, as
+  // distinct from the connection checks in validate_ui_wiring. Registered in the
+  // same change as the change_magazine null-branch fix, deliberately: an
+  // unregistered harness is not parked, it is a test that silently rots, and a
+  // rot test reads as coverage. The fix and the registration landing together
+  // means neither can be done without the other.
+  //
+  // 36 of these are the post-fix count the coordinator specified (32 pass / 4 fail
+  // became 36 pass / 0 fail, and that number is the signal that the fix worked --
+  // not the absence of an error). The remaining 10 are the detach-gate controls
+  // added alongside it, including the one that fails if a later refactor lets a
+  // null detach bypass the INTERNAL gate.
+  weapon_requests_runtime: 46,
   meta_persistence: 126,
   meta_progression: 34,
   meta_market: 53,
