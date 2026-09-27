@@ -144,16 +144,34 @@ func _run() -> void:
 	_check(keep_view.safe_pocket_rows()[0]["id"] == "M4_Carbine",
 		"the pocket row carries registry identity too (got '%s')" % String(keep_view.safe_pocket_rows()[0]["id"]))
 
-	# A GENUINE DIVERGENCE BETWEEN TWO APIs IN THE SAME CLASS, recorded rather
-	# than worked around. Under CONSUME_KEEP_ALL, partition() keeps every carried
-	# entry (it checks `loss`) while keeps() does not: keeps() only consults
-	# `recoverable` and `safe_pocket`. So the two disagree for any item that is
-	# not literally in the pocket. is_kept_on_death() delegates to keeps(), so
-	# this view reports "not spared" for an item the loss sweep would return.
-	# I am NOT changing src/meta/death_policy.gd -- it is main's file and whether
-	# keeps() should mean "the loss switch spares this" is a product call. The
-	# check pins the CURRENT behaviour so a future fix is a visible change and not
-	# a silent one.
+	# A GENUINE DIVERGENCE BETWEEN TWO APIs IN THE SAME CLASS, pinned rather than
+	# worked around. Under CONSUME_KEEP_ALL, partition() keeps every carried
+	# entry while keeps() does not:
+	#   - keeps()      death_policy.gd:68-73 -- consults `recoverable` and
+	#                  `safe_pocket` and NEVER reads `loss`.
+	#   - partition()  death_policy.gd:86 -- `if loss == Loss.CONSUME_KEEP_ALL or
+	#                  _kept_by_policy(data)`, i.e. the loss mode is tested FIRST.
+	# So for any carried item not literally in the pocket the two disagree.
+	# is_kept_on_death() delegates to keeps(), so this view reports "not spared"
+	# for an item the loss sweep would hand back.
+	#
+	# NOT PATCHED HERE, DELIBERATELY, AND NOT BECAUSE IT IS UNCLEAR. The
+	# coordinator determined the direction on 2026-09-27: CONSUME_KEEP_ALL
+	# declares that every carried item is kept, partition() implements exactly
+	# that, and keeps() can never produce that answer -- so keeps() is what must
+	# change, and the symmetric "fix" of making partition() drop items would be
+	# wrong. The FIX IS ROUTED TO META, because src/meta/ is meta's file and two
+	# lanes touching death_policy.gd in one night coupled their staging before.
+	# The view is not compensating: no loss check here, no reimplementation of
+	# partition's rules in the view, because a view that second-guesses its
+	# dependency is a second place for the policy to rot.
+	#
+	# *** WHEN THIS CHECK FAILS, THAT IS THE FIX LANDING, NOT A REGRESSION. ***
+	# Once keeps() honours the loss switch, `keeps` becomes true here and this
+	# assertion fails. That failure is the evidence the fix landed, and it must
+	# be INVERTED in the same commit -- assert that the two AGREE, rather than
+	# softened to tolerate both outcomes. Softening it would throw away the only
+	# thing this finding produced: a test that can tell the bug from the fix.
 	var keep_all := DeathPolicy.new()
 	keep_all.loss = DeathPolicy.Loss.CONSUME_KEEP_ALL
 	keep_all.recoverable = true
@@ -161,9 +179,9 @@ func _run() -> void:
 	p_keep.loadout = {"primary": [{"path": BRAZIL.resource_path}]}
 	var keep_all_view := StashView.new(p_keep, keep_all)
 	var partition_keeps: bool = keep_all.partition(p_keep.loadout)["lost"].is_empty()
-	_check(partition_keeps == true and keep_all_view.is_kept_on_death(BRAZIL.resource_path) == false,
-		"KNOWN DIVERGENCE, pinned: under KEEP_ALL partition() returns the item but keeps() does not (partition=%s keeps=%s)"
-			% [partition_keeps, keep_all_view.is_kept_on_death(BRAZIL.resource_path)])
+	var keeps_now: bool = keep_all_view.is_kept_on_death(BRAZIL.resource_path)
+	_check(partition_keeps == true and keeps_now == false,
+		"KNOWN DIVERGENCE, pinned: under KEEP_ALL partition() returns the item but keeps() does not (partition=%s keeps=%s). IF THIS FAILS, keeps() now honours the loss switch and the fix landed -- INVERT this assertion to assert agreement, in the same commit. Do not soften it." % [partition_keeps, keeps_now])
 
 	# ── recoverable items are INSURANCE's, and a claim is not ownership ─────
 	var p3 := _profile()
