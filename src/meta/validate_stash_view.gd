@@ -144,44 +144,70 @@ func _run() -> void:
 	_check(keep_view.safe_pocket_rows()[0]["id"] == "M4_Carbine",
 		"the pocket row carries registry identity too (got '%s')" % String(keep_view.safe_pocket_rows()[0]["id"]))
 
-	# A GENUINE DIVERGENCE BETWEEN TWO APIs IN THE SAME CLASS, pinned rather than
-	# worked around. Under CONSUME_KEEP_ALL, partition() keeps every carried
-	# entry while keeps() does not:
-	#   - keeps()      death_policy.gd:68-73 -- consults `recoverable` and
-	#                  `safe_pocket` and NEVER reads `loss`.
-	#   - partition()  death_policy.gd:86 -- `if loss == Loss.CONSUME_KEEP_ALL or
-	#                  _kept_by_policy(data)`, i.e. the loss mode is tested FIRST.
-	# So for any carried item not literally in the pocket the two disagree.
-	# is_kept_on_death() delegates to keeps(), so this view reports "not spared"
-	# for an item the loss sweep would hand back.
+	# keeps() AND partition() MUST AGREE. This arm was written the other way round
+	# and was deliberately INVERTED rather than softened when the fix landed.
 	#
-	# NOT PATCHED HERE, DELIBERATELY, AND NOT BECAUSE IT IS UNCLEAR. The
-	# coordinator determined the direction on 2026-09-27: CONSUME_KEEP_ALL
-	# declares that every carried item is kept, partition() implements exactly
-	# that, and keeps() can never produce that answer -- so keeps() is what must
-	# change, and the symmetric "fix" of making partition() drop items would be
-	# wrong. The FIX IS ROUTED TO META, because src/meta/ is meta's file and two
-	# lanes touching death_policy.gd in one night coupled their staging before.
-	# The view is not compensating: no loss check here, no reimplementation of
-	# partition's rules in the view, because a view that second-guesses its
-	# dependency is a second place for the policy to rot.
+	# THE FINDING, for the next reader. Under CONSUME_KEEP_ALL the two disagreed:
+	#   - keeps()      consulted only `recoverable` and `safe_pocket` and never
+	#                  read `loss` at all;
+	#   - partition()  tested `loss == Loss.CONSUME_KEEP_ALL or _kept_by_policy(...)`
+	#                  first, so it kept everything.
+	# is_kept_on_death() delegates to keeps(), so the home screen reported "not
+	# spared" for items the loss sweep actually returned -- and _resolve_loss
+	# builds report.lost and the insurance claim from that same split, so the
+	# number a player is SHOWN would have disagreed with the number they are PAID.
+	# Reported by me, pinned by this arm, fixed by meta in 42f7cd6 (agent/
+	# meta-death-policy), which refactored both entry points onto a single
+	# _spared() so the two cannot diverge by omission again.
 	#
-	# *** WHEN THIS CHECK FAILS, THAT IS THE FIX LANDING, NOT A REGRESSION. ***
-	# Once keeps() honours the loss switch, `keeps` becomes true here and this
-	# assertion fails. That failure is the evidence the fix landed, and it must
-	# be INVERTED in the same commit -- assert that the two AGREE, rather than
-	# softened to tolerate both outcomes. Softening it would throw away the only
-	# thing this finding produced: a test that can tell the bug from the fix.
-	var keep_all := DeathPolicy.new()
-	keep_all.loss = DeathPolicy.Loss.CONSUME_KEEP_ALL
-	keep_all.recoverable = true
-	var p_keep := _profile()
-	p_keep.loadout = {"primary": [{"path": BRAZIL.resource_path}]}
-	var keep_all_view := StashView.new(p_keep, keep_all)
-	var partition_keeps: bool = keep_all.partition(p_keep.loadout)["lost"].is_empty()
-	var keeps_now: bool = keep_all_view.is_kept_on_death(BRAZIL.resource_path)
-	_check(partition_keeps == true and keeps_now == false,
-		"KNOWN DIVERGENCE, pinned: under KEEP_ALL partition() returns the item but keeps() does not (partition=%s keeps=%s). IF THIS FAILS, keeps() now honours the loss switch and the fix landed -- INVERT this assertion to assert agreement, in the same commit. Do not soften it." % [partition_keeps, keeps_now])
+	# WHY IT IS A MATRIX AND NOT THE ONE ROW THAT FOUND THE BUG. The original arm
+	# covered KEEP_ALL + recoverable=true only. Fixing the switch there and
+	# nothing else would pass. A regression in any of the five rows below -- or a
+	# future switch added to one entry point and not the other -- fails here, which
+	# is the whole value of pinning a divergence rather than documenting it.
+	#
+	# IT MUST STAY ARMED. If this ever fails, one of the two entry points has
+	# drifted again; do NOT relax a row to make it pass.
+	#
+	# THE `expected` TERM IS LOAD-BEARING, AND AN ARM PROVED IT. Removing the
+	# loss switch from _spared() makes BOTH entry points return false -- so they
+	# AGREE, and a check asserting only `kept == asked` would have PASSED while
+	# the policy quietly stopped honouring KEEP_ALL. Agreement is necessary and
+	# not sufficient; the third term is what catches both entry points drifting
+	# together. Measured, not reasoned: with the switch deleted this row reported
+	# partition=false keeps=false, and only `kept == expected` turned it red.
+	var _agreements: Array[String] = []
+	var _rows := [
+		# [loss, recoverable, in_pocket, expected_spared, label]
+		[DeathPolicy.Loss.CONSUME_KEEP_ALL, true, false, true, "KEEP_ALL keeps everything"],
+		[DeathPolicy.Loss.CONSUME_KEEP_ALL, false, false, true,
+			"KEEP_ALL + recoverable=false still keeps (the switch wins; the old keeps() said false here)"],
+		[DeathPolicy.Loss.CONSUME, true, true, true, "CONSUME spares a pocket item"],
+		[DeathPolicy.Loss.CONSUME, true, false, false, "CONSUME does not spare an unflagged item"],
+		[DeathPolicy.Loss.CONSUME, false, true, false,
+			"CONSUME + recoverable=false spares nothing, even from a populated pocket"],
+	]
+	for row in _rows:
+		var loss_mode: int = row[0]
+		var rec: bool = row[1]
+		var in_pocket: bool = row[2]
+		var expected: bool = row[3]
+		var label: String = row[4]
+		var pol := DeathPolicy.new()
+		pol.loss = loss_mode
+		pol.recoverable = rec
+		if in_pocket:
+			pol.safe_pocket = [BRAZIL.resource_path]
+		var prof := _profile()
+		prof.loadout = {"primary": [{"path": BRAZIL.resource_path}]}
+		var kept: bool = pol.partition(prof.loadout)["lost"].is_empty()
+		var asked: bool = StashView.new(prof, pol).is_kept_on_death(BRAZIL.resource_path)
+		_agreements.append("%s: partition=%s keeps=%s want=%s" % [label, kept, asked, expected])
+		_check(kept == asked and kept == expected,
+			"the two entry points AGREE and both give the right answer -- %s (partition=%s keeps=%s)"
+				% [label, kept, asked])
+	_check(_agreements.size() == 5, "all five policy configurations are compared, not just the one that found the bug")
+
 
 	# ── recoverable items are INSURANCE's, and a claim is not ownership ─────
 	var p3 := _profile()
