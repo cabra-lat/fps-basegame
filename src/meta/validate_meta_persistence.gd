@@ -45,6 +45,7 @@ func _initialize() -> void:
 	TranslationProbe.select_test_locale()
 	v = ValidateUtil.new("validate_meta_persistence")
 	v.begin()
+	_check_round_trip_survives()
 	DirAccess.make_dir_recursive_absolute(TEST_DIR)
 	_cleanup()
 
@@ -812,3 +813,47 @@ func _cleanup() -> void:
 		return
 	for f in d.get_files():
 		d.remove(f)
+
+
+## An item must SURVIVE a save/load round trip, from ANY directory.
+##
+## THIS EXISTS BECAUSE A DISPOSABLE PROBE CAUGHT A REAL DEFECT and was then
+## deleted. Do not simplify this away. The bug: encode_item() read
+## "content.resource_path" bare for a plain Item and for InventoryContainer.
+## Weapons and attachments had a base_path meta tag plus a directory scan as
+## fallbacks; a plain Item had NEITHER. The arena duplicates item templates at
+## runtime, and a duplicate loses resource_path, so every armour, medical and
+## magazine item became an empty path on encode and was then DROPPED by
+## _decode_plain with only a warning. Silent data loss on save, affecting 50 of
+## the shipped items, invisible until something actually round-tripped one.
+##
+## The red arm that proves this bites: restore the bare resource_path read and 2
+## of these 3 items are lost. M4_Carbine is in the set ON PURPOSE -- it survives
+## either way, because weapons always had the fallback. That asymmetry IS the bug:
+## one save/load path was safe for a category and lossy for the rest.
+func _check_round_trip_survives() -> void:
+	var cases := [
+		["res://resources/medical/army_bandage.tres", "medical"],
+		["res://resources/medical/ai2_medkit.tres", "medical"],
+		["res://resources/armor/GOST_BR1.tres", "armor"],
+	]
+	var lost: Array[String] = []
+	for c in cases:
+		var src := load(String(c[0])) as Resource
+		_check(src != null and src is Item,
+			"the %s round-trip fixture loads as an Item (%s)" % [c[1], c[0]])
+		var dup := src.duplicate(true)
+		_check(dup.resource_path == "",
+			"a runtime duplicate of the %s item has NO resource_path, which is what made this lossy" % c[1])
+		var enc := ItemCodec.encode_item(InventorySystem.create_inventory_item(dup as Item, 1))
+		_check(String(enc.get("path", "")) != "",
+			"a runtime-duplicated %s item still encodes a CONTENT PATH (%s -> %s)"
+				% [c[1], String(src.resource_path).get_file(), String(enc.get("path", "<ABSENT>"))])
+		if ItemCodec.decode_item(enc) == null:
+			lost.append(String(c[1]))
+	_check(lost.is_empty(),
+		"NO runtime-duplicated item is lost on a save/load round trip (lost: %s)" % ", ".join(lost))
+	var wdup := (load("res://resources/weapons/M4_Carbine.tres") as Resource).duplicate(true)
+	_check(ItemCodec.decode_item(
+			ItemCodec.encode_item(InventorySystem.create_inventory_item(wdup as Item, 1))) != null,
+		"and a runtime-duplicated WEAPON still round-trips, so the fallback is not weapon-specific")
