@@ -16,6 +16,8 @@
 #       schema-identical to the F9 path with the not_sampled rule intact
 #   [K] the mon == -1 exit of the not-sampled rule: an engine monitor that does
 #       not resolve must degrade to a NAMED hole, never to a number
+#   [L] every ENGINE_MONITOR id is a PER-FRAME duration, pinned by measurement so
+#       a cumulative clock can never be published as a cost again
 #
 # [J] PROVES THE AFFORDANCE'S CONTRACT, NOT THE ENGINE'S DELIVERY. It calls the
 # shutdown handler directly and checks the file it writes. That the engine
@@ -37,6 +39,8 @@ extends SceneTree
 
 const OUT := "user://validate_profiler"
 
+var _l_probe: ProfilerSemantics = null
+var _l_pub: Profiler = null
 var v: ValidateUtil
 var _deferred = false
 
@@ -61,8 +65,20 @@ func _initialize() -> void:
 
 # Runs once the tree is up. Sections [E3]..[I] need a live tree; [A]..[E2] do not.
 func _process(_delta: float) -> bool:
+	# false, not true, on BOTH exits.
+	#
+	# Before setup: keep the tree alive.
+	# After setup: keep the tree alive so [L]'s probe gets its frames.
+	#
+	# This guard used to `return true`, which was correct when _process was a
+	# one-shot: the sections ran on frame 1, called quit(), done. [L] needs live
+	# frames, and `return true` ended the tree on the SECOND frame — the frame
+	# after the one-shot had already cleared _deferred — so the probe died part
+	# way through with no output, no summary, and rc=0. A gate that ends
+	# silently and successfully is the worst failure mode in this file, and it
+	# is why the exit code alone is not evidence that a section ran.
 	if not _deferred:
-		return true
+		return false
 	_deferred = false
 	_e3_accessor_published_before_start()
 	_f_ring_buffer()
@@ -71,10 +87,20 @@ func _process(_delta: float) -> bool:
 	_i_overlay()
 	_j_dump_on_exit()
 	_k_monitor_miss_is_a_hole()
-
-	v.finish()
-	quit(v.failed)
-	return true
+	# [L] needs live frames, and this is the FIRST section in the file that does.
+	# It is driven by a CALLBACK, not by await, and that is not a style choice:
+	# a function containing `await` is a coroutine, and under `--script` on a
+	# SceneTree the engine discards an unawaited coroutine — so calling it
+	# without `await` runs a third of the section AFTER RESULT: PASS has already
+	# been printed, and awaiting it instead suspends _initialize() so the tree
+	# never reaches quit(). Both were tried; both lie. The callback keeps the
+	# main loop driving, samples every frame, and runs the assertions BEFORE
+	# finish(), which is the only ordering that is actually true.
+	_l_start()
+	# false, not true: _finish_gate() is what ends the run, once the probe has
+	# its frames. Returning true here would stop the tree on the first frame and
+	# the probe would never be sampled.
+	return false
 
 # ─── [A] REGISTRY ──────────────────────────────────────────────────────────
 
@@ -513,7 +539,14 @@ func _k_monitor_miss_is_a_hole() -> void:
 	# and needs no SceneTree, no opt-in and no accumulated state, so this section
 	# cannot be affected by how the profiler was brought up.
 	var p: Profiler = Profiler.new()
+	_k_missing_monitor_is_a_hole(p)
+	_k_resolvable_monitor_still_samples(p)
+	_reset_instrument()
 
+## The hole side of [K], split from its sibling so that neither half is a
+## 79-line function — the size at which a reader stops checking a test against
+## the thing it claims to test.
+func _k_missing_monitor_is_a_hole(p: Profiler) -> void:
 	# A monitor name this engine does not have. Any id outside monitor_name()'s
 	# match list resolves to "", and "" to -1, which is the branch under test.
 	var missing := ProfilerSubsystems.Entry.new(
@@ -531,9 +564,10 @@ func _k_monitor_miss_is_a_hole() -> void:
 	v.check(String(e.get("reason", "")).contains("no_such_monitor"),
 		"and the reason NAMES the subsystem, so the hole says which hole it is (reason: %s)" % str(e.get("reason")))
 
-	# The other direction: an id that DOES resolve must still produce a number.
-	# Without this, the checks above would be satisfied by a _entry_for() that
-	# reports not_sampled unconditionally.
+## The other direction: an id that DOES resolve must still produce a number.
+## Without this, the checks in _k_missing_monitor_is_a_hole would be satisfied by
+## a _entry_for() that reports not_sampled unconditionally.
+func _k_resolvable_monitor_still_samples(p: Profiler) -> void:
 	var real_id := &"process_total"
 	var real_entry: ProfilerSubsystems.Entry = null
 	for x in ProfilerSubsystems.entries():
@@ -541,18 +575,107 @@ func _k_monitor_miss_is_a_hole() -> void:
 			real_entry = x
 			break
 	v.check(real_entry != null, "the registry still contains a resolvable engine-monitor id")
-	if real_entry != null:
-		v.check(real_entry.monitor() != -1, "and it resolves in THIS engine (%s)" % real_entry.monitor_name())
-		var r := p._entry_for(real_entry, {})
-		v.check(r.get("state") == "sampled",
-			"a resolvable monitor still reports sampled (got '%s')" % str(r.get("state")))
-		v.check(r.has("value") and typeof(r["value"]) in [TYPE_FLOAT, TYPE_INT],
-			"with a numeric value, so [K] is not satisfied by blanket not_sampled")
+	if real_entry == null:
+		return
+	v.check(real_entry.monitor() != -1, "and it resolves in THIS engine (%s)" % real_entry.monitor_name())
+	var r := p._entry_for(real_entry, {})
+	v.check(r.get("state") == "sampled",
+		"a resolvable monitor still reports sampled (got '%s')" % str(r.get("state")))
+	v.check(r.has("value") and typeof(r["value"]) in [TYPE_FLOAT, TYPE_INT],
+		"with a numeric value, so [K] is not satisfied by blanket not_sampled")
 
-	_reset_instrument()
+## [L] Every ENGINE_MONITOR id is a per-frame duration, and the profiler
+## publishes it as one.
+##
+## A capture read physics_process_total as 17.8 ms early and 3567 ms late with
+## almost no decreases, and was diagnosed as a cumulative clock published as a
+## per-frame cost. The proposed fix was to demote the entry to a hole. That
+## diagnosis was wrong, and the way to stop it being re-derived is to MEASURE
+## the semantics in the gate rather than argue about them in review.
+##
+## The measuring is done by ProfilerSemantics (src/dev/profiler/
+## semantics_probe.gd) because it is an instrument, not a verdict. The verdicts
+## stay here, in one place, where a reviewer can read what is and is not claimed.
+func _l_start() -> void:
+	# The detector is pinned FIRST, on data where the answer is not in doubt. A
+	# "nothing looks wrong" assertion is satisfied by a detector that never
+	# fires, so the detector is itself under test before it is trusted.
+	v.check(ProfilerSemantics.looks_cumulative(PackedFloat64Array([1.0, 2.0, 3.0, 10.0, 40.0, 400.0])),
+		"[L] detector: a series that only rises, fast, is recognised as a running total")
+	v.check(not ProfilerSemantics.looks_cumulative(PackedFloat64Array([10.0, 3.0, 11.0, 2.0, 9.0, 4.0])),
+		"[L] detector: a series that rises and falls is not")
+	v.check(not ProfilerSemantics.looks_cumulative(PackedFloat64Array([5.0, 5.0, 5.0, 5.0])),
+		"[L] detector: a flat series is not — 0 draw calls headless is not a leak")
 
-## Puts the instrument back to how a release build looks: no instance, recorder
-## inert, no accumulated state.
+	var ids: Array[StringName] = []
+	for e in ProfilerSubsystems.entries():
+		if e.source == ProfilerSubsystems.Source.ENGINE_MONITOR:
+			ids.append(e.id)
+	v.check(ids.size() >= 3,
+		"precondition: there are engine-monitor ids to check (found %d)" % ids.size())
+	if ids.is_empty():
+		_finish_gate()
+		return
+	_l_probe = ProfilerSemantics.new()
+	_l_pub = Profiler.new()
+	_l_probe.start(root, ids, _l_pub, _l_report)
+	# Deliberately no finish()/quit() here: this returns to _process, which
+	# returns to the engine, and the tree keeps iterating until the probe calls
+	# back into _l_report().
+
+func _l_report(probe: ProfilerSemantics) -> void:
+	v.check(probe.frames >= 2,
+		"the probe ran live frames rather than exiting at once (%d)" % probe.frames)
+	for id in probe.raw.keys():
+		_l_check_series("engine monitor '%s'" % id, probe.raw[id], false)
+	for id in probe.published.keys():
+		_l_check_series("published '%s'" % id, probe.published[id], true)
+
+	# The positive form, which is the assertion that can actually CATCH a running
+	# total rather than merely fail to notice one. The probe alternates the
+	# physics load 1x / 48x once per FRAME, so a monitor reporting a per-frame
+	# cost has to fall on the way back down; a running total physically cannot.
+	# This distinguishes the two behaviours rather than merely noticing that a
+	# number changed — a test that only asserted "not the old value" would pass
+	# just as happily on a different wrong number.
+	#
+	# The 1.25 below is deliberately low, and the reason is worth keeping next to
+	# it. It is not asserting that the swing is dramatic — it is asserting only
+	# that the series is NOT CONSTANT, so that the fall above is signal rather
+	# than jitter. The load itself is what carries the weight: at 1x/240x the
+	# measured swing is roughly 7x (e.g. 867 ms against 114 ms), so the check is
+	# not balanced on a knife edge. An earlier version injected 48x, which showed
+	# only ~1.8x, and under the full gate's load that compressed far enough to
+	# produce zero falls in 9 samples — a red arm for the wrong reason, on
+	# correct code. Fixing it by raising the injected load rather than by
+	# lowering the bar is the whole point.
+	var pp: PackedFloat64Array = probe.published.get(&"physics_process_total", PackedFloat64Array())
+	if pp.size() >= 4:
+		var swings := ProfilerSemantics.falls(pp)
+		v.check(swings >= 1,
+			"under a 1x/240x per-frame load swing, the published physics cost FALLS at least once (%d falls in %d samples) — a running total could not"
+				% [swings, pp.size()])
+		v.check(ProfilerSemantics.max_of(pp) > ProfilerSemantics.min_nonzero(pp) * 1.25,
+			"and the swing is actually visible in the data, so the fall above is not noise (max=%.4f, smallest non-zero=%.4f)"
+				% [ProfilerSemantics.max_of(pp), ProfilerSemantics.min_nonzero(pp)])
+	_finish_gate()
+
+func _l_check_series(what: String, s: PackedFloat64Array, is_published: bool) -> void:
+	var tail := "" if s.size() < 2 else ", first=%.4f last=%.4f" % [s[0], s[s.size() - 1]]
+	v.check(s.size() >= 2, "%s was sampled more than once (%d samples)" % [what, s.size()])
+	if s.size() < 2:
+		return
+	var n := ProfilerSemantics.falls(s)
+	var claim := "a running total presented as a per-frame cost" if is_published \
+		else "a running total published as a cost"
+	v.check(not ProfilerSemantics.looks_cumulative(s),
+		"%s is not %s (%d samples, %d falls%s)" % [what, claim, s.size(), n, tail])
+
+## The one place the gate is allowed to end, so a section that needs live frames
+## and one that does not cannot disagree about who prints the summary.
+func _finish_gate() -> void:
+	v.finish()
+	quit(v.failed)
 func _reset_instrument() -> void:
 	if Profiler.instance != null and is_instance_valid(Profiler.instance):
 		Profiler.instance.free()

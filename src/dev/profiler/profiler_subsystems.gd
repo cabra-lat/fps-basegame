@@ -91,17 +91,36 @@ static func entries() -> Array[Entry]:
 	var list: Array[Entry] = []
 	# The card asks for "the physics step as a whole". This engine cannot answer
 	# that, and the answer must be a gap rather than a plausible number: see
-	# physics_step below. physics_process_total is the script half of it, not the
-	# same thing, and labelling it as the whole step would be a lie in a field
-	# name.
+	# physics_step below.
 	list.append(new_id(&"physics_step", "physics step (whole)", Source.UNAVAILABLE, "", "time",
 		"Godot 4.7 exposes NO monitor for the whole physics step. Verified against all 60 "
-		+ "Performance.Monitor constants: TIME_PHYSICS_STEP and TIME_TOTAL do not exist. The nearest "
-		+ "real measurement is physics_process_total, which times script _physics_process callbacks "
-		+ "only and excludes the physics server, broadphase and solving. Frame-total minus script time "
-		+ "would be an inference rather than a measurement, so no number is reported here."))
+		+ "Performance.Monitor constants: TIME_PHYSICS_STEP and TIME_TOTAL do not exist. "
+		+ "Frame-total minus script time would be an inference rather than a measurement, so no "
+		+ "number is reported here."))
 	list.append(new_id(&"process_total", "_process total (all scripts)", Source.ENGINE_MONITOR, "Performance.TIME_PROCESS"))
-	list.append(new_id(&"physics_process_total", "_physics_process total (scripts only)", Source.ENGINE_MONITOR, "Performance.TIME_PHYSICS_PROCESS"))
+	# MEASURED, not remembered. A capture in which this id read 17.8 ms early and
+	# 3567 ms late, with almost no decreases, was read as a cumulative clock, and
+	# the fix proposed for that reading was to demote this entry to a hole. That
+	# reading is wrong, and the gate now pins the real semantics (validate_profiler
+	# section [L]) so it cannot be re-derived:
+	#
+	#   * it FALLS. Under a controlled, known, varying script load it read
+	#     0.430220 s and then 0.224602 s, and a running total cannot fall;
+	#   * it HOLDS CONSTANT when no new physics work happens, so it does not
+	#     accumulate between samples;
+	#   * therefore it is a PER-FRAME duration, like its neighbours, and the
+	#     slow capture was a real, progressively worsening physics step on a
+	#     3.51 fps software-rasterised run — not an instrument artefact.
+	#
+	# WHAT IS *NOT* VERIFIED, and is therefore not claimed: that the figure counts
+	# script _physics_process callbacks to the exclusion of the physics server,
+	# broadphase and solving. Godot's documentation says so, this repository's
+	# earlier comment repeated it, and no measurement on 4.7.1 has confirmed it
+	# here. An unverified scope claim is stated as unverified rather than
+	# inherited, because a number that is wrong AND documented as right is worse
+	# than a number that is missing. Treat this as the physics time attributable
+	# to the frame, of unknown composition within it.
+	list.append(new_id(&"physics_process_total", "physics time for the frame (composition unverified)", Source.ENGINE_MONITOR, "Performance.TIME_PHYSICS_PROCESS"))
 	list.append(new_id(&"bot_ai", "bot AI update", Source.SCOPE, "src/npcs/bot/bot.gd::_physics_process (after the corpse early-return)"))
 	list.append(new_id(&"bot_animation_skeleton", "bot animation + skeleton", Source.SCOPE,
 		"src/npcs/bot/bot.gd::_tick_anim + _tick_lod (per-frame). NOT covered: the one-shot rig.play() "
