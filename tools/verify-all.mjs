@@ -559,6 +559,58 @@ function declaredUidRepos() {
   return raw.split(/\r?\n/).map((line) => (line.trim().split(/\s+/)[1] || '').trim()).filter(Boolean);
 }
 
+// A 160000 gitlink is a POINTER, not a copy: the game repo records a commit
+// SHA per submodule and the code lives in a separate repository. A pointer and
+// its checkout can therefore disagree, and when they do every harness in this
+// file measures code the game repo does not believe it has. That is not
+// hypothetical - on 2026-09-27 the pointer recorded d26d451 while the checkout
+// on disk was af09788, eight commits behind, and the visible symptom was a
+// meta_flea failure that looked like a merge casualty and was not one.
+//
+// `git submodule status` prefixes each line: a leading space means the
+// checkout matches the recorded SHA, '+' means it is a DIFFERENT commit than
+// recorded, '-' means not initialised, and 'U' means a merge conflict. Only
+// the clean prefix passes. A silently-skipped submodule would reproduce the
+// class of defect this gate exists to catch, so an absent .gitmodules is a
+// PASS (a project with no submodules has nothing to disagree) and an
+// unpopulated submodule is a FAIL, not a skip.
+function gateSubmodulePins() {
+  if (!existsSync(join(ROOT, '.gitmodules'))) {
+    record('submodule_pins', 'PASS', 'no .gitmodules — nothing to disagree');
+    return;
+  }
+  const out = execFileSync('git', ['submodule', 'status', '--recursive'], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+  });
+  const rows = out.split(/\r?\n/).filter(Boolean);
+  if (!rows.length) {
+    record('submodule_pins', 'PASS', 'no submodules');
+    return;
+  }
+  const drifted = [];
+  for (const row of rows) {
+    const state = row[0];
+    if (state === ' ') continue;
+    const rest = row.slice(1).trim();
+    // `git submodule status` prints: <prefix><sha> <path> (<describe>).
+    // The path is the SECOND field, not the last — the last field is the
+    // describe string, and taking it produces a report of "(heads/main)".
+    const fields = rest.split(/\s+/);
+    const path = fields[1] || fields[0];
+    const why = state === '+' ? 'checkout is at a DIFFERENT commit than the gitlink records'
+      : state === '-' ? 'not initialised'
+        : state === 'U' ? 'merge conflict inside the submodule'
+          : `unexpected prefix '${state}'`;
+    drifted.push(`${path} — ${why}`);
+  }
+  if (drifted.length) {
+    record('submodule_pins', 'FAIL',
+      `${drifted.length}/${rows.length} submodule(s) do not match the recorded gitlink: ${drifted.join('; ')}`);
+    return;
+  }
+  record('submodule_pins', 'PASS', `${rows.length} submodule(s), every checkout matches its recorded SHA`);
+}
+
 function gateUidTracking() {
   const list = join(logDir, 'uid_missing.log');
   writeFileSync(list, '');
@@ -718,6 +770,7 @@ async function main() {
   console.log(`logs: ${logDir}\n`);
   gateLockWrapper();
   const importOk = await importGodot();
+  gateSubmodulePins();
   gateUidTracking();
   if (!importOk) {
     record('harnesses', 'SKIP', 'import/parse failed; downstream Godot gates would use an invalid cache');
