@@ -523,6 +523,42 @@ function gateLockWrapper() {
   record('lock_wrapper', 'FAIL', `lock wrapper red arm: ${outcome.detail} — the wrapper must refuse to run unlocked, must never claim a lock it did not take, and must not run against a tree other than its own. ${outcome.failedChecks.slice(0, 4).join(' | ') || `see ${logPath}`}`);
 }
 
+// The population of the uid check is the superproject plus every submodule
+// declared in .gitmodules. Both halves of that are deliberate, and the second
+// one exists because the first one alone is not enough.
+//
+// The LIST is derived, because a hardcoded one had already gone stale. It named
+// the superproject and `addons/cabra.lat_shooters`, which is the ONE submodule
+// that tracks uids, and omitted the three that do not. A check whose scope is
+// drawn to cover exactly the repositories that pass is not a coverage gap: it
+// is a population chosen to agree with its own result, and it is green for
+// that reason rather than because the tree is clean.
+//
+// The EXPECTATION stays hardcoded in EXPECTED_UID_REPOS, because a list
+// re-derived at gate time would only prove the filesystem agrees with
+// itself. Keeping the expectation beside the derivation means a sixth
+// submodule is a visible diff in review, and `uid_tracking_scope` fails at run
+// time if the two ever disagree. Deriving the scan but hardcoding what it
+// should cover is what makes the coverage auditable.
+const EXPECTED_UID_REPOS = [
+  '.',
+  'addons/cabra.lat_shooters',
+  'addons/cabra.lat_cursors',
+  'addons/cabra.lat_interactions',
+  'addons/cabra.lat_state_machines',
+  'third_party/godotik',
+];
+
+// Read the declared submodule paths out of .gitmodules. Keys look like
+// `submodule.<name>.path`, where <name> itself contains dots and slashes
+// (`submodule.addons/cabra.lat_cursors.path`), so the name is never parsed —
+// only the value after the first whitespace is used.
+function declaredUidRepos() {
+  const raw = gitOutput('.', ['config', '-f', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$']);
+  if (!raw) return [];
+  return raw.split(/\r?\n/).map((line) => (line.trim().split(/\s+/)[1] || '').trim()).filter(Boolean);
+}
+
 function gateUidTracking() {
   const list = join(logDir, 'uid_missing.log');
   writeFileSync(list, '');
@@ -530,7 +566,22 @@ function gateUidTracking() {
   let checked = 0;
   let skipped = [];
   let details = [];
-  for (const repo of ['.', 'addons/cabra.lat_shooters']) {
+  const declared = declaredUidRepos();
+  const repos = ['.', ...declared];
+  // The derived list may be a SUPERSET of the expectation (a new submodule is
+  // scanned immediately, never silently dropped) or a subset (a submodule was
+  // removed). Either way the disagreement is the finding, not the scan.
+  const unlisted = declared.filter((repo) => !EXPECTED_UID_REPOS.includes(repo));
+  const gone = EXPECTED_UID_REPOS.filter((repo) => repo !== '.' && !declared.includes(repo));
+  if (unlisted.length || gone.length) {
+    const parts = [];
+    if (unlisted.length) parts.push(`submodule(s) not in EXPECTED_UID_REPOS: ${unlisted.join(' ')}`);
+    if (gone.length) parts.push(`EXPECTED_UID_REPOS entr(ies) no longer in .gitmodules: ${gone.join(' ')}`);
+    record('uid_tracking_scope', 'FAIL', `${parts.join('; ')} — the uid scan covers what .gitmodules declares, so the list above is what it checked, but this hardcoded expectation is what a reviewer signed off on. Update EXPECTED_UID_REPOS in tools/verify-all.mjs deliberately, do not let it drift.`);
+  } else {
+    record('uid_tracking_scope', 'PASS', `.gitmodules declares ${declared.length} submodule(s) and EXPECTED_UID_REPOS agrees with all of them, so the uid scan covers the superproject plus every declared submodule`);
+  }
+  for (const repo of repos) {
     const absolute = resolve(repo);
     const top = gitOutput(repo, ['rev-parse', '--show-toplevel']);
     if (!top || realpathSync(top.trim()) !== realpathSync(absolute)) {
@@ -570,7 +621,7 @@ function gateUidTracking() {
   const skipNote = skipped.length ? `; SKIPPED (no git checkout): ${skipped.join(' ')}` : '';
   if (!checked) record('uid_tracking', 'SKIP', `no git checkout to check (skipped: ${skipped.join(' ') || 'none'})`);
   else if (total) record('uid_tracking', 'FAIL', `${total} uid/script pairing problem(s) (${details.join(' ')}) — a script without a .uid, or a .uid whose resource is not tracked (an orphan .uid makes --import try to open a missing file) — list in ${list}${skipNote}`);
-  else record('uid_tracking', 'PASS', `every tracked script in ${checked} repo(s) has a tracked .uid, and every tracked .uid has a tracked resource${skipNote}`);
+  else record('uid_tracking', 'PASS', `every tracked script in ${checked} repo(s) has a tracked .uid, and every tracked .uid has a tracked resource (repos: ${repos.join(' ')})${skipNote}`);
 }
 
 async function reimportAfterHarness(name) {
