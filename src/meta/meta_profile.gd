@@ -198,7 +198,9 @@ static func _restore_stash(p: MetaProfile, sd) -> void:
 	var g := p.stash.grid
 	g.width = p.stash.grid_width
 	g.height = p.stash.grid_height
-	g._reset_grid()
+	# The grid's width/height setters rebuild the occupancy cache themselves now
+	# (INV-39), so the explicit g._reset_grid() after them was both redundant and
+	# a private method of the shooter addon reached from the game repo.
 	for item_data in s.get("items", []):
 		var item := ItemCodec.decode_item(item_data)
 		if item == null:
