@@ -26,6 +26,14 @@ const _FLEA_FRAME_KEY := "Listing #%d %s %d cr [%s] seller=%s"
 ## visible once the rest of the suite had the precondition.
 const TranslationProbe := preload("res://src/meta/translation_probe.gd")
 const BANDAGE := "res://resources/medical/army_bandage.tres"
+## Developer placeholder text that must never ship. Matched as a SUBSTRING so a
+## scaffold line is caught whatever noun the class uses, and kept as a list so a
+## new one is a one-line addition rather than a new rule.
+const SCAFFOLD_DESCRIPTION_MARKERS: Array[String] = [
+	"is the default one",
+	"Generic ammunition",
+	"Default armor.",
+]
 
 var v: ValidateUtil
 var profile: MetaProfile
@@ -59,6 +67,8 @@ func _initialize() -> void:
 	_scenario_fair_price_sale()
 	_scenario_service_api()
 	_check_description_tail()
+	_check_no_scaffold_descriptions_in_shipped_resources()
+	_check_trader_set_is_data()
 	_scenario_persistence()
 
 	quit(v.finish())
@@ -279,11 +289,14 @@ func _check_description_tail() -> void:
 
 	# And the scaffold text must never reach a frame, wherever it comes from.
 	# Enumerated from the trader RESOURCES rather than hardcoded here, so a new
-	# offer cannot slip past by being omitted from a list -- the same rule the
-	# i18n harness's _trader_item_paths() follows. That function lives in
-	# validate_i18n.gd, so it is not callable from here; these three paths are
-	# read from the pack instead, and the comment says so rather than implying a
-	# shared helper that does not exist.
+	# offer cannot slip past by being omitted from a list.
+	# CORRECTION to the comment that used to stand here, which cited
+	# validate_i18n.gd's _trader_item_paths() as following the same rule. It does
+	# not: that function enumerates OFFERS from the trader resources (true) while
+	# hardcoding the three trader PATHS three lines above the offers loop
+	# (validate_i18n.gd:480-482), and its own comment claims the opposite. I cited
+	# it as precedent without reading it, which is the same mistake as citing a
+	# README, so the precedent claim is gone rather than repeated.
 	var scaffold: Array[String] = []
 	for path in _offered_item_paths():
 		var text := ItemDescriptions.source_text(load(path))
@@ -293,16 +306,187 @@ func _check_description_tail() -> void:
 		"no item offered to a trader carries scaffold description text (checked %d, scaffold: %s)"
 			% [_offered_item_paths().size(), str(scaffold)])
 
+## Every shipped resource, at any nesting depth, not just what a trader offers.
+## CAUGHT 2026-09-26, the way the finding that prompted it says it should be
+## caught: coordinator asked whether any OTHER class carried the same scaffold
+## string, on the grounds that a check which found one instance will not find the
+## other five. It could not. The existing check above reads `source_text()`, which
+## is the TOP-LEVEL item's description, and the scaffold text turned out to live
+## 16 times in NESTED sub-resources (15 Ammofeed blocks inside weapon .tres files,
+## 1 Attachment), where a top-level reader cannot see it -- and one of the three
+## traders' item sets does not happen to include PEQ-15, so even a full scan of
+## the offered set would have missed it. A raw text scan is the only mechanism
+## that closes the gap by construction: the string cannot hide from a scan of the
+## file it is written in, at any depth, loaded or not.
+##
+## Its red arm is the data it removed: re-adding any one of the 16 lines turns
+## this check red while every other check in this file stays green.
+func _check_no_scaffold_descriptions_in_shipped_resources() -> void:
+	v.section("[K] no shipped resource declares a scaffold description")
+	var hits: Array[String] = []
+	var paths := _shipped_resource_paths("res://resources/")
+	for path in paths:
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f == null:
+			continue
+		var text := f.get_as_text()
+		f.close()
+		for line in text.split("\n"):
+			var trimmed := String(line).strip_edges()
+			if not trimmed.begins_with("description"):
+				continue
+			for marker in SCAFFOLD_DESCRIPTION_MARKERS:
+				if trimmed.contains(marker):
+					hits.append("%s: %s" % [path.get_file(), trimmed])
+					break
+	_check(paths.size() > 0, "the scan actually found resources to read (scanned %d)" % paths.size())
+	_check(hits.is_empty(),
+		"no shipped resource declares a scaffold description at any depth (scanned %d, hits: %s)"
+			% [paths.size(), str(hits)])
+
+## Every .tres under `root`, recursively. Enumerated from the filesystem rather
+## than a hardcoded list for the same reason the trader items are: a resource
+## nobody remembered to list is exactly the one that ships broken.
+func _shipped_resource_paths(root: String) -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(root)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full := root.path_join(entry)
+		if dir.current_is_dir():
+			if not entry.begins_with("."):
+				out.append_array(_shipped_resource_paths(full))
+		elif entry.ends_with(".tres"):
+			out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()
+	return out
+
+## THE FLEA SUBJECT, deliberately outside the trader set. The raid mission item
+## is listable even though no trader stocks it, which is the whole point of a flea
+## market, so it is named here rather than smuggled in as a fourth trader.
+const FLEA_SUBJECT := "res://resources/raid1/marked_intel.tres"
+## Where the trader set LIVES. The set is the directory: a trader exists because
+## its resource is in here, and adding a fourth trader is dropping a file in, not
+## editing three harnesses.
+const TRADERS_DIR := "res://resources/meta/traders/"
+
+## The trader set is DATA, and this is the check that says so.
+## CAUGHT 2026-09-26, in a review of my own work rather than in a failure:
+## _offered_item_paths() listed the three trader .tres paths as literals, so the
+## third trader was a string in a test I wrote and a fourth trader needed a code
+## edit. That is the exact mistake AGENTS.md names -- "Hardcoding a faction list is
+## the same mistake as hardcoding the weapon list" -- and the irony is not lost on me
+## that the same reading of paperclip's declarative registry, which I had just
+## written up as the thing worth copying, was describing the fix for a literal list
+## sitting in my own harness.
+##
+## Paperclip's registry is worth more than its shape here, because of the one check
+## that shape comes with: "throws when a declared adapter has no installed
+## implementation" (adapter-registry-bootstrap.reconcile.test.ts). A trader may
+## therefore DECLARE an offer, but every declared offer must resolve to a real
+## resource -- advertising stock that cannot be loaded is the same class of defect as
+## offering a harness that does not exist, and in this codebase it is worse, because
+## market.gd:157 charges the player and takes barter goods BEFORE it resolves
+## item_path, and returns "item indisponivel" with the money already gone.
+##
+## Deliberately NOT enforced here: that a declared trader has no runtime scene.
+## trader_point.gd binds a trader by GROUP plus a trader_id, so the mapping is
+## scene-side and there is no data field to check; paperclip could throw because its
+## adapter type names an installed module, and we cannot, which is the asymmetry
+## behind "copy the shape, not the behaviour" from the same review.
+func _check_trader_set_is_data() -> void:
+	v.section("[L] the trader set is data, not a list of literals")
+	var paths := _trader_resource_paths()
+	# Non-vacuity FIRST. An enumeration that finds nothing must not read as
+	# "no scaffold text" and "no bad offers" -- that is how a directory typo turns
+	# this section into four vacuous passes.
+	_check(paths.size() > 0,
+		"the trader directory is enumerable, not missing (found %d, dir %s)"
+			% [paths.size(), TRADERS_DIR])
+
+	var declared_offers := 0
+	var declared_paths: Dictionary = {}
+	var bad_ids: Array[String] = []
+	var empty_offers: Array[String] = []
+	var unimplemented: Array[String] = []
+	var offered := _offered_item_paths()
+	for path in paths:
+		var t := load(path) as Resource
+		if t == null:
+			bad_ids.append("%s: not loadable" % path.get_file())
+			continue
+		var id := String(t.get("id"))
+		if id == "":
+			bad_ids.append("%s: no trader id" % path.get_file())
+		var offers: Array = t.get("offers") as Array
+		if offers.is_empty():
+			empty_offers.append(path.get_file())
+		for offer in offers:
+			if offer == null:
+				unimplemented.append("%s: null offer" % path.get_file())
+				continue
+			var item_path := String((offer as Resource).get("item_path"))
+			declared_offers += 1
+			# The paperclip check, on our data: declared but not implemented fails.
+			if item_path == "" or not ResourceLoader.exists(item_path):
+				unimplemented.append("%s: %s" % [path.get_file(), item_path if item_path != "" else "<empty item_path>"])
+			declared_paths[item_path] = true
+	_check(bad_ids.is_empty(), "every trader resource loads and carries an id (bad: %s)" % str(bad_ids))
+	_check(empty_offers.is_empty(), "every trader stocks at least one offer (empty: %s)" % str(empty_offers))
+	_check(unimplemented.is_empty(),
+		"every declared offer resolves to a real resource (declared %d, unimplemented: %s)"
+			% [declared_offers, str(unimplemented)])
+	# And the flea surface must equal the DATA, not a subset of it: if the
+	# enumeration silently dropped a trader, the scaffold check above would have
+	# passed while covering less ground than it appears to.
+	#
+	# Set equality, not a count. The first version of this check compared COUNTS
+	# and failed at 9 declared offers against 8 seen, which looked like a dropped
+	# trader and was not: two traders stock the same item, and _collect_offer()
+	# dedupes because the flea surface is a set of distinct items. Counting
+	# declared offers therefore measures duplicates, and a harness that gets
+	# "refuse to count duplicates" wrong will send the next person looking for a
+	# bug in the enumeration. Sets cannot drift that way.
+	var missing: Array[String] = []
+	for item_path in declared_paths:
+		if not offered.has(item_path):
+			missing.append(item_path)
+	var extra: Array[String] = []
+	for item_path in offered:
+		if item_path != FLEA_SUBJECT and not declared_paths.has(item_path):
+			extra.append(item_path)
+	_check(missing.is_empty() and extra.is_empty(),
+		"the flea surface is exactly the declared offer set (declared %d offers = %d distinct, subject %s, missing: %s, extra: %s)"
+			% [declared_offers, declared_paths.size(), FLEA_SUBJECT.get_file(), str(missing), str(extra)])
+
+## Every trader resource in the pack, from the FILESYSTEM. The point of not
+## writing the three paths out is that a fourth trader is a file rather than a code
+## edit, so a harness cannot disagree with the game about who the traders are.
+func _trader_resource_paths() -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(TRADERS_DIR)
+	if dir == null:
+		return out
+	for f in dir.get_files():
+		if f.ends_with(".tres"):
+			out.append(TRADERS_DIR + f)
+	out.sort()
+	return out
+
 ## Every item a trader offers or barters, read from the trader resources.
 func _offered_item_paths() -> Array[String]:
 	var out: Array[String] = []
-	for tp in ["res://resources/meta/traders/field_surgeon.tres", "res://resources/meta/traders/gunsmith.tres", "res://resources/meta/traders/quartermaster.tres"]:
+	for tp in _trader_resource_paths():
 		var t := load(tp) as Resource
 		if t == null:
 			continue
 		for offer in (t.get("offers") as Array):
 			_collect_offer(out, offer as Resource)
-	out.append("res://resources/raid1/marked_intel.tres")
+	out.append(FLEA_SUBJECT)
 	return out
 
 func _collect_offer(out: Array[String], offer: Resource) -> void:

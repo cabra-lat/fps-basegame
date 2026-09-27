@@ -7,7 +7,6 @@
 [sub_resource type="Resource" id="Resource_4qgmr"]
 script = ExtResource("1_naomm")
 name = "Generic Ammofeed"
-description = "This Ammofeed is the default one."
 type = 1
 empty_mass = 0.0
 compatible_calibers = PackedStringArray("9x19mm")

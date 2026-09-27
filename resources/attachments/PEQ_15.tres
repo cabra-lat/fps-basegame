@@ -9,7 +9,6 @@ script = ExtResource("1_qn80i")
 model_scene = ExtResource("model")
 icon = ExtResource("icon")
 name = "PEQ-15"
-description = "This Attachment is the default one."
 type = 3
 attachment_point = 6
 mass = 0.25

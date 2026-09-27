@@ -7,7 +7,6 @@
 [sub_resource type="Resource" id="Resource_jxgio"]
 script = ExtResource("1_xrp62")
 name = "Generic Ammofeed"
-description = "This Ammofeed is the default one."
 type = 1
 empty_mass = 0.0
 compatible_calibers = PackedStringArray(".44 Magnum")
