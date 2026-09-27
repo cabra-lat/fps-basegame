@@ -416,8 +416,42 @@ func _check_item_registry() -> void:
 	# counter, and the debt being non-zero is the authorised state, not a defect.
 	# Printed so the number cannot drift unnoticed between now and whenever the
 	# pt-BR strings are authored.
+	#
+	# PARTITIONED, because one entry in this list is not content work. A harness
+	# needs an item that is registered and permanently untranslated, and meta's
+	# fixture under resources/meta/fixtures/ is that item BY DESIGN -- its key is
+	# "FIXTURE untranslated designation", and translating it would destroy the only
+	# subject for the registered-but-untranslated branch. Counting it as debt points
+	# whoever works the translation queue at a string that must never be written.
+	# So it is reported, by name, in its own bucket -- NOT filtered out, because
+	# hiding a registered id from this report is exactly how a real debt goes
+	# missing. Fixtures are identified by DIRECTORY rather than by a hardcoded id,
+	# so a second one is classified correctly without editing this code.
+	var fixtures: Array[String] = []
+	var product_debt: Array[String] = []
+	for id in untranslated:
+		if _is_test_fixture(id):
+			fixtures.append(id)
+		else:
+			product_debt.append(id)
 	print("NOTE: REGISTRY DEBT: %d of %d registered ids are registered but UNTRANSLATED, and must be marked as such in the UI rather than rendered as English (ids: %s)"
 		% [untranslated.size(), ids.size(), ", ".join(untranslated.slice(0, 6))])
+	print("NOTE:   of those, %d are TEST FIXTURES under %s, untranslated BY DESIGN and never to be translated (ids: %s)"
+		% [fixtures.size(), FIXTURE_DIR, ", ".join(fixtures)])
+	print("NOTE:   PRODUCT debt is therefore %d of %d registered ids, and is the number to work from"
+		% [product_debt.size(), ids.size() - fixtures.size()])
+
+## Items under this directory are TEST FIXTURES, not catalogue content. A harness needs
+## an item that is registered and permanently untranslated in order to exercise the
+## registered-but-untranslated branch, and that item is a fixture BY DESIGN.
+const FIXTURE_DIR := "res://resources/meta/fixtures/"
+
+
+## Is this registered id a test fixture rather than a product item?
+## By DIRECTORY, not by a hardcoded id, so adding a second fixture needs no edit here.
+func _is_test_fixture(id: String) -> bool:
+	return FileAccess.file_exists(FIXTURE_DIR + id + ".tres")
+
 
 ## If someone hardcodes a translated string in a display helper, these two stop
 ## being equal to the catalogue lookup.
