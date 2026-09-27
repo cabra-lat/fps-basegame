@@ -220,3 +220,6 @@ msgstr "Kit de primeiros socorros de campo. Recupera até 85 PV e estanca hemorr
 
 msgid "A marked intel packet. Recover it and reach an extraction point."
 msgstr "Um pacote de intel marcado. Recupere-o e chegue a um ponto de extração."
+
+msgid "Field scout"
+msgstr "Batedor de campo"
