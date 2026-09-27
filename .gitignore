@@ -15,8 +15,24 @@ export_credentials.cfg
 data_*/
 mono_crash.*.json
 
-addons/
+# NOTE: this is `addons/*`, not `addons/`, and the difference is load-bearing.
+# `addons/` excludes the addons DIRECTORY, and git cannot re-include a file whose
+# parent directory is excluded - so a `!addons/libik/...` rule placed under it is
+# silently dead and every re-inclusion below is a no-op. `addons/*` excludes the
+# CONTENTS while leaving the directory itself re-includable. Verified behaviourally
+# with git check-ignore, not by reading the rules.
+addons/*
 assets/models/weapon_thirty_twelve/
+
+# GodotIK: the GDExtension DESCRIPTOR is source and is tracked, because without it
+# a fresh checkout cannot know the extension exists at all. The compiled binaries
+# under bin/ stay ignored on purpose - ~17MB of platform-locked native code that a
+# fetch-and-build reproduces, and committing them buries real changes in an
+# unreviewable binary diff.
+!addons/libik/
+addons/libik/*
+!addons/libik/libik.gdextension
+!addons/libik/libik.gdextension.uid
 
 # Local agent message queue (AMQ maildir, per-machine scratch)
 .agent-mail/
