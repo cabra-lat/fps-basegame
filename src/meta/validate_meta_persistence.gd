@@ -23,6 +23,16 @@ const SAVE := "user://meta_test/profile.save"
 # See src/meta/translation_probe.gd.
 const TranslationProbe := preload("res://src/meta/translation_probe.gd")
 const STARTER := "res://resources/meta/starter_loadout.tres"
+## A real weapon .tres, standing in for "the player's own gun" so the loss the
+## overwrite fix prevents is VISIBLE instead of indistinguishable from the starter.
+##
+## IT MUST NOT BE THE STARTER'S OWN PRIMARY, and that is not a detail. This
+## constant was M4_Carbine, which is exactly what starter_loadout.tres puts in
+## primary. Overwriting the player's gun with the starter then produced a
+## byte-IDENTICAL loadout signature, so the "the player's primary is unchanged"
+## assertion stayed GREEN while the overwrite happened. AK_47 is the starter's
+## SECONDARY, so the two can no longer be confused.
+const PLAYER_GUN_PATH := "res://resources/weapons/AK_47.tres"
 const BANDAGE := "res://resources/medical/army_bandage.tres"
 const AMMO_9MM := "res://resources/ammo/9_19mm_VPAM_PM2.tres"
 
@@ -435,6 +445,85 @@ func _scenario_hub_deploy_contract() -> void:
 	var granted_kit_sig := _loadout_signature(service.profile.loadout)
 	_check(_loadout_signature(restarted_starter.loadout) == granted_kit_sig,
 		"a refused second grant leaves the player's current loadout byte-identical (no silent overwrite)")
+
+	# THE OVERWRITE FIX MASKED THE ROUND TRIP, and this check exists because it did.
+	# With occupied slots now skipped, a reloaded profile refuses a second grant for
+	# TWO reasons at once -- the flag is set AND the slots are full -- so the check
+	# above started passing even with BOTH once-only mechanisms removed. It was
+	# green for the wrong reason, which is the same failure as a vacuous assertion
+	# wearing a number.
+	#
+	# The confound is removed by emptying the slots: the player is now poor, having
+	# lost the kit, so the ONLY thing that can refuse the grant is the flag itself.
+	var bare_profile := ProfileStore.load_profile(path)
+	var bare_service := MetaService.new()
+	bare_service.save_path = path
+	bare_service.use_profile(bare_profile, path)
+	bare_profile.loadout = {}
+	_check(bare_profile.loadout.is_empty(), "the reloaded profile's kit is cleared, so the slot-skip cannot be what refuses the grant")
+	_check(bool(bare_profile.role_state().get("starter_granted", false)),
+		"and the flag itself SURVIVED the save and reload on its own, not merely the effect of a full loadout")
+	_check(bare_service.grant_starter_loadout(starter) == 0,
+		"CONSTRUCTED BREAK: with every slot EMPTY, a profile that already had a starter still refuses a second one -- so the once-only guarantee is the FLAG and not the skip")
+
+	# THE OVERWRITE FIX, WHICH IS ITS OWN CARD (e3646d) and needs its own arm
+	# because the existing refusal check alone cannot see it: a refused grant
+	# changes nothing under EITHER the old code or the new, so "the loadout is
+	# byte-identical after a refusal" is not evidence that an ACCEPTED second grant
+	# is non-destructive. Only a grant that actually proceeds can tell them apart.
+	#
+	# The mechanism reproduced in miniature: starter_granted is per-identifier state,
+	# so clearing the flag is exactly what an invented faction id used to do.
+	var clobber := MetaProfile.new()
+	var clobber_service := MetaService.new()
+	clobber_service.save_path = TEST_DIR + "/starter_clobber.save"
+	ProfileStore.delete(clobber_service.save_path)
+	clobber_service.use_profile(clobber, clobber_service.save_path)
+	clobber_service.grant_starter_loadout(starter)
+	_check(clobber.loadout.get("primary", []).size() > 0, "the fixture has a primary to protect")
+	# Replace the primary with the player's own gun, so the slot holds something that
+	# is NOT the starter, whose loss would be visible rather than indistinguishable
+	# from the kit that replaced it.
+	var player_gun := ItemCodec.encode_item(ItemCodec.item_from_path(PLAYER_GUN_PATH))
+	clobber.loadout["primary"] = [player_gun]
+	var protected_sig := _loadout_signature(clobber.loadout)
+	clobber.role_state()["starter_granted"] = false
+	var regranted := clobber_service.grant_starter_loadout(starter)
+	_check(regranted == 0,
+		"CONSTRUCTED BREAK: a grant onto an OCCUPIED slot delivers nothing (got %d), so it cannot replace the player's gun" % regranted)
+	_check(_loadout_signature(clobber.loadout) == protected_sig,
+		"CONSTRUCTED BREAK: the player's own primary is byte-identical after the second grant -- the overwrite is gone, not merely smaller")
+	_check(clobber.loadout["primary"][0] == player_gun,
+		"CONSTRUCTED BREAK: and specifically the player's own gun is the one still equipped, which the signature alone could not prove while the starter's own primary was the same file")
+	# The other half of the contract: the flag records DELIVERED, not considered. A
+	# grant that delivered nothing must not mark the profile as having received a
+	# starter, or a player whose slots were full could never be offered one again.
+	_check(not bool(clobber.role_state().get("starter_granted", false)),
+		"a grant that delivered nothing does NOT set starter_granted, so the profile can still be offered one later")
+	# The empty-slot half, so the fix is a SKIP and not a blanket refusal. The return
+	# is captured ONCE: the first version of this called grant_starter_loadout() a
+	# second time inside the format string, so the message reported that second
+	# call's 0 while the assertion tested the first call's 2 -- a check whose printed
+	# evidence contradicted its own verdict.
+	var fresh := MetaProfile.new()
+	var fresh_service := MetaService.new()
+	fresh_service.save_path = TEST_DIR + "/starter_fresh.save"
+	ProfileStore.delete(fresh_service.save_path)
+	fresh_service.use_profile(fresh, fresh_service.save_path)
+	var fresh_added := fresh_service.grant_starter_loadout(starter)
+	_check(fresh_added == 2,
+		"the fix is a SKIP, not a refusal: a profile with empty slots still receives the full starter (got %d)" % fresh_added)
+	_check(bool(fresh.role_state().get("starter_granted", false)),
+		"and a grant that DID deliver marks the flag")
+	# Currency is the other value a grant could destroy, and it was already guarded.
+	var broke := MetaProfile.new()
+	broke.currency = 5000
+	var broke_service := MetaService.new()
+	broke_service.save_path = TEST_DIR + "/starter_currency.save"
+	ProfileStore.delete(broke_service.save_path)
+	broke_service.use_profile(broke, broke_service.save_path)
+	broke_service.grant_starter_loadout(starter)
+	_check(broke.currency == 5000, "a grant never reduces an existing balance (got %d)" % broke.currency)
 
 	# ONCE PER FACTION, which is the documented promise and needs two factions to
 	# mean anything: one grant on the starting faction, a second on another, and a
