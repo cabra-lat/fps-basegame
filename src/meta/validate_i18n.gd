@@ -123,6 +123,8 @@ func _initialize() -> void:
 	_check_gated_reason_is_localized()
 	_check_registry_ids_match_their_resources()
 	_check_every_offered_item_is_registered()
+	_check_every_visible_item_has_a_registered_id()
+	_check_role_ids_resolve_through_the_registry()
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
@@ -608,6 +610,57 @@ func _check_every_offered_item_is_registered() -> void:
 ## Offer and barter item paths, read from the trader resources rather than
 ## hardcoded here, so a new offer cannot slip past the check by omission. Split
 ## into helpers because the nesting limit is 5 and the inline version hit 6.
+## The direction the other checks do NOT cover: id -> resource.
+## _check_registry_ids_match_their_resources() walks the REGISTRY and asks
+## whether each id has a file. This walks the FILES and asks whether each one has
+## an id, which is the other half of "cannot be translated without an id": today an
+## item .tres can be added to a trader, translated in the PO, shipped, and no check
+## notices, because nothing ever asks whether the file is reachable FROM the
+## registry. A display path that falls back to the .tres name renders the raw id
+## again -- the exact F-MKT defect -- and it is invisible until a player reads it.
+## Non-vacuous by construction: the trader offer paths are the source, so an empty
+## scan means the traders lost their offers, and that is a failure worth hearing.
+func _check_every_visible_item_has_a_registered_id() -> void:
+	var paths := _trader_item_paths()
+	var unregistered: Array[String] = []
+	for path in paths:
+		if ItemNames.id_for_path(path) == "":
+			unregistered.append(path)
+	_check(not paths.is_empty() and unregistered.is_empty(),
+		"every tradable item .tres is REACHABLE FROM the registry (unregistered: %s)"
+			% ", ".join(unregistered))
+
+## Role ids, so a role cannot ship with a name nothing can resolve.
+## SCANNED, NOT HARDCODED: this reads whatever is in resources/meta/roles/ rather
+## than naming the shipped role, because roles are DATA and a game ships three,
+## five or ten of them (project rule). A day with no role resources on the ref
+## scans 0 and this check is VACUOUS -- that is why the count is in the evidence
+## string and not only in a comment. When the death-policy ref (fe42546, holding
+## role_definition.gd + field_scout.tres) lands, this starts covering it with no
+## edit here.
+func _check_role_ids_resolve_through_the_registry() -> void:
+	var dir := DirAccess.open("res://resources/meta/roles")
+	var scanned := 0
+	var unresolved: Array[String] = []
+	if dir:
+		dir.list_dir_begin()
+		var f := dir.get_next()
+		while f != "":
+			if f.ends_with(".tres"):
+				var role := load("res://resources/meta/roles/" + f) as Resource
+				if role == null:
+					continue
+				scanned += 1
+				var rid := String(role.get("id"))
+				if rid.is_empty() or ItemNames.display_name(rid) == "":
+					unresolved.append("%s(id=%s)" % [f, rid if not rid.is_empty() else "<empty>"])
+			f = dir.get_next()
+		dir.list_dir_end()
+	_check(unresolved.is_empty(),
+		"every ROLE id resolves to a translated name (scanned=%d, unresolved: %s)%s"
+			% [scanned, ", ".join(unresolved),
+			" -- VACUOUS: this ref has no resources/meta/roles yet" if scanned == 0 else ""])
+
 func _trader_item_paths() -> Array[String]:
 	var out: Array[String] = []
 	for trader_path in ["res://resources/meta/traders/field_surgeon.tres",
