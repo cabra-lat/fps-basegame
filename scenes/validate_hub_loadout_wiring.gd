@@ -125,6 +125,7 @@ func _run() -> void:
 		"the hub does NOT hardcode any of the five reason keys or their text (%d found): it is handed keys and renders them" % leaks)
 
 	h.queue_free()
+	_free_items_marking()
 	_finish()
 
 
@@ -142,6 +143,69 @@ func _finish() -> void:
 	else:
 		print("RESULT: PASS")
 	call_deferred("_quit", code)
+
+
+## 87ab63: the free-items MARKING, and that it is data rather than a branch.
+##
+## The option is offered only when the player genuinely owns nothing, and the set
+## comes from the StarterLoadout resource. The last check is the one that matters
+## for the card's design constraint: a hardcoded fallback in the controller is
+## how the hub got a hardcoded Portuguese catalogue, and a string search for a
+## weapon NAME in the controller is the check that would catch the next one. It is
+## deliberately not satisfied by the resource merely existing -- the name must
+## appear in the CONTROLLER for the check to fail, and it does not.
+func _free_items_marking() -> void:
+	_check(FileAccess.file_exists("res://scenes/operations_hub_controller.gd"), "the hub controller exists")
+	var src: String = FileAccess.get_file_as_string("res://scenes/operations_hub_controller.gd")
+	_check(src.contains("_free_starter_option"), "and it has the free-starter projection")
+	_check(src.contains("starter_loadout.tres"),
+		"which reads the starter set from the RESOURCE, not from a literal list")
+	_check(src.contains("FreeItemsView"),
+		"and asks FreeItemsView whether the player owns nothing, so the hub and the hideout cannot disagree about that")
+	# THE DATA CHECK: no shipped weapon or item NAME appears in the controller at
+	# all. Strip comments first, or the prose documenting the constraint would
+	# satisfy the search for the thing the constraint forbids.
+	#
+	# WHOLE-WORD, and that detail is the one that matters. The first version
+	# searched for the id in quotes or followed by ".tres", and a red arm that
+	# hardcoded "Free M4_Carbine starter kit" -- the name embedded INSIDE a larger
+	# string, which is exactly how a hardcoded label looks in practice -- passed
+	# 19/19. A quoted search finds only the convenient shape of the mistake.
+	var code := ""
+	for line in src.split("\n"):
+		if not String(line).strip_edges().begins_with("#"):
+			code += line + "\n"
+	var leaked := ""
+	for id in ItemNames.KEYS:
+		if _contains_word(code, String(id)):
+			leaked += id + " "
+	_check(leaked.is_empty(),
+		"and hardcodes NO item name at all (a hardcoded fallback is how the hub got a hardcoded catalogue) [leaked: %s]" % leaked)
+	# And the marking is a MARKING, not a grant: the controller must not call the
+	# grant, because a screen that hands out gear on click is the faucet.
+	_check(not code.contains("grant_starter_loadout"),
+		"and it MARKS the option rather than granting it -- the controller must not call the faucet")
+
+## Does `text` contain `word` as a WHOLE identifier token?
+##
+## Not a substring test and not a quoted test: a hardcoded item name is almost
+## never a standalone string, it is a name inside a sentence like "Free M4_Carbine
+## starter kit", and a quoted search misses precisely that. Boundaries are
+## non-identifier characters, so `_M4` and `M4X` do not match while `M4_Carbine`
+## inside prose does.
+func _contains_word(text: String, word: String) -> bool:
+	if word.is_empty():
+		return false
+	var at := text.find(word)
+	while at >= 0:
+		var before := "" if at == 0 else text[at - 1]
+		var after := "" if at + word.length() >= text.length() else text[at + word.length()]
+		var ok_before := before == "" or not (before == "_" or before.to_lower() != before.to_upper())
+		var ok_after := after == "" or not (after == "_" or after.to_lower() != after.to_upper())
+		if ok_before and ok_after:
+			return true
+		at = text.find(word, at + 1)
+	return false
 
 
 func _check(ok: bool, message: String) -> void:

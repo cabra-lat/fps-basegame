@@ -177,12 +177,21 @@ func _project_meta_options(profile_value: Variant) -> void:
 				var projected_valid := bool((projected as Dictionary).get("valid", false))
 				if not (projected as Dictionary).has("valid"):
 					projected_valid = _selection_is_valid(projected_selection as Dictionary)
-				hub.set_loadouts([{
+				var extra: Array = [{
 					"id": projected_id,
 					"label": String((projected as Dictionary).get("label", "Loadout %s" % projected_id)),
 					"valid": projected_valid,
 					"summary": String((projected as Dictionary).get("summary", "Loadout selected")),
-				}])
+				}]
+				# The free-items marking (87ab63). Offered ONLY when the player
+				# genuinely owns nothing, and emptiness is asked of FreeItemsView
+				# rather than re-derived here, so the hub and the hideout cannot
+				# disagree about what "owns nothing" means -- the overlap the
+				# coordinator asked to be prevented rather than discovered later.
+				var free_option: Dictionary = _free_starter_option(profile_value)
+				if not free_option.is_empty():
+					extra.append(free_option)
+				hub.set_loadouts(extra)
 				return
 		# An empty projection is the empty state. If Meta still has a non-empty
 		# active kit, it was rejected as malformed; expose that as INVALID rather
@@ -257,3 +266,50 @@ func _on_deploy_requested(loadout_id: String) -> void:
 	arena_launch_requested.emit(loadout_id)
 	if auto_route and get_tree() != null:
 		get_tree().change_scene_to_file(arena_scene_path)
+
+
+## The starter option, or {} when it must not be offered (87ab63).
+##
+## DATA, NOT A BRANCH. The set comes from the StarterLoadout RESOURCE and each
+## path is resolved through ItemCodec and then ItemNames, exactly as the hideout
+## resolves identity -- so a renamed item cannot leave the hub offering a ghost
+## row, which is the entire reason the starter set is a resource. There is
+## deliberately no literal weapon name in this function.
+##
+## NOT A FAUCET. This only MARKS the option; it grants nothing. The grant stays
+## behind the once-per-faction flag and the no_transfer stamp, which
+## validate_starter_loadout.gd pins. A screen that handed out gear on click would
+## be the faucet the card warns about, so this is a label and a selection.
+func _free_starter_option(profile_value: Variant) -> Dictionary:
+	if not (profile_value is MetaProfile):
+		return {}
+	var profile: MetaProfile = profile_value as MetaProfile
+	if not FreeItemsView.new(profile, null).owns_nothing():
+		return {}
+	var starter: StarterLoadout = load("res://resources/meta/starter_loadout.tres") as StarterLoadout
+	if starter == null:
+		return {}
+	var selection: Dictionary = {}
+	for slot_name in starter.slots:
+		var encoded: Array = []
+		for path in (starter.slots as Dictionary)[slot_name]:
+			var item: Item = ItemCodec.item_from_path(String(path))
+			if item == null:
+				continue
+			# Stamped no_transfer here as well as at grant time, so gear that
+			# reaches a loadout by this route carries the same laundering guard.
+			item.set_meta("no_transfer", true)
+			encoded.append(ItemCodec.encode_item(item))
+		if not encoded.is_empty():
+			selection[slot_name] = encoded
+	if selection.is_empty():
+		return {}
+	return {
+		"id": "starter",
+		# A source string, i.e. the PO msgid the hub translates at render time --
+		# the same contract as ACTIVE_LOADOUT_LABEL.
+		"label": "Free starter kit",
+		"selection": selection,
+		"valid": true,
+		"free": true,
+	}
