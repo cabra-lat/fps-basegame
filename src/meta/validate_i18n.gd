@@ -124,7 +124,7 @@ func _initialize() -> void:
 	_check_registry_ids_match_their_resources()
 	_check_every_offered_item_is_registered()
 	_check_every_visible_item_has_a_registered_id()
-	_check_role_ids_resolve_through_the_registry()
+	_check_role_display_names_resolve()
 	_check_purchase_feed_is_localized()
 	_check_market_call_site_uses_the_registry()
 	_check_flea_listing_resolves_through_the_registry()
@@ -630,15 +630,20 @@ func _check_every_visible_item_has_a_registered_id() -> void:
 		"every tradable item .tres is REACHABLE FROM the registry (unregistered: %s)"
 			% ", ".join(unregistered))
 
-## Role ids, so a role cannot ship with a name nothing can resolve.
+## Role display names, so a role cannot ship with a name nothing can resolve.
+##
+## THE MECHANISM IS THE ROLE'S OWN KEY, NOT ItemNames. A role is not an item:
+## RoleDefinition carries `display_name_key`, a PO msgid, exactly parallel to
+## ItemNames.KEYS mapping an item id to its key, and there is deliberately no
+## RoleNames registry because roles are data. So this asks the question that
+## actually matters for a player: does the role's name RESOLVE IN THE CATALOGUE,
+## rather than rendering as the raw key?
+##
 ## SCANNED, NOT HARDCODED: this reads whatever is in resources/meta/roles/ rather
-## than naming the shipped role, because roles are DATA and a game ships three,
-## five or ten of them (project rule). A day with no role resources on the ref
-## scans 0 and this check is VACUOUS -- that is why the count is in the evidence
-## string and not only in a comment. When the death-policy ref (fe42546, holding
-## role_definition.gd + field_scout.tres) lands, this starts covering it with no
-## edit here.
-func _check_role_ids_resolve_through_the_registry() -> void:
+## than naming the shipped role, because a game ships three, five or ten of them
+## (project rule: content is data). The count travels in the evidence string, and
+## says VACUOUS at zero, so a green here cannot be read as coverage it lacks.
+func _check_role_display_names_resolve() -> void:
 	var dir := DirAccess.open("res://resources/meta/roles")
 	var scanned := 0
 	var unresolved: Array[String] = []
@@ -651,13 +656,18 @@ func _check_role_ids_resolve_through_the_registry() -> void:
 				if role == null:
 					continue
 				scanned += 1
-				var rid := String(role.get("id"))
-				if rid.is_empty() or ItemNames.display_name(rid) == "":
-					unresolved.append("%s(id=%s)" % [f, rid if not rid.is_empty() else "<empty>"])
+				var key := String(role.get("display_name_key"))
+				if key.is_empty():
+					unresolved.append("%s declares no display_name_key" % f)
+				elif TranslationServer.translate(key) == key:
+					# A real, shippable defect: the name is player-readable and the
+					# catalogue has no entry, so it renders as the raw key in every
+					# non-English locale. Reported, never worked around.
+					unresolved.append("%s key '%s' has no catalogue entry" % [f, key])
 			f = dir.get_next()
 		dir.list_dir_end()
 	_check(unresolved.is_empty(),
-		"every ROLE id resolves to a translated name (scanned=%d, unresolved: %s)%s"
+		"every ROLE display name resolves through the catalogue (scanned=%d, unresolved: %s)%s"
 			% [scanned, ", ".join(unresolved),
 			" -- VACUOUS: this ref has no resources/meta/roles yet" if scanned == 0 else ""])
 
