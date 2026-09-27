@@ -30,27 +30,40 @@ func _ready() -> void:
 	_setup_settings()
 
 func _on_play() -> void:
+	var reach := ActionLog.reached("MainMenu/BtnPlay", "route")
 	get_tree().change_scene_to_file("res://scenes/arena_blockout.tscn")
+	ActionLog.ok(reach, "res://scenes/arena_blockout.tscn")
 
 func _on_hub() -> void:
+	var reach := ActionLog.reached("MainMenu/BtnHub", "route")
 	get_tree().change_scene_to_file(HUB_SCENE)
+	ActionLog.ok(reach, HUB_SCENE)
 
 
 ## cf9448: the hideout is a ROUTE IN, not an orphan scene. A screen that exists with
 ## no way in is the same failure as the unconnected gunsmith request signals, and
 ## the acceptance for that card is the route rather than the screen internals.
 func _on_hideout() -> void:
+	var reach := ActionLog.reached("MainMenu/BtnHideout", "route")
 	# Cached and null-checked rather than chained: INV-38a ratchets chained
 	# get_tree() call sites and this handler added one. Same pattern as the hub
 	# controller's return_to_hub.
 	var tree: SceneTree = get_tree()
 	if tree == null:
+		# A REAL no-op, not a contrived one: the click arrived and there is a
+		# specific reason nothing happened. Before the record existed this was
+		# the exact silence the card is about -- a handler that ran, understood
+		# the click, and returned with nothing to show for it.
+		ActionLog.no_op(reach, "no_scene_tree", HIDEOUT_SCENE)
 		return
 	tree.change_scene_to_file(HIDEOUT_SCENE)
+	ActionLog.ok(reach, HIDEOUT_SCENE)
 
 
 func _on_quit() -> void:
+	var reach := ActionLog.reached("MainMenu/BtnQuit", "route")
 	get_tree().quit()
+	ActionLog.ok(reach)
 
 # ─── settings screen ───
 
@@ -124,10 +137,14 @@ func _on_fullscreen(on: bool) -> void:
 	SettingsStore.apply_display(settings)
 
 func _on_open_settings() -> void:
+	var reach := ActionLog.reached("MainMenu/BtnSettings", "panel")
 	($Menu as Control).visible = false
 	($SettingsPanel as Control).visible = true
+	ActionLog.ok(reach, "SettingsPanel")
 
 func _on_back() -> void:
+	var reach := ActionLog.reached("SettingsPanel/BtnBack", "panel")
 	SettingsStore.save_all(settings)
 	($SettingsPanel as Control).visible = false
 	($Menu as Control).visible = true
+	ActionLog.ok(reach, "Menu")

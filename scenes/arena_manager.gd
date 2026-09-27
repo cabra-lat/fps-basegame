@@ -436,12 +436,27 @@ func _on_pause_continue() -> void:
 ## open the gunsmith (which releases it last). In debug_range there is no
 ## listener, so nothing closes blindly — only the opener closes.
 func _on_weapon_modify_requested(w: Weapon) -> void:
+	# f5cac6. The card's own repro -- "clicking Modify in the gunsmith produces
+	# nothing visible" -- lives in this function, and it was invisible for a
+	# structural reason: the guard below returned with nothing to show, and
+	# nothing recorded that the click had arrived. The REACHED is recorded BEFORE
+	# the guard, because a record written after the work cannot show that the
+	# click got here first.
+	var reach := ActionLog.reached("Inventory/ContextMenu/ModifyWeapon", "gunsmith.open", "" if w == null else w.resource_path)
 	if gunsmith == null or w == null:
+		# A real no-op with a real reason, not a placeholder: the gunsmith is not
+		# constructed, or the request carried no weapon. Before the record existed
+		# both were indistinguishable from the click not landing.
+		ActionLog.no_op(reach,
+			"no_gunsmith" if gunsmith == null else "no_weapon")
 		return
 	var inv = player.get("inventory_ui")
 	if inv != null and inv.has_method("close_inventory") and inv.visible:
 		inv.close_inventory()
 	gunsmith.open_for_weapon(w)
+	# Names what CHANGED, not merely that a handler ran: "OK" on its own would be
+	# a receipt wearing a result's clothes.
+	ActionLog.ok(reach, w.resource_path)
 
 func _on_pause_restart() -> void:
 	get_tree().paused = false
