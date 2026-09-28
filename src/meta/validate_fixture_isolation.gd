@@ -361,6 +361,14 @@ func _finish() -> void:
 	print("─── FIXTURE ISOLATION ───")
 	for l in _fail_lines:
 		print("  FAIL: %s" % l)
-	print("checks: %d, passed: %d, failed: %d" % [_pass + _fail, _pass, _fail])
+	# FIXED 2026-09-28: the comma broke tools/verify-all.mjs's own count parser, so the
+	# MIN_CHECKS floor this harness is registered under was SILENTLY INERT and the gate
+	# reported "?" instead of a number. The parser is /checks passed\s*:?\s*[0-9]+/i with a
+	# fallback of /checks:\s*[0-9]+ pass/i -- "checks: 30, passed: 30" satisfies NEITHER,
+	# because a comma sits where the fallback needs the word "pass". A harness that cannot
+	# report its count cannot have a floor enforced on it, and the failure is invisible:
+	# the run still prints RESULT: PASS. Reported by agsuite-dev, who gated it and noticed the
+	# question mark. Printing the count in the form the gate parses is the whole fix.
+	print("checks passed: %d, passed: %d, failed: %d" % [_pass + _fail, _pass, _fail])
 	print("RESULT: %s" % ("PASS" if _fail == 0 else "FAIL"))
 	quit(0 if _fail == 0 else 1)
