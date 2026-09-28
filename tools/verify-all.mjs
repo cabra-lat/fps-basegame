@@ -1053,7 +1053,7 @@ function gateUidTracking() {
 }
 
 async function reimportAfterHarness(name) {
-  const result = await runLogged(`reimport.${name}`, godot, ['--headless', '--path', '.', '--import'], 120_000);
+  const result = await runLogged(`reimport.${name}`, godot, ['--headless', '--path', '.', '--import'], IMPORT_BUDGET_MS);
   const text = readLog(result.log);
   const [asset, repeats] = largestReimportLoop(text);
   return { ...result, asset, repeats, uidFailure: hasUidFailure(text) };
