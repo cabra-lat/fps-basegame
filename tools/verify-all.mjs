@@ -486,6 +486,34 @@ function preflightManifestAgainstPin() {
 
 if (!preflightManifestAgainstPin()) process.exit(4);
 
+// ALIAS SWEEP, static and no-run. Two NAMES for one script resolves cleanly, so every
+// existence check passes and the file runs twice -- once per name -- each against a floor
+// that belonged to whichever name last pointed at it. That is how one 41-check file came
+// to serve a floor of 45 and a floor of 48, both unreachable. Statically visible, needs no
+// Godot run, cannot be argued with.
+//
+// WARN, not FAIL, and deliberately: whether weapon_requests_runtime should exist as a
+// distinct gate at all is an open decision (the addon renamed the file and the alias was
+// deliberate), so a FAIL here would be a permanently red gate I do not own the answer to.
+// This makes the fault loud and count-lossy while the decision stays with the owner --
+// the same restraint that kept me from lowering a floor to turn a red gate green.
+function preflightManifestAliases() {
+  const byScript = new Map();
+  for (const [name, script] of HARNESS_SCRIPTS) {
+    if (!byScript.has(script)) byScript.set(script, []);
+    byScript.get(script).push(name);
+  }
+  const aliases = [...byScript].filter(([, names]) => names.length > 1);
+  if (aliases.length === 0) {
+    record('manifest_alias', 'PASS', `${HARNESS_SCRIPTS.length} registered, no script under two names`);
+    return;
+  }
+  record('manifest_alias', 'WARN',
+    `${aliases.length} script(s) registered under more than one name (each runs twice, each name carries its own floor): ` +
+    aliases.map(([s, ns]) => `${ns.join('+')} -> ${s}`).join('; '));
+}
+preflightManifestAliases();
+
 function killTree(child) {
   if (!child?.pid) return;
   try { process.kill(-child.pid, 'SIGTERM'); } catch { try { child.kill('SIGTERM'); } catch {} }
