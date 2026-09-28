@@ -412,14 +412,33 @@ func _scope_inventory() -> void:
 	_check(arena_src.contains("ActionLog.reached(\"Inventory/ContextMenu/ModifyWeapon\""),
 		"scope: the gunsmith Modify route is instrumented -- the card's own repro")
 
-	# The two honest negatives. Each says what is missing and why, rather than
-	# being quietly left out of the harness.
+	# THE SCOPE LIMITS, AS NOTES AND NOT AS ASSERTIONS.
+	#
+	# These two used to be scored checks, and the first one was the same disease as
+	# the hub's expired premise, wearing the OTHER polarity: it asserted an ABSENCE
+	# -- main.gd does not contain "action_performed" -- and the project's direction
+	# is to FILL that absence. So the harness was one correct fix away from failing
+	# a system that had just got better, which is the same failure mode as
+	# asserting a key is "currently untranslated" and watching it become
+	# translated. Naming a limit does not unpin it; the word "honest" above was
+	# doing the work that a real property would have to do.
+	#
+	# They are NOTES now, printed like the other LIMIT lines in this harness, so the
+	# information survives and the VERDICT stops depending on a value the project
+	# intends to change. An assertion about a property that is SUPPOSED to change
+	# has to be written against the property, never against its current value.
 	var requests_src := FileAccess.get_file_as_string("res://addons/cabra.lat_shooters/src/ui/inventory/main.gd")
-	_check(not requests_src.contains("action_performed"),
-		"scope LIMIT, named not hidden: the inventory root does NOT forward action_performed, so inventory action results are currently unobservable from the game")
+	if not requests_src.contains("action_performed"):
+		print("  NOTE  scope LIMIT: the inventory root does not forward action_performed, so inventory action")
+		print("        results are not observable from the game. This is a DISCLOSURE, not a verdict: the")
+		print("        addon is expected to grow that forward, and this line must not turn red when it does.")
 	var scope_src := FileAccess.get_file_as_string("res://addons/cabra.lat_shooters/src/world/attachment_scope_3d.gd")
+	# THIS ONE STAYS AN ASSERTION, and it is the control for the reasoning above: it
+	# asserts that the API EXISTS, which is a property of the interface, not a
+	# value it happens to hold. A positive existence check does not expire when the
+	# thing it names is used differently.
 	_check(scope_src.contains("func start_zooming") and scope_src.contains("func stop_zooming"),
-		"scope LIMIT: the zoom API named in the card exists in the scope script")
+		"scope: the zoom API named in the card exists in the scope script")
 
 
 # ── plumbing ────────────────────────────────────────────────────────────────
