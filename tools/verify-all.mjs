@@ -139,6 +139,24 @@ const HARNESS_SCRIPTS = [
   ['i18n', 'res://src/meta/validate_i18n.gd'],
   ['invariants', 'res://addons/cabra.lat_shooters/test/validate_invariants.gd'],
   ['locomotion_orientation', 'res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd'],
+  // action_log
+  ['action_log', 'res://scenes/validate_action_log.gd'],
+  // hideout_behaviour
+  ['hideout_behaviour', 'res://scenes/validate_hideout_behaviour.gd'],
+  // hideout_route
+  ['hideout_route', 'res://scenes/validate_hideout_route.gd'],
+  // free_items_view
+  ['free_items_view', 'res://src/meta/validate_free_items_view.gd'],
+  // starter_loadout
+  ['starter_loadout', 'res://src/meta/validate_starter_loadout.gd'],
+  // stash_view
+  ['stash_view', 'res://src/meta/validate_stash_view.gd'],
+  // hub_loadout_wiring  RED: an UNTRANSLATED hub reason renders the key
+  ['hub_loadout_wiring', 'res://scenes/validate_hub_loadout_wiring.gd'],
+  // ui_wiring  RED: a request signal is emitted into the void
+  ['ui_wiring', 'res://scenes/validate_ui_wiring.gd'],
+  // loadout_view  RED: is_legal_while_equipped absent at the pin
+  ['loadout_view', 'res://src/meta/validate_loadout_view.gd'],
   ['factions', 'res://scenes/validate_factions.gd'],
   ['raid1_scenario', 'res://scenes/validate_raid1_scenario.gd'],
   ['gunsmith_preview', 'res://scenes/validate_gunsmith_preview.gd'],
@@ -211,7 +229,17 @@ const MIN_CHECKS = {
   raid1_scenario: 22,
   gunsmith_preview: 83,
   arena_spawn: 60,
+  action_log: 63,
+  hideout_behaviour: 21,
+  hideout_route: 20,
+  free_items_view: 33,
+  starter_loadout: 16,
+  stash_view: 51,
+  hub_loadout_wiring: 17,
+  ui_wiring: 15,
+  loadout_view: 40,
 };
+
 // check_scripts is intentionally absent: it runs as the import/parse gate and
 // never goes through gateHarness, so there is no countChecks() to compare.
 
@@ -330,7 +358,7 @@ function preflightHarnessCoverage() {
   }
   if (orphans.length === 0) {
     record('harness_coverage', 'PASS',
-      `${HARNESS_SCRIPTS.length} registered (${registered.length} under the addon), every SceneTree harness on disk is wired`);
+      `${HARNESS_SCRIPTS.length} registered (${registered.size} under the addon), every SceneTree harness on disk is wired`);
     return true;
   }
   // SEVERITY, and it is the whole judgement: WARN, not FAIL. An unwired harness is a
@@ -441,8 +469,21 @@ function readLog(log) {
   try { return readFileSync(log, 'utf8'); } catch { return ''; }
 }
 
+// FOUR SHAPES, because four of the harnesses this gate runs print the fifth the
+// three original patterns do not match. "checks=21 passed=21" returns '?' through every
+// one of them, so a harness that passes every check is reported as an unreadable count
+// and the gate goes red for a FORMAT reason rather than a behaviour one.
+//
+// The direction matters: the fix is here and not in the four callers. A counter in the
+// shared mechanism that cannot read three of the five shapes its own harnesses print is
+// the defect; reformatting four other lanes' output so one parser accepts it is how a
+// shared utility quietly becomes the tail that wags the dog. Settled by CALLING this:
+//
+//   countChecks('checks=21 passed=21')  -> 21   (was '?')
+//   countChecks('checks=40 passed=35')  -> 40   the TOTAL, which is what a floor needs
 function countChecks(text) {
-  return text.match(/checks passed\s*:?\s*[0-9]+/i)?.[0]?.match(/[0-9]+/)?.[0]
+  return text.match(/checks[= ]\s*([0-9]+)\s+passed/i)?.[1]
+    ?? text.match(/checks passed\s*:?\s*[0-9]+/i)?.[0]?.match(/[0-9]+/)?.[0]
     ?? text.match(/checks:\s*[0-9]+ pass/i)?.[0]?.match(/[0-9]+/)?.[0]
     ?? text.match(/^\s*passed\s+[0-9]+/im)?.[0]?.match(/[0-9]+/)?.[0]
     ?? '?';
