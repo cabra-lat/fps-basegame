@@ -839,6 +839,107 @@ function gateSubmodulePins() {
   record('submodule_pins', 'PASS', `${rows.length} submodule(s), every checkout matches its recorded SHA`);
 }
 
+  // PIN-BACKWARDS GUARD. The gate above answers "does the checkout match the pin THIS
+  // tree records". It cannot answer "did a commit move the pin backwards", because a
+  // backwards pin is internally consistent: the worktree checks out whatever the commit
+  // says, so every per-tree check passes while the tree has lost addon commits. Measured
+  // 2026-09-27 by ballistics across every live branch: the hole is real and currently
+  // unexploited (no live branch has pin(child) an ancestor of pin(parent)). It is here
+  // so a future one is caught, not because it is biting.
+  //
+  // PARENT-RELATIVE, never against main. Comparing a branch to main is wrong at the
+  // moment of a legitimate rebase or a branch cut made before a bump, and that is the form
+  // that would have cried wolf: a base was once read as an edit, raising a false alarm
+  // that a commit would roll back an ammo fix. "pin(child) is an ancestor of
+  // pin(parent)" is the only form that means this commit moved the pin backwards.
+  //
+  // The set of commits that CAN roll a pin back is exactly the commits where the pin
+  // differs from the parent's: a commit that does not change the pin cannot move it, and
+  // a three-way merge keeps the other side's. That is merge semantics, not a property of
+  // this repo, and it is what makes the sweep cheap enough to run in the gate: we look
+  // only at commits that move a pin, not at every commit on every branch.
+  function gateSubmodulePinBackwards() {
+    if (!existsSync(join(ROOT, '.gitmodules'))) {
+      record('submodule_pin_backwards', 'PASS', 'no .gitmodules — no pin to move backwards');
+      return;
+    }
+    // `ls-tree -r`: the gitlinks live under addons/, so a non-recursive listing of HEAD
+    // finds none of them and this gate would silently pass on an empty set. That is the
+    // same shape as a count that reads zero because nothing ran, so it is worth stating:
+    // a gate that finds no submodules to compare is not the same as a gate that finds no
+    // backwards pins. The `.gitmodules` presence check above keeps the truly-absent case
+    // honest, and the row count below makes an unexpectedly empty set visible.
+    const shas = gitOut(['ls-tree', '-r', 'HEAD'], ROOT).split('\n')
+      .map((l) => l.trim().split(/\s+/))
+      .filter((c) => c[0] === '160000' && c[3])
+      .map((c) => ({ path: c[3], pin: c[2] }));
+    if (shas.length === 0) {
+      record('submodule_pin_backwards', 'PASS', 'no submodule gitlinks at HEAD');
+      return;
+    }
+    const pinOf = (path) => {
+      const dir = join(ROOT, path);
+      if (!existsSync(dir)) return null;
+      try { return gitOut(['rev-parse', 'HEAD'], dir).trim(); } catch { return null; }
+    };
+    const shasLive = shas.map((s) => ({ ...s, repo: join(ROOT, s.path), live: pinOf(s.path) }))
+      .filter((s) => s.live !== null);
+    if (shasLive.length === 0) {
+      record('submodule_pin_backwards', 'SKIP', 'no submodule checked out; cannot resolve pin history');
+      return;
+    }
+    // Commits that touch a pin: `git log --format=%H` over the recorded paths. `--all`
+    // so unpushed branches are covered, which is where a backwards move is cheapest to
+    // make and least likely to be noticed.
+    const range = ['log', '--all', '--format=%H', '--', ...shas.map((s) => s.path)];
+    let commits = [];
+    try { commits = gitOut(range, ROOT).split('\n').map((s) => s.trim()).filter(Boolean); }
+    catch { record('submodule_pin_backwards', 'SKIP', 'could not walk pin-moving commits'); return; }
+
+    const pinAt = (rev, path) => {
+      const line = gitOut(['ls-tree', rev, '--', path], ROOT).split('\n')
+        .map((l) => l.trim()).find((l) => l.startsWith('160000'));
+      return line ? line.split(/\s+/)[2] : null;
+    };
+    const backwards = [];
+    let examined = 0;
+    for (const commit of commits) {
+      // Resolve the pin at this commit and at its FIRST parent. Merge commits are
+      // skipped: their first parent is one side of a merge, and a merge that keeps the
+      // other side's pin is legitimate, not a rollback.
+      const parents = gitOut(['rev-list', '--parents', '-n', '1', commit], ROOT).trim().split(/\s+/).slice(1);
+      if (parents.length !== 1) continue;
+      for (const s of shasLive) {
+        let child, parent;
+        try { child = pinAt(commit, s.path); parent = pinAt(parents[0], s.path); }
+        catch { continue; }
+        if (!child || !parent || child === parent) continue;
+        examined += 1;
+        // The ancestry test MUST run inside the SUBMODULE's repository. child and parent
+        // are commits in the addon's history, not the game repo's, and asking the game repo
+        // "is child an ancestor of parent" makes it print "fatal: not a valid commit name"
+        // to stderr and exit nonzero -- which is indistinguishable from a clean negative
+        // answer. That is how the first version of this gate reported PASS on a real
+        // backwards pin: the comparison was answering about the wrong repository, and
+        // erroring. An error and a "no" look identical to any code that only catches.
+        let isBackwards = false;
+        try { gitOut(['merge-base', '--is-ancestor', child, parent], s.repo); isBackwards = true; }
+        catch { isBackwards = false; } // not an ancestor in the SUBMODULE: a normal move
+        if (isBackwards) {
+          backwards.push({ commit: commit.slice(0, 12), path: s.path, parent: parent.slice(0, 12), child: child.slice(0, 12) });
+        }
+      }
+    }
+    if (backwards.length === 0) {
+      record('submodule_pin_backwards', 'PASS',
+        `${commits.length} pin-touching commit(s) walked, ${examined} pin move(s), none backwards`);
+      return;
+    }
+    record('submodule_pin_backwards', 'FAIL',
+      `${backwards.length} commit(s) moved a submodule pin BACKWARDS (parent-to-child): ` +
+      backwards.map((b) => `${b.commit} ${b.path} ${b.parent}->${b.child}`).join('; '));
+  }
+
 function gateUidTracking() {
   const list = join(logDir, 'uid_missing.log');
   writeFileSync(list, '');
@@ -1000,6 +1101,7 @@ async function main() {
   gateLockWrapper();
   const importOk = await importGodot();
   gateSubmodulePins();
+  gateSubmodulePinBackwards();
   gateUidTracking();
   if (!importOk) {
     record('harnesses', 'SKIP', 'import/parse failed; downstream Godot gates would use an invalid cache');
