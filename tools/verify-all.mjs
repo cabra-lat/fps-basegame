@@ -127,7 +127,7 @@ const HARNESS_SCRIPTS = [
   ['ballistics', 'res://addons/cabra.lat_shooters/test/validate_ballistics.gd'],
   ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
   ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
-  ['weapon_requests_runtime', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
+  ['weapon_requests_runtime', 'res://addons/cabra.lat_shooters/test/validate_weapon_requests_runtime.gd'],
   ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
   ['fixture_isolation', 'res://src/meta/validate_fixture_isolation.gd'],
   ['item_codec_paths', 'res://src/meta/validate_item_codec_paths.gd'],
