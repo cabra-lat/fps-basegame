@@ -182,7 +182,7 @@ const MIN_CHECKS = {
   item_codec_paths: 17,
   profiler: 120,
   assets: 123,
-  ballistics: 52,
+  ballistics: 68,
   weapon_mechanics: 45,
   inventory_ux: 77,
   // 38a378. EXECUTED-behaviour checks for the three inventory weapon actions, as
