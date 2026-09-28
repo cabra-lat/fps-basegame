@@ -237,7 +237,7 @@ const MIN_CHECKS = {
   stash_view: 51,
   hub_loadout_wiring: 17,
   ui_wiring: 15,
-  loadout_view: 40,
+  loadout_view: 48,
 };
 
 // check_scripts is intentionally absent: it runs as the import/parse gate and
