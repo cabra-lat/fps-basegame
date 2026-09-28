@@ -652,11 +652,16 @@ function hasUidFailure(text) {
   return /Unrecognized UID|Can't find file .* during file reimport/i.test(text);
 }
 
+// The import budget, named once. It appears at TWO call sites (the first attempt and the
+// per-harness re-import) and it is quoted in the timeout message, so three places would be
+// three things that can drift apart. One constant, three readers.
+const IMPORT_BUDGET_MS = 120_000;
+
 async function importGodot() {
   const importLog = join(logDir, 'import.log');
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     let detected = null;
-    const running = runLogged('import', godot, ['--headless', '--path', '.', '--import'], 120_000);
+    const running = runLogged('import', godot, ['--headless', '--path', '.', '--import'], IMPORT_BUDGET_MS);
     const watcher = setInterval(() => {
       const liveText = readLog(importLog);
       const [liveAsset, liveRepeats] = largestReimportLoop(liveText);
@@ -697,12 +702,26 @@ async function importGodot() {
       }
       return true;
     }
-    if (attempt < 2) {
-      console.error('verify-all: import timed out; waiting 5s + retry once');
-      await new Promise((resolveSleep) => setTimeout(resolveSleep, 5000));
+    if (result.code === 124) {
+      // A TIMEOUT is not retried. The loop runs the IDENTICAL command against the IDENTICAL
+      // tree with the IDENTICAL 120_000 ms budget, and nothing clears .godot or the page
+      // cache between attempts -- so attempt 2 is the same machine, the same tree and the
+      // same budget, and can only repeat the outcome. It costs 120 further seconds and it
+      // makes "TIMED OUT (120s x2)" read like a second chance at something variable, when
+      // the variable is the machine and not the attempt.
+      //
+      // The KILL path is different and keeps its retry: the watcher polls at 250ms and kills
+      // the import tree on a reimport loop or a uid failure, and a KILLED attempt is a
+      // genuinely different starting state from a timed-out one. That case is handled above
+      // and returns before reaching here.
+      record('import/parse', 'FAIL',
+        `import TIMED OUT (${Math.round(IMPORT_BUDGET_MS / 1000)}s, not retried: a second identical attempt on the same tree and budget can only repeat it — this is a machine-speed signal, not a flaky one; see ${importLog})`);
+      return false;
     }
   }
-  record('import/parse', 'FAIL', `import TIMED OUT (120s x2) (see ${importLog})`);
+  // Unreachable in practice: the timeout branch above returns, and the kill branch returns too.
+  // Kept as a backstop so the loop can never fall through without recording a verdict.
+  record('import/parse', 'FAIL', `import did not produce a verdict (see ${importLog})`);
   return false;
 }
 
