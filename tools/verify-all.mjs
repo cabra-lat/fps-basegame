@@ -39,7 +39,7 @@
 // tree: initialising submodules does not stage it.
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -141,6 +141,24 @@ const HARNESS_SCRIPTS = [
   ['i18n', 'res://src/meta/validate_i18n.gd'],
   ['invariants', 'res://addons/cabra.lat_shooters/test/validate_invariants.gd'],
   ['locomotion_orientation', 'res://addons/cabra.lat_shooters/test/validate_locomotion_orientation.gd'],
+  // action_log
+  ['action_log', 'res://scenes/validate_action_log.gd'],
+  // hideout_behaviour
+  ['hideout_behaviour', 'res://scenes/validate_hideout_behaviour.gd'],
+  // hideout_route
+  ['hideout_route', 'res://scenes/validate_hideout_route.gd'],
+  // free_items_view
+  ['free_items_view', 'res://src/meta/validate_free_items_view.gd'],
+  // starter_loadout
+  ['starter_loadout', 'res://src/meta/validate_starter_loadout.gd'],
+  // stash_view
+  ['stash_view', 'res://src/meta/validate_stash_view.gd'],
+  // hub_loadout_wiring  RED: an UNTRANSLATED hub reason renders the key
+  ['hub_loadout_wiring', 'res://scenes/validate_hub_loadout_wiring.gd'],
+  // ui_wiring  RED: a request signal is emitted into the void
+  ['ui_wiring', 'res://scenes/validate_ui_wiring.gd'],
+  // loadout_view  RED: is_legal_while_equipped absent at the pin
+  ['loadout_view', 'res://src/meta/validate_loadout_view.gd'],
   ['factions', 'res://scenes/validate_factions.gd'],
   ['raid1_scenario', 'res://scenes/validate_raid1_scenario.gd'],
   ['gunsmith_preview', 'res://scenes/validate_gunsmith_preview.gd'],
@@ -213,7 +231,17 @@ const MIN_CHECKS = {
   raid1_scenario: 22,
   gunsmith_preview: 83,
   arena_spawn: 60,
+  action_log: 63,
+  hideout_behaviour: 21,
+  hideout_route: 20,
+  free_items_view: 33,
+  starter_loadout: 16,
+  stash_view: 51,
+  hub_loadout_wiring: 17,
+  ui_wiring: 15,
+  loadout_view: 48,
 };
+
 // check_scripts is intentionally absent: it runs as the import/parse gate and
 // never goes through gateHarness, so there is no countChecks() to compare.
 
@@ -291,7 +319,63 @@ function preflightHarnessPaths() {
   return false;
 }
 
+// COVERAGE PREFLIGHT, the other direction. preflightHarnessPaths() asks "is every
+// REGISTERED path on disk"; this asks "is every harness ON DISK registered" — and the
+// second question is the one that has actually bitten. A harness written and never
+// wired does not fail, does not warn, and does not appear in the per-gate output, so
+// the failure mode of a MISSING TEST is indistinguishable from the success mode of a
+// PASSING ONE. That happened to me here: a sed anchor that did not match left the edit
+// a no-op, the run printed RESULT: PASS, and "the gate is green" — the signal that is
+// supposed to mean the gate ran — was true, and meant nothing.
+//
+// The discriminator is BEHAVIOURAL, not a hand-kept list: a harness extends SceneTree
+// and owns _initialize(); a helper like validate_util.gd extends RefCounted and is
+// never a gate. A declared list of "files that are exempt" would go stale the first
+// time someone adds a library, and would then be reporting on itself rather than on the
+// tree. Distinct exit code 3, so "you have an unwired harness" cannot be mistaken for
+// either a missing path (2) or a content failure (1).
+const HARNESS_ROOTS = ['scenes', 'src/meta', 'addons/cabra.lat_shooters/test'];
+function preflightHarnessCoverage() {
+  const registered = new Set(HARNESS_SCRIPTS.map(([name, script]) =>
+    resToPath(script).slice(ROOT.length + 1)));
+  const orphans = [];
+  for (const root of HARNESS_ROOTS) {
+    const dir = join(ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith('.gd') || file.endsWith('.uid')) continue;
+      // NAME IS NOT THE DISCRIMINATOR. An earlier version filtered on ^(validate_|check_scripts)
+      // first, which meant a SceneTree harness outside that convention was never even read,
+      // while the row reported what 'extends SceneTree' about a set chosen by filename. Every
+      // .gd in the roots is examined and the behavioural test below decides.
+      const rel = join(root, file);
+      if (registered.has(rel)) continue;
+      // A library is not a gate. Read the file and decide from what it declares
+      // rather than from its name, so `validate_util.gd` is exempt for the reason it
+      // is exempt instead of because someone typed its name into an allowlist.
+      const head = readFileSync(join(dir, file), 'utf8').slice(0, 400);
+      const isHarness = /^\s*extends\s+SceneTree\b/m.test(head);
+      if (isHarness) orphans.push(rel);
+    }
+  }
+  if (orphans.length === 0) {
+    record('harness_coverage', 'PASS',
+      `${HARNESS_SCRIPTS.length} registered (${registered.size} under the addon), every SceneTree harness on disk is wired`);
+    return true;
+  }
+  // SEVERITY, and it is the whole judgement: WARN, not FAIL. An unwired harness is a
+  // test nobody is RUNNING, not a test that FAILED, and FAIL would assert a verdict
+  // nobody obtained -- the RESULT = passed == checks shape this project keeps finding.
+  // Loud and count-lossy, but not a red gate: one harness nobody registered must not
+  // block every lane's verification while it is being wired in dependency order.
+  record('harness_coverage', 'WARN',
+    `${orphans.length} harness script(s) extend SceneTree but are NOT registered, so they run nothing: ${orphans.join(', ')}. ` +
+    'A green gate is not evidence that they exist. Add a [name, res://path] entry to HARNESS_SCRIPTS, or delete the file if it was scratch.');
+  return true;
+}
+
 if (!preflightHarnessPaths()) process.exit(2);
+preflightHarnessCoverage();
 
 function killTree(child) {
   if (!child?.pid) return;
@@ -387,8 +471,21 @@ function readLog(log) {
   try { return readFileSync(log, 'utf8'); } catch { return ''; }
 }
 
+// FOUR SHAPES, because four of the harnesses this gate runs print the fifth the
+// three original patterns do not match. "checks=21 passed=21" returns '?' through every
+// one of them, so a harness that passes every check is reported as an unreadable count
+// and the gate goes red for a FORMAT reason rather than a behaviour one.
+//
+// The direction matters: the fix is here and not in the four callers. A counter in the
+// shared mechanism that cannot read three of the five shapes its own harnesses print is
+// the defect; reformatting four other lanes' output so one parser accepts it is how a
+// shared utility quietly becomes the tail that wags the dog. Settled by CALLING this:
+//
+//   countChecks('checks=21 passed=21')  -> 21   (was '?')
+//   countChecks('checks=40 passed=35')  -> 40   the TOTAL, which is what a floor needs
 function countChecks(text) {
-  return text.match(/checks passed\s*:?\s*[0-9]+/i)?.[0]?.match(/[0-9]+/)?.[0]
+  return text.match(/checks[= ]\s*([0-9]+)\s+passed/i)?.[1]
+    ?? text.match(/checks passed\s*:?\s*[0-9]+/i)?.[0]?.match(/[0-9]+/)?.[0]
     ?? text.match(/checks:\s*[0-9]+ pass/i)?.[0]?.match(/[0-9]+/)?.[0]
     ?? text.match(/^\s*passed\s+[0-9]+/im)?.[0]?.match(/[0-9]+/)?.[0]
     ?? '?';
