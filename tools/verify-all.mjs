@@ -9,7 +9,9 @@
 // still exit 0 and the run reports RESULT: PASS. The orchestrator's
 // log-honesty check greps SCRIPT ERROR, and that count is 0, so a missing
 // rig is not caught here. DO NOT READ A GREEN RUN AS PROOF THAT libik IS
-// STAGED. (Observed on f30e0f9: `verify-all --quick` returned RESULT: PASS
+// STAGED. NOTE THE CITATION IS NOT AN AGGREGATE: --quick runs ONE harness of 21
+// and never runs qa_audit, so the run below could not have caught this. Observed
+// on f30e0f9: `verify-all --quick` returned RESULT: PASS
 // with addons/libik entirely absent and SCRIPT ERROR count 0. verifier
 // reports the loader's missing-ext_resource and GDExtension ERROR lines
 // scrolling past in the same state; the honesty check greps SCRIPT ERROR,
