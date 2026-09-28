@@ -70,15 +70,35 @@ func _run() -> void:
 	_check(not status.text.is_empty(), "the reason line is never blank when reasons exist")
 
 	# ── keys, not sentences: the label renders through the catalogue ─────────
-	var over: String = TranslationServer.translate("LOADOUT_REASON_OVER_MASS")
-	_check(over == "LOADOUT_REASON_OVER_MASS",
-		"the reason is currently UNTRANSLATED, and the label shows the key itself rather than a composed sentence")
-	_check(status.text.contains(over), "the label shows exactly what the catalogue resolves the key to")
+	# The label must show whatever the CATALOGUE resolves the key to, whether that
+	# is the key itself or a finished translation. An earlier version of this check
+	# asserted the key was CURRENTLY UNTRANSLATED, which was true when it was
+	# written and stopped being true the moment game.po gained
+	# LOADOUT_REASON_OVER_MASS (game.po:654). It then failed on a screen that had
+	# got BETTER, which is the same shape as the prose excuse registry: an
+	# assertion pinned to a temporary state, kept in step by hand, and reporting a
+	# failure whose real content is that someone else did their job.
+	var over_key := "LOADOUT_REASON_OVER_MASS"
+	var over: String = TranslationServer.translate(over_key)
+	_check(not over.is_empty(),
+		"the catalogue resolves the reason key to something non-empty")
+	_check(status.text.contains(over),
+		"the label shows exactly what the catalogue resolves the key to, translated or not")
+	# The real property, and the one that survives translation: the label never
+	# contains a COMPOSED ENGLISH SENTENCE of our own making. It renders the
+	# catalogue's answer or the key, and nothing else.
+	_check(not status.text.contains("over mass") and not status.text.contains("exceeds"),
+		"the label does not compose its own English sentence instead of rendering the catalogue's answer")
 
 	# ── the hygiene the API promises ───────────────────────────────────────
-	h.set_loadout_reasons(["", "   ", 42, null, "LOADOUT_REASON_GRID_OVERLAP"])
+	# Same correction, and it is why this row was red for a reason nobody was
+	# looking at: the assertion expected the RAW KEY in the label, so it failed
+	# precisely when the key became translated.
+	var gap_key := "LOADOUT_REASON_GRID_OVERLAP"
+	var gap: String = TranslationServer.translate(gap_key)
+	h.set_loadout_reasons(["", "   ", 42, null, gap_key])
 	await process_frame
-	_check(status.text.count("\n") == 0 and status.text.contains("LOADOUT_REASON_GRID_OVERLAP"),
+	_check(status.text.count("\n") == 0 and status.text.contains(gap),
 		"blank, whitespace and non-string entries are dropped, so only real keys render")
 
 	# ── A STALE REASON MUST NOT SURVIVE A LOADOUT CHANGE. This is the failure
