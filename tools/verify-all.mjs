@@ -330,7 +330,7 @@ function preflightHarnessCoverage() {
   }
   if (orphans.length === 0) {
     record('harness_coverage', 'PASS',
-      `${registered.size} registered, every SceneTree harness on disk is wired`);
+      `${HARNESS_SCRIPTS.length} registered (${registered.length} under the addon), every SceneTree harness on disk is wired`);
     return true;
   }
   // SEVERITY, and it is the whole judgement: WARN, not FAIL. An unwired harness is a
