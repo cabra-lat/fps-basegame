@@ -390,7 +390,7 @@ static func _collect_names(dir_path: String) -> void:
 		var r := load(p) as Resource
 		if r == null:
 			continue
-		var n := String(r.get("name"))
+		var n := String((r as Resource).name) if ("name" in r) else ""
 		if n != "" and not _name_index.has(n):
 			_name_index[n] = p
 		# Recurse: items live in per-category subdirectories (armor/, medical/,
@@ -428,7 +428,11 @@ static func _scan_for_name(dir: String, target: String) -> String:
 			continue
 		var p := dir + "/" + f
 		var r := load(p)
-		if r is Resource and (r as Resource).name == target:
+		# Form 4 from agsuite-dev's engine measurement: the guard has to short-circuit on
+		# "name" IN r specifically, not on r is Resource -- a Quest passes every other test.
+		# Object.get() on a property the object does not have is ITSELF an error in Godot 4,
+		# so get() is not a safe read; it only changes WHICH error fires on the same line.
+		if r is Resource and ("name" in r) and (r as Resource).name == target:
 			return p
 	return ""
 
