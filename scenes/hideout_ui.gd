@@ -79,6 +79,11 @@ func refresh() -> void:
 	var rows: Array = _view.rows()
 	for row in rows:
 		_list.add_child(_make_row(row))
+	# An empty list and a list that failed to render must not look the same. The
+	# screen was a blank half-window with a label floating in the middle of it, and
+	# "nothing recovered yet" is a fact about the save rather than about the code.
+	if rows.is_empty():
+		_list.add_child(_make_note("nothing recovered yet"))
 	var pending: int = int(_view.pending_item_count())
 	var waits: int = int(_view.raids_until_next_return())
 	_summary.text = "recovered goods (%d pending, next return in %s)" % [pending, _row_wait(waits)]
@@ -115,6 +120,19 @@ func _refresh_stash() -> void:
 		]
 	for row in _stash.rows():
 		_stash_rows.add_child(_make_stash_row(row))
+	if _stash.rows().is_empty():
+		_stash_rows.add_child(_make_note("nothing stored"))
+
+
+## A single dim line, used for both empty states so the two screens cannot drift
+## apart in how they say nothing. Deliberately not a disabled control: a greyed-out
+## button reads as broken, and the file's own rule above says the two states must
+## be distinguishable rather than identical.
+func _make_note(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", Color(0.55, 0.60, 0.68, 1.0))
+	return label
 
 
 func _make_stash_row(row: Dictionary) -> Control:

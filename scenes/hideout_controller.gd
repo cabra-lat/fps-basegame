@@ -48,9 +48,27 @@ func bind_hideout(value: HideoutUI) -> void:
 ## list rather than a crash, because "no free items yet" and "the service is not
 ## up" must not look the same to a player.
 func refresh() -> void:
-	if _ui == null or _service == null:
+	if _ui == null:
 		return
-	_ui.bind(_service.profile, _service.insurance)
+	if _service == null:
+		# THE ROUTE FROM THE MAIN MENU INJECTS NOTHING. The only caller of
+		# set_meta_service in the whole tree is a harness (src/meta/validate_meta_flow.gd),
+		# so a player pressing "hideout" on the menu reached a screen whose _service
+		# was null, which meant bind() was never called and the window rendered as an
+		# empty half-screen with a blank summary - the exact confusion the comment
+		# above forbids. The autoload is spelled Meta, not MetaService, which is
+		# half of why this was not obvious.
+		_service = get_node_or_null(^"/root/Meta")
+	if _service == null:
+		return
+	# The autoload carries the PROFILE but has no `insurance` member at all - the
+	# insurance manifest is a separate object and the hideout was never wired to it.
+	# free_items_view null-checks insurance in every accessor, so `get` yields null
+	# for the missing member and the screen reports an empty claim list rather than
+	# throwing on the way to showing the player what they own. Reading it as
+	# `_service.insurance` printed a script error every time the hideout opened,
+	# which is a worse screen than the empty one it replaced.
+	_ui.bind(_service.profile, _service.get("insurance"))
 
 
 func _connect_ui() -> void:
