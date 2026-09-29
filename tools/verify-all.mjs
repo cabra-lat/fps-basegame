@@ -214,6 +214,12 @@ const MIN_CHECKS = {
   ballistics: 68,
   weapon_mechanics: 45,
   inventory_ux: 77,
+  // task_1790474085894_2f12c9. 2, stated by the harness itself in both its PASS and
+  // FAIL paths, not taken from a neighbouring row. Without this entry the
+  // b3eaae4 aggregate reported 'an unfloored harness can lose checks
+  // silently' in the same hour the row landed. Must land WITH the addon commit
+  // range/no-bare-prints-count, since the floor is meaningless without the count.
+  no_bare_prints: 2,
   // 38a378. EXECUTED-behaviour checks for the three inventory weapon actions, as
   // distinct from the connection checks in validate_ui_wiring. Registered in the
   // same change as the change_magazine null-branch fix, deliberately: an
