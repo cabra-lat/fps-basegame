@@ -128,6 +128,7 @@ const HARNESS_SCRIPTS = [
   ['weapon_mechanics', 'res://addons/cabra.lat_shooters/test/validate_weapon_mechanics.gd'],
   ['inventory_ux', 'res://addons/cabra.lat_shooters/test/validate_inventory_ux.gd'],
   ['weapon_requests_runtime', 'res://addons/cabra.lat_shooters/test/validate_weapon_requests_runtime.gd'],
+  ['weapon_assembly', 'res://src/weapons/validate_weapon_assembly.gd'],
   ['meta_persistence', 'res://src/meta/validate_meta_persistence.gd'],
   ['fixture_isolation', 'res://src/meta/validate_fixture_isolation.gd'],
   ['item_codec_paths', 'res://src/meta/validate_item_codec_paths.gd'],
@@ -199,6 +200,10 @@ const MIN_CHECKS = {
   // null detach bypass the INTERNAL gate, and the counterpart that fails if a
   // refusal announces a change it did not make.
   weapon_requests_runtime: 48,
+  // A probe that catches a real bug leaves an assertion behind. These three did:
+  // the AK_47 ghost row, the two checks that could not fail, and a fixture that
+  // was never a fixture. Registered on the same commit as the code they cover.
+  weapon_assembly: 91,
   meta_persistence: 126,
   meta_progression: 34,
   meta_market: 53,

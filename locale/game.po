@@ -872,3 +872,23 @@ msgstr ""
 
 msgid "FIXTURE untranslated designation"
 msgstr ""
+# ── frankenstein weapon assembly refusals (f5cac6 successor) ─────────────────
+# A refusal a player reads. Keys, not sentences: the reason vocabulary is owned
+# by the catalogue so a screen can never compose its own copy, which is the shape
+# that made the hub's reasons unreadable. Every key is asserted non-empty and
+# non-sentence by validate_weapon_assembly.gd.
+
+msgid "ASSEMBLY_NO_RECEIVER"
+msgstr "Sem receptor: monte um receptor primeiro"
+
+msgid "ASSEMBLY_PART_DOES_NOT_FIT_RECEIVER"
+msgstr "Esta peça não serve neste receptor"
+
+msgid "ASSEMBLY_SOCKET_ALREADY_TAKEN"
+msgstr "Este encaixe já está ocupado"
+
+msgid "ASSEMBLY_CALIBRE_MISMATCH"
+msgstr "Calibre incompatível com o cano montado"
+
+msgid "ASSEMBLY_NO_PARTS"
+msgstr "Nenhuma peça para montar"

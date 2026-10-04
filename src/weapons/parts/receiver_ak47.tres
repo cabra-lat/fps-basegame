@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="WeaponPart" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/weapon_part.gd" id="1_part"]
+
+[resource]
+script = ExtResource("1_part")
+socket = "Receiver"
+fits_receiver = ""
+calibre = "any"
+scene = "res://src/weapons/weapon_ak47.tscn"
+display_name_override = "AK-47 receiver"

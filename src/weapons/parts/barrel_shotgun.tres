@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="WeaponPart" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/weapon_part.gd" id="1_part"]
+
+[resource]
+script = ExtResource("1_part")
+socket = "Barrel"
+fits_receiver = ""
+calibre = "12x70"
+scene = "res://src/weapons/barrel_shotgun.tscn"
+delta_firerate = -440
+delta_recoil_kick = 0.06
+display_name_override = "Shotgun barrel"

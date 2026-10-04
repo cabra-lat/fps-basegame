@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="WeaponPart" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/weapons/weapon_part.gd" id="1_part"]
+
+[resource]
+script = ExtResource("1_part")
+socket = "MagazinePoint"
+fits_receiver = ""
+calibre = "7.62"
+scene = "res://src/weapons/magazine_ak47.tscn"
+delta_reload_time = 0.3
+delta_ergonomics = -6
+display_name_override = "AK-47 magazine"
