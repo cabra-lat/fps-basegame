@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="RuntimeDebugVisualRegistry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/debug/runtime_debug_visual_registry.gd" id="1_reg"]
+
+[resource]
+script = ExtResource("1_reg")
+scripts = Array[String]([])
